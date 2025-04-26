@@ -1,0 +1,143 @@
+# Proje Amacı: Banka ekstre SMS ve E-postalarını okuyup, son ödeme tarihlerini ve kredi ilk ödeme tarihlerini listeleyen React Native/Capacitor Android uygulaması.
+
+# --- Genel Kurallar ---
+
+# Yoksayılacak Dizinler/Dosyalar (Performans ve Alaka Düzeyi için)
+ignore:
+  - node_modules/
+  - android/build/
+  - android/app/build/
+  - ios/Pods/
+  - ios/build/
+  - www/
+  - dist/
+  - .gradle/
+  - .idea/
+  - *.log
+  - coverage/
+
+# --- Bağlam Öncelikleri ---
+
+# Öncelikli Dizinler (Bu dizinlerdeki dosyalara daha fazla ağırlık ver)
+priority_dirs:
+  - src/
+  - src/pages/
+  - src/store/
+  - src/services/
+  - src/components/
+
+# Anahtar Dosyalar (Bu dosyalar genellikle önemlidir)
+key_files:
+  - src/App.tsx
+  - src/store/index.ts
+  - src/store/slices/authSlice.ts
+  - src/store/slices/permissionSlice.ts
+  - src/store/slices/dataSlice.ts
+  - src/store/slices/loadingSlice.ts
+  - src/services/gmail.service.ts
+  - src/services/calendar.service.ts
+  - src/services/sms-parsing/sms-processor.ts
+  - src/pages/LoginPage.tsx
+  - src/pages/AccountTab.tsx
+  - src/pages/ManualEntryTab.tsx
+  - src/pages/SettingsTab.tsx
+  - src/types/manual-entry.types.ts
+  - capacitor.config.ts
+  - package.json
+  - .cursorrules
+
+# Dil/Framework Bilgisi (AI'nın doğru araçları kullanmasına yardımcı olur)
+language: typescript
+framework: react
+platform: capacitor
+
+# --- Mevcut Durum ve Yapılanlar (React Native / Capacitor Projesi) ---
+
+# 1. Temel Kurulum ve Platform:
+#    - Capacitor kullanılarak React (TypeScript) ile mobil uygulama geliştirildi.
+#    - Android platformu hedeflendi.
+
+# 2. İzin Yönetimi:
+#    - Android için SMS okuma izni istendi ve yönetildi (`@plugins/sms-reader`).
+#    - İzin kontrolü ve isteme arayüzü `SettingsTab.tsx` içine taşındı.
+
+# 3. Google Entegrasyonu:
+#    - Google ile OAuth 2.0 girişi yapıldı (`@plugins/google-auth`). Giriş işlemi `LoginPage.tsx` sayfasına taşındı.
+#    - Başarılı giriş sonrası `idToken` alınıp Redux state'inde (`authSlice`) saklanıyor.
+#    - Gmail API kullanılarak e-postaları okuma izni alındı (sadece okuma).
+#    - `gmail.service.ts` ile Gmail API işlemleri (arama, detay alma, içerik çözme) yönetildi.
+#    - E-posta içeriği okunurken karakter kodlama sorunlarını (örn. Türkçe karakterler) önlemek için,
+#      `gmail.service.ts`'teki `decodeEmailBody` fonksiyonu `Content-Type` başlığındaki `charset` bilgisine göre
+#      (varsayılan UTF-8) `TextDecoder` API'sini kullanarak merkezi olarak çözme işlemi yapar.
+#    - Google Calendar API entegrasyonu yapıldı (`calendar.service.ts`).
+#        - `createEvent`: Yeni takvim etkinliği oluşturur.
+#        - `searchEvents`: Belirli bir başlık ve tarihe sahip etkinliğin var olup olmadığını kontrol eder.
+#        - (Dolaylı olarak AccountTab üzerinden) Kredi taksitlerinin tamamını takvime ekleme yeteneği kazandırıldı.
+
+# 4. Veri Ayrıştırma (Parsing):
+#    - **SMS:**
+#        - Native Android SMS okuyucu eklentisi (`SmsReaderPlugin.java`), belirtilen göndericilerden (`senders`)
+#          ve mesaj içeriğinde belirli bir anahtar kelime (`query`) geçen mesajları filtreleyerek getirme yeteneği kazandı.
+#        - `sms-processor.ts` içindeki `fetchAndParseStatements` ve `fetchAndParseLoans` fonksiyonları,
+#          her banka için ayrı ayrı `SmsReader.getMessages` çağrısı yaparak bu native filtrelemeyi kullanır.
+#          Her banka için tanımlı gönderici listesi (`smsSenderKeywords`) ve mesaja özel anahtar kelime
+#          (`smsStatementQueryKeyword` veya `smsLoanQueryKeyword`) filtre olarak gönderilir (Garanti kredi için keyword kaldırıldı, sonra geri alındı).
+#        - Her banka için sadece ilgili filtreye uyan *en yeni* SMS mesajı (ekstre veya kredi) işlenir.
+#        - Belirli bankalardan (QNB, Garanti BBVA) gelen ekstre ve kredi SMS'lerini ayrıştırmak için parser sınıfları/objeleri
+#          (`qnb-parser.ts`, `garanti-loan-parser.ts`) oluşturuldu.
+#        - QNB parser'ı (`qnb-parser.ts`) ekstre (`1,800.50` formatı için `parseStandardNumber`)
+#          ve kredi (`15.000,00` formatı için `parseTurkishNumber`) SMS'lerindeki farklı sayı formatlarını işler.
+#        - Garanti BBVA kredi parser'ı (`garanti-loan-parser.ts`), taksit tutarı ve ilk ödeme tarihi içermeyen SMS formatını işler.
+#    - **E-posta:**
+#        - Belirli bankalardan (Yapı Kredi, Ziraat Bankası) gelen ekstre e-postalarını ayrıştırmak için parser sınıfları
+#          (`yapikredi-email-parser.ts`, `ziraat-email-parser.ts`) oluşturuldu.
+#        - Ziraat parser'ı DD/MM/YYYY tarih formatını, dönem borcunu ve spesifik "<Ay Adı> Ayı E-Ekstre Servisi"
+#          konu başlığını işler. Regex'ler HTML yapısını ve olası hatalı etiketleri dikkate alır.
+#        - Yapı Kredi parser'ı "DD Ay YYYY" formatındaki tarihi ve toplam borcu ayrıştırır.
+#        - E-posta parser'larındaki manuel karakter kodlama düzeltmeleri ve esnek regex'ler (merkezi çözümleme sonrası) kaldırıldı.
+#    - `sms-processor.ts` içinde `statementProcessor` sınıfı ile hem SMS hem de e-posta kaynaklı ekstre/kredi verileri merkezi olarak işlendi.
+#    - Banka bazlı yapılandırmalar (`availableBankProcessors`) tanımlandı (SMS göndericileri, SMS sorgu anahtar kelimeleri (ekstre/kredi için ayrı),
+#      e-posta sorguları, parser'lar).
+
+# 5. State Yönetimi (Redux):
+#    - Kullanıcı oturumu (`idToken`), izinler ve ayrıştırılmış verileri yönetmek için Redux (`@reduxjs/toolkit`, `react-redux`) entegre edildi.
+#    - State'in kalıcılığı için `redux-persist` kullanıldı.
+#        - `authSlice` (kullanıcı/token), `permissionSlice` (SMS izni) ve `dataSlice` (ekstre/kredi listesi) kalıcı olarak depolandı (`localStorage`).
+#        - `dataSlice` artık otomatik ayrıştırılan ekstre/kredilere ek olarak manuel girilen kayıtları da (`ManualEntry` tipi) tutar.
+#        - `dataSlice` içinde manuel kayıt ekleme (`addManualEntry`) ve silme (`deleteManualEntry`) reducer'ları bulunur.
+#        - **`dataSlice` içindeki tarih alanları (`dueDate`, `firstPaymentDate`) artık Redux state'inde serialize edilebilir ISO string formatında saklanıyor.** Bu, "non-serializable value" uyarılarını önler.
+#        - **`fetchAndProcessDataThunk`, parser'lardan gelen `Date` nesnelerini state'e yazmadan önce ISO string'e çevirmekle sorumludur.**
+#        - `redux-persist` için kullanılan özel `dateTransform` (`src/store/transforms/dateTransform.ts`) basitleştirildi; artık state yüklenirken (rehydration) string'leri `Date` nesnesine geri **dönüştürmüyor**, çünkü state'in string formatında kalması hedefleniyor.
+#    - **Memoized Selector:** `dataSlice` içinde `createSelector` kullanılarak `selectAllDataWithDates` adında memoize edilmiş bir selector oluşturuldu. Bu selector, state'deki ISO tarih string'lerini okuyup bileşenlerin kullanması için tekrar `Date` nesnelerine çevirir ve gereksiz yeniden render'ları (re-renders) engeller. Bileşenler (`AccountTab.tsx` vb.) state'den veri okurken bu selector'ü kullanır.
+#    - `ParsedLoan` tipi, `installmentAmount` ve `firstPaymentDate` alanlarının `null` olmasına izin verecek şekilde güncellendi.
+#    - Bileşenlerde local state yerine Redux hook'ları (`useSelector`, `useDispatch`) kullanıldı.
+#    - `gmailService` ve `calendarService`, API istekleri için gerekli token bilgisini Redux store'dan (`state.auth.accessToken` içinde saklanan `idToken`) aldı.
+
+# 6. Kullanıcı Arayüzü (Ionic):
+#    - Ionic Framework bileşenleri kullanılarak sekmeli bir arayüz oluşturuldu (`App.tsx`).
+#    - Uygulama başlangıcında kullanıcı giriş yapmamışsa `LoginPage.tsx` gösterilir, giriş yapılmışsa sekmeli arayüz gösterilir (`App.tsx` içinde yönlendirme).
+#    - Tüm sekmelerde (`AccountTab.tsx`, `ManualEntryTab.tsx`, `SettingsTab.tsx`) başlığın (`<IonHeader>`)
+#      durum çubuğuna çok yakın olmasını önlemek için `className="ion-padding-top"` eklendi.
+#    - **LoginPage:** Google ile giriş yapma butonu içerir.
+#    - **AccountTab (Ekstreler Sekmesi):** Otomatik ayrıştırılmış en yeni ekstre/kredi verilerini VE **manuel olarak eklenen kayıtları** birleşik bir listede gösterir. SMS izni yoksa Ayarlar sekmesine yönlendirme mesajı gösterir. Otomatik ekstreler ve manuel kayıtlar için "Takvime Ekle" butonu içerir. Krediler için "Tüm Taksitleri Ekle" butonu bulunur (**bu buton, kredinin tüm taksitlerini hesaplar, hafta sonuna denk gelenleri Cuma'ya ayarlar ve her birini takvimde var olup olmadığını kontrol ederek ekler**). Öğelere tıklandığında detayları (orijinal mesaj içeriği dahil) gösteren bir modal açılır. **Manuel kayıtlarda sola kaydırarak silme özelliği vardır (`IonItemSliding`).**
+#    - **ManualEntryTab (Ekle Sekmesi):** Eskiden SMS listesiydi. Artık kullanıcıların manuel olarak ödeme/ekstre kaydı (Açıklama, Tutar, Son Ödeme Tarihi) girmesi için bir form içerir. Girilen kayıtları Redux'a (`dataSlice`) kaydeder.
+#    - **SettingsTab:** Google hesabından çıkış yapma ve SMS okuma iznini kontrol etme/isteme işlevlerini barındırır.
+#    - Stil düzenlemesi: Bileşenlerdeki inline stiller (`style` prop) ilgili CSS dosyalarına (`*.css`) taşındı ve `className` ile referans verildi.
+
+# 7. Web Mock'ları:
+#    - `sms-reader/web.ts` mock'u güncellenerek Garanti, Yapı Kredi, Ziraat için örnek SMS'ler eklendi ve Garanti mock'u `smsLoanQueryKeyword` filtresine uygun hale getirildi.
+#    - `google-auth/web.ts` mock'unda `trySilentSignIn` metodu aktif hale getirildi.
+
+# --- Değişiklik Kuralları ---
+# Parser ve Mock Dosyaları: `src/services/` altındaki `*parser.ts` veya `*mock.ts` ile biten dosyalarda değişiklik yapmadan önce kullanıcıdan ONAY ALINMALIDIR.
+
+# --- Sonraki Adımlar / İyileştirmeler (Olası) ---
+# - Daha fazla banka için SMS ve E-posta parser'ları eklemek.
+# - Yapı Kredi için SMS parser'ı eklemek (hem ekstre hem kredi?).
+# - Ayrıştırılmış **kredi** verilerini de Google Takvim'e etkinlik olarak ekleme özelliği (ilk ödeme tarihi baz alınarak).
+#    - Takvim etkinliği formatını/detaylarını iyileştirmek (örn. tutar, kart no).
+# - Arka planda periyodik veri kontrolü ve bildirim gönderme (Capacitor Background Runner / Push Notifications?).
+# - Daha detaylı hata yönetimi ve kullanıcıya geri bildirim (örn. API hataları, parse hataları için).
+# - Ayarlar sekmesini daha işlevsel hale getirmek (örn. hangi bankaların taranacağını seçme, bildirim ayarları, takvim seçimi).
+# - UI/UX iyileştirmeleri (örn. daha iyi yükleme göstergeleri, boş durum mesajları).
+# - Testler yazmak (Unit/Integration), özellikle parser'lar ve servisler için. 

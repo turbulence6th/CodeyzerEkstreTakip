@@ -1,0 +1,38 @@
+.error-card-content {
+  color: #856404;
+  background-color: #fff3cd;
+  border: 1px solid #ffeeba;
+}
+
+.fetch-data-button {
+  margin-top: 10px;
+}
+
+.permission-warning-text {
+  /* color: var(--ion-color-dark-shade, #333); // Eski koyu renk */
+  color: var(--ion-color-orange, #ff9500); /* Turuncu uyarı rengi, fallback ile */
+  font-weight: bold; /* Metni kalın yap */
+  margin-top: 10px;
+  font-size: small;
+}
+
+.calendar-button-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.calendar-check-spinner {
+  width: 16px;
+  height: 16px;
+}
+
+.calendar-action-button {
+  margin: 0;
+  padding: 0 4px;
+}
+
+/* Üstte görünen toast bildirimlerine başlık altı boşluğu ekle */
+.toast-wrapper.toast-top {
+  margin-top: 65px; /* Başlık yüksekliğine göre ayarlanabilir bir değer */
+} 

@@ -7,13 +7,17 @@ import {
   IonTabBar,
   IonTabButton,
   IonTabs,
-  setupIonicReact
+  setupIonicReact,
+  IonLoading
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
-import { ellipse, square, triangle } from 'ionicons/icons';
-import Tab1 from './pages/Tab1';
-import Tab2 from './pages/Tab2';
-import Tab3 from './pages/Tab3';
+import { addOutline, listCircleOutline, mailOutline, settingsOutline } from 'ionicons/icons';
+import AccountTab from './pages/AccountTab';
+import ManualEntryTab from './pages/ManualEntryTab';
+import SettingsTab from './pages/SettingsTab';
+import LoginPage from './pages/LoginPage';
+import { PersistGate } from 'redux-persist/integration/react';
+import ToastManager from './components/ToastManager';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -45,43 +49,82 @@ import '@ionic/react/css/palettes/dark.system.css';
 /* Theme variables */
 import './theme/variables.css';
 
+// Redux
+import { useSelector } from 'react-redux';
+import type { RootState } from './store';
+import { persistor } from './store';
+
 setupIonicReact();
 
-const App: React.FC = () => (
+const App: React.FC = () => {
+  // Global loading state'ini al
+  const isGlobalLoading = useSelector((state: RootState) => state.loading.isActive);
+  // Kullanıcının giriş yapıp yapmadığını kontrol et
+  const isAuthenticated = useSelector((state: RootState) => !!state.auth.accessToken);
+
+  return (
   <IonApp>
-    <IonReactRouter>
-      <IonTabs>
-        <IonRouterOutlet>
-          <Route exact path="/tab1">
-            <Tab1 />
-          </Route>
-          <Route exact path="/tab2">
-            <Tab2 />
-          </Route>
-          <Route path="/tab3">
-            <Tab3 />
-          </Route>
-          <Route exact path="/">
-            <Redirect to="/tab1" />
-          </Route>
-        </IonRouterOutlet>
-        <IonTabBar slot="bottom">
-          <IonTabButton tab="tab1" href="/tab1">
-            <IonIcon aria-hidden="true" icon={triangle} />
-            <IonLabel>Tab 1</IonLabel>
-          </IonTabButton>
-          <IonTabButton tab="tab2" href="/tab2">
-            <IonIcon aria-hidden="true" icon={ellipse} />
-            <IonLabel>Tab 2</IonLabel>
-          </IonTabButton>
-          <IonTabButton tab="tab3" href="/tab3">
-            <IonIcon aria-hidden="true" icon={square} />
-            <IonLabel>Tab 3</IonLabel>
-          </IonTabButton>
-        </IonTabBar>
-      </IonTabs>
-    </IonReactRouter>
+    <PersistGate loading={null} persistor={persistor}>
+      <ToastManager />
+      <IonReactRouter>
+        {isAuthenticated ? (
+            // Kullanıcı giriş yapmışsa ana sekmeleri göster
+            <IonTabs>
+              <IonRouterOutlet>
+                <Route exact path="/account">
+                  <AccountTab />
+                </Route>
+                <Route exact path="/statements">
+                  <AccountTab />
+                </Route>
+                <Route exact path="/add">
+                  <ManualEntryTab />
+                </Route>
+                <Route path="/settings">
+                  <SettingsTab />
+                </Route>
+                <Route exact path="/">
+                  <Redirect to="/statements" />
+                </Route>
+                {/* Eğer login sayfasına gitmeye çalışırsa anasayfaya yönlendir */}
+                <Route exact path="/login">
+                    <Redirect to="/statements" />
+                </Route>
+              </IonRouterOutlet>
+              <IonTabBar slot="bottom">
+                <IonTabButton tab="statements" href="/statements">
+                  <IonIcon aria-hidden="true" icon={listCircleOutline} />
+                  <IonLabel>Ekstreler</IonLabel>
+                </IonTabButton>
+                <IonTabButton tab="add" href="/add">
+                  <IonIcon aria-hidden="true" icon={addOutline} />
+                  <IonLabel>Ekle</IonLabel>
+                </IonTabButton>
+                <IonTabButton tab="settings" href="/settings">
+                  <IonIcon aria-hidden="true" icon={settingsOutline} />
+                  <IonLabel>Ayarlar</IonLabel>
+                </IonTabButton>
+              </IonTabBar>
+            </IonTabs>
+        ) : (
+            // Kullanıcı giriş yapmamışsa LoginPage'i göster
+            <IonRouterOutlet>
+                <Route exact path="/login">
+                    <LoginPage />
+                </Route>
+                {/* Diğer tüm yolları login'e yönlendir */}
+                <Redirect to="/login" />
+            </IonRouterOutlet>
+        )}
+      </IonReactRouter>
+    </PersistGate>
+      {/* Global Loading Göstergesi */}
+      <IonLoading 
+          isOpen={isGlobalLoading} 
+          message={'Lütfen bekleyin...'}
+      />
   </IonApp>
 );
+};
 
 export default App;
