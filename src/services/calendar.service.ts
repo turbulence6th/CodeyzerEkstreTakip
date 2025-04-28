@@ -73,42 +73,46 @@ class CalendarService {
     }
 
     /**
-     * Belirli bir özete ve tarihe sahip etkinlikleri Google Takvim'de arar.
-     * @param summary - Aranacak etkinliğin başlığı (tam eşleşme aranır).
-     * @param targetDate - Etkinliğin aranacağı tarih (YYYY-MM-DD formatında).
-     * @param timeZone - Zaman dilimi (örn: "Europe/Istanbul").
+     * Belirli bir AppID'ye sahip etkinliği Google Takvim'de arar.
+     * AppID'nin formatı: "[AppID: type_name_YYYY-MM-DD...]"
+     * @param appId - Aranacak etkinliğin AppID'si (örn: "[AppID: ekstre_yapikredi_2024-07-15]").
      * @returns Eşleşen etkinlik bulunursa true, bulunmazsa false döner.
      */
-    async searchEvents(
-        summary: string,
-        targetDate: string, // YYYY-MM-DD
-        timeZone: string = 'Europe/Istanbul'
-    ): Promise<boolean> {
+    async searchEvents(appId: string): Promise<boolean> {
+        // AppID'den tarihi çıkar (YYYY-MM-DD kısmını bul)
+        const dateMatch = appId.match(/(\d{4}-\d{2}-\d{2})/);
+        if (!dateMatch) {
+            console.error('CalendarService: Could not extract date from AppID:', appId);
+            // Tarih çıkarılamazsa geniş bir aralıkta arama yapmayı deneyebiliriz
+            // ancak bu daha yavaş olabilir. Şimdilik hata verelim veya false dönelim.
+            // return false; // Veya hata fırlat?
+            throw new Error(`AppID'den tarih çıkarılamadı: ${appId}`);
+        }
+        const targetDate = dateMatch[1]; // YYYY-MM-DD
+
         // timeMin ve timeMax için UTC RFC3339 formatını kullan
-        // targetDate'in YYYY-MM-DD olduğu varsayılıyor
         const startOfDayUtc = `${targetDate}T00:00:00Z`;
-        // Bitiş zamanı için bir sonraki günün başlangıcı
         const dateObj = new Date(targetDate + 'T00:00:00Z');
         dateObj.setUTCDate(dateObj.getUTCDate() + 1);
-        const endOfDayUtc = dateObj.toISOString(); // Bu zaten YYYY-MM-DDTHH:mm:ss.sssZ formatında olacak
+        const endOfDayUtc = dateObj.toISOString();
 
         const timeMin = startOfDayUtc;
         const timeMax = endOfDayUtc;
 
-        // API URL'si
-        // singleEvents=true -> Tekrarlayan etkinlikleri ayrı ayrı listeler
-        // q -> Tam metin araması yapar (özet, açıklama vb.)
-        // timeMin/timeMax -> Belirtilen tarih aralığındaki etkinlikleri filtreler
-        // maxResults=1 -> Eşleşen ilk etkinliği bulmak yeterli
-        const url = `${this.calendarApiBaseUrl}/calendars/primary/events?q=${encodeURIComponent(summary)}&timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&maxResults=1`;
+        // q parametresi olarak AppID'nin tamamını kullan
+        // AppID köşeli parantez içerdiği için encodeURIComponent kullanalım
+        const searchQuery = encodeURIComponent(appId);
 
-        console.log(`CalendarService: Searching events with query: "${summary}" on ${targetDate}`);
+        // API URL'si
+        // q araması açıklama dahil tüm alanlarda yapılır.
+        const url = `${this.calendarApiBaseUrl}/calendars/primary/events?q=${searchQuery}&timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&maxResults=1`;
+
+        console.log(`CalendarService: Searching event with AppID: "${appId}" within date: ${targetDate}`);
 
         try {
-            // fetch yerine fetchWithAuth kullan
             const response = await fetchWithAuth(url, {
                 method: 'GET',
-                headers: { 'Accept': 'application/json' }, // Auth header'ı fetchWithAuth ekler
+                headers: { 'Accept': 'application/json' },
             });
             const responseData = await response.json();
 
@@ -120,11 +124,21 @@ class CalendarService {
             console.log('CalendarService: Search response:', responseData);
 
             // Eğer 'items' dizisi varsa ve içinde en az bir etkinlik varsa, eşleşme bulunmuştur.
-            return responseData.items && responseData.items.length > 0;
+            // Google q parametresi bazen alakasız sonuçlar dönebileceği için,
+            // dönen sonucun açıklamasında gerçekten aradığımız AppID'nin olup olmadığını kontrol etmek daha güvenli olabilir.
+            if (responseData.items && responseData.items.length > 0) {
+                const foundEvent = responseData.items[0];
+                if (foundEvent.description && foundEvent.description.includes(appId)) {
+                    console.log(`CalendarService: Exact match found for AppID: ${appId}`);
+                    return true;
+                }
+                 console.log(`CalendarService: Found event(s) with query, but none contain the exact AppID in description. AppID: ${appId}`);
+            }
+            
+            return false; // Tam eşleşme bulunamadı
 
         } catch (error) {
             console.error('CalendarService: Error searching events:', error);
-            // Hata mesajı fetchWithAuth veya API'den gelir
             throw error;
         }
     }

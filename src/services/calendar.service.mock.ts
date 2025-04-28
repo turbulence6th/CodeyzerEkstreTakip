@@ -32,19 +32,14 @@ class CalendarServiceMock {
         return mockEvent;
     }
 
-    async searchEvents(
-        summary: string,
-        targetDate: string, // YYYY-MM-DD
-        timeZone: string = 'Europe/Istanbul'
-    ): Promise<boolean> {
-        console.log(`[Mock] CalendarService.searchEvents called for summary: "${summary}" on ${targetDate}`);
+    async searchEvents(appId: string): Promise<boolean> {
+        console.log(`[Mock] CalendarService.searchEvents called for AppID: "${appId}"`);
         await new Promise(res => setTimeout(res, MOCK_DELAY));
 
-        // Mock'ta oluşturulan etkinlikler arasında ara
+        // Mock'ta oluşturulan etkinliklerin açıklamalarında ara
         const found = createdEvents.some(event => {
-            // Tarih kısmını karşılaştır (ISO string'den YYYY-MM-DD al)
-            const eventDate = event.start.dateTime.substring(0, 10);
-            return event.summary === summary && eventDate === targetDate;
+            // Açıklama varsa ve AppID'yi içeriyorsa true dön
+            return event.description && event.description.includes(appId);
         });
 
         console.log(`[Mock] CalendarService.searchEvents returning: ${found}`);

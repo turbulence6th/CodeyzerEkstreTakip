@@ -36,7 +36,8 @@ import DisplayItemList from '../components/DisplayItemList'; // Yeni liste bile�
 
 // Utils importları
 import { formatDate, formatCurrency, formatTargetDate } from '../utils/formatting';
-import { isStatement, isManualEntry } from '../utils/typeGuards';
+import { generateAppId } from '../utils/identifiers';
+import { isStatement, isManualEntry, isLoan } from '../utils/typeGuards';
 
 type DisplayItem = ParsedStatement | ParsedLoan | ManualEntry;
 
@@ -114,43 +115,23 @@ const AccountTab: React.FC = () => {
 
       setIsCheckingCalendar(true);
       const newStatus: Record<string, boolean> = {};
-      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
       for (const item of displayItems) {
-        let itemKey = "";
-        let summary = "";
-        let targetDateForSearch = "";
+        // Her öğe tipi için doğru AppID'yi üret
+        // Krediler için, sadece ilk taksitin durumunu kontrol etmek UI için yeterli
+        const appIdToCheck = isLoan(item) ? generateAppId(item, 1) : generateAppId(item);
+
+        if (!appIdToCheck) {
+            console.warn('Could not generate AppID for calendar check:', item);
+            continue; // ID üretilemezse atla
+        }
 
         try {
-        if (isStatement(item) && item.dueDate) {
-            const targetDate = new Date(item.dueDate);
-            targetDateForSearch = formatTargetDate(targetDate);
-            summary = `${item.bankName} Kredi Kartı Son Ödeme`;
-            itemKey = `${item.bankName}-${targetDateForSearch}-${item.last4Digits || 'null'}`;
-            newStatus[itemKey] = await calendarService.searchEvents(summary, targetDateForSearch, timeZone);
-          } else if (isManualEntry(item) && item.dueDate) {
-            const targetDate = new Date(item.dueDate);
-            targetDateForSearch = formatTargetDate(targetDate);
-            summary = item.description;
-            itemKey = `manual-${item.id}`;
-            newStatus[itemKey] = await calendarService.searchEvents(summary, targetDateForSearch, timeZone);
-          } else if (!isStatement(item) && !isManualEntry(item)) {
-            const loan = item as ParsedLoan;
-            if (loan.firstPaymentDate && loan.termMonths) {
-                const targetDate = new Date(loan.firstPaymentDate);
-                targetDateForSearch = formatTargetDate(targetDate);
-                summary = `Kredi Taksidi - ${loan.bankName} - Taksit 1/${loan.termMonths}`;
-                itemKey = `loan-${loan.bankName}-${targetDateForSearch}-${loan.termMonths}`;
-                newStatus[itemKey] = await calendarService.searchEvents(summary, targetDateForSearch, timeZone);
-            }
-          }
+          // Üretilen AppID ile arama yap
+          newStatus[appIdToCheck] = await calendarService.searchEvents(appIdToCheck);
         } catch (error: any) {
-          console.error(`Error checking calendar status for item:`, item, error);
-          if (itemKey) {
-            if (isManualEntry(item) || isStatement(item)) {
-            newStatus[itemKey] = false;
-            }
-          }
+          console.error(`Error checking calendar status for AppID: ${appIdToCheck}`, item, error);
+          newStatus[appIdToCheck] = false; // Hata durumunda false ata
         }
       }
       console.log("AccountTab Effect: calendar status checked:", newStatus);
@@ -187,165 +168,168 @@ const AccountTab: React.FC = () => {
   };
 
   const handleAddToCalendar = async (item: ParsedStatement | ManualEntry) => {
-    if (!item.dueDate) { 
-        dispatch(addToast({ message: 'Etkinlik oluşturmak için son ödeme tarihi bilgisi eksik.', duration: 3000, color: 'warning', }));
+    const itemDate = isStatement(item) || isManualEntry(item) ? item.dueDate : null;
+    if (!itemDate) {
+        dispatch(addToast({ message: 'Etkinlik oluşturmak için tarih bilgisi eksik.', duration: 3000, color: 'warning', }));
+        return;
+    }
+    const itemKey = generateAppId(item);
+    if (!itemKey) {
+        dispatch(addToast({ message: 'Etkinlik için benzersiz kimlik oluşturulamadı.', duration: 3000, color: 'danger', }));
         return;
     }
 
     dispatch(startGlobalLoading());
     try {
-      const dueDate = new Date(item.dueDate);
-      // Saati 10:00 olarak ayarla
-      dueDate.setHours(10, 0, 0, 0); 
+      const dueDate = new Date(itemDate);
+      dueDate.setHours(10, 0, 0, 0);
       const startTime = dueDate;
       const endTime = new Date(startTime.getTime());
-      // Bitiş saatini 10:30 yapalım
-      endTime.setHours(10, 30, 0, 0); 
+      endTime.setHours(10, 30, 0, 0);
 
       const startTimeIsoForApi = startTime.toISOString();
       const endTimeIsoForApi = endTime.toISOString();
 
-      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const targetDateForSearch = formatTargetDate(dueDate);
-
       let summary = "";
       let description = "";
-      let itemKey = "";
 
       if (isManualEntry(item)) {
           summary = item.description;
           description = `Son Ödeme: ${formatDate(item.dueDate)}
 Tutar: ${formatCurrency(item.amount)}`;
-          itemKey = `manual-${item.id}`;
       } else {
           summary = `${item.bankName} Kredi Kartı Son Ödeme`;
           description = `Son Ödeme Tarihi: ${formatDate(item.dueDate)}`;
-      if (item.amount !== null && item.amount !== undefined) {
-         description += `\nSon Ödeme Tutarı: ${formatCurrency(item.amount)}`;
-      }
+          if (item.amount !== null && item.amount !== undefined) {
+             description += `\nSon Ödeme Tutarı: ${formatCurrency(item.amount)}`;
+          }
           if (item.last4Digits) {
                description += `\nKart: ...${item.last4Digits}`;
           }
-      description += `\nKaynak: ${item.source.toUpperCase()}`;
-          itemKey = `${item.bankName}-${targetDateForSearch}-${item.last4Digits || 'null'}`;
+          description += `\nKaynak: ${item.source.toUpperCase()}`;
       }
+
+      description += `\n\n${itemKey}`;
 
       if (calendarEventStatus[itemKey] === true) {
         console.log(`Event ${itemKey} already exists in calendar (checked from state).`);
         dispatch(addToast({ message: 'Bu etkinlik zaten takviminizde mevcut.', duration: 3000, color: 'warning', }));
+        dispatch(stopGlobalLoading());
         return;
       }
 
-      const exists = await calendarService.searchEvents(summary, targetDateForSearch, timeZone);
+      const exists = await calendarService.searchEvents(itemKey);
       if (exists) {
          console.log(`Event ${itemKey} already exists in calendar (checked via API).`);
          setCalendarEventStatus(prevStatus => ({ ...prevStatus, [itemKey]: true }));
         dispatch(addToast({ message: 'Bu etkinlik zaten takviminizde mevcut.', duration: 3000, color: 'warning', }));
+        dispatch(stopGlobalLoading());
         return;
       }
 
-      console.log(`Adding to calendar: ${summary} at ${startTimeIsoForApi}`);
-      await calendarService.createEvent(summary, description, startTimeIsoForApi, endTimeIsoForApi, timeZone);
+      console.log(`Adding to calendar: ${summary} for ${itemKey}`);
+      await calendarService.createEvent(summary, description, startTimeIsoForApi, endTimeIsoForApi);
       setCalendarEventStatus(prevStatus => ({ ...prevStatus, [itemKey]: true }));
       dispatch(addToast({ message: 'Etkinlik başarıyla takvime eklendi.', duration: 2000, color: 'success', }));
-
     } catch (error: any) {
       console.error('Error adding event to calendar:', error);
-      dispatch(addToast({ message: `Takvime eklenirken hata: ${error.message || 'Bilinmeyen bir hata oluştu.'}`, duration: 3000, color: 'danger', }));
+      dispatch(addToast({ message: `Takvime eklenirken hata oluştu: ${error.message || 'Bilinmeyen bir hata oluştu.'}`, duration: 3000, color: 'danger', }));
     } finally {
       dispatch(stopGlobalLoading());
     }
   };
 
   const handleAddAllInstallments = async (loan: ParsedLoan) => {
-    if (!loan.firstPaymentDate || !loan.termMonths || loan.termMonths <= 0) {
-      dispatch(addToast({ message: 'Taksitleri eklemek için ilk ödeme tarihi ve taksit sayısı bilgisi gereklidir.', duration: 3000, color: 'warning', }));
-      return;
+    if (!loan.firstPaymentDate || !loan.termMonths || !loan.installmentAmount) {
+        dispatch(addToast({ message: 'Taksitleri eklemek için ilk ödeme tarihi, vade ve taksit tutarı bilgisi gerekli.', duration: 3000, color: 'warning', }));
+        return;
     }
 
     setIsAddingInstallments(true);
+    dispatch(startGlobalLoading());
     let addedCount = 0;
     let skippedCount = 0;
+    let errorCount = 0;
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const originalFirstPaymentDate = new Date(loan.firstPaymentDate);
 
     try {
+      const firstPayment = new Date(loan.firstPaymentDate);
+
       for (let i = 0; i < loan.termMonths; i++) {
-        // Her taksit için tarihi hesapla
-        let installmentDate = addMonths(originalFirstPaymentDate, i); // 'let' olarak değiştirildi
+          let paymentDate = addMonths(firstPayment, i);
+          
+          const dayOfWeek = paymentDate.getDay();
+          if (dayOfWeek === 0) {
+              paymentDate.setDate(paymentDate.getDate() - 2);
+          } else if (dayOfWeek === 6) {
+              paymentDate.setDate(paymentDate.getDate() - 1);
+          }
 
-        // --- HAFTA SONU KONTROLÜ --- 
-        const dayOfWeek = installmentDate.getDay(); // 0: Pazar, 6: Cumartesi
-        if (dayOfWeek === 0) { // Pazar ise 2 gün geri git (Cuma)
-            installmentDate.setDate(installmentDate.getDate() - 2);
-            console.log(`Adjusted date from Sunday to Friday for installment ${i + 1}`);
-        } else if (dayOfWeek === 6) { // Cumartesi ise 1 gün geri git (Cuma)
-            installmentDate.setDate(installmentDate.getDate() - 1);
-            console.log(`Adjusted date from Saturday to Friday for installment ${i + 1}`);
-        }
-        // --- HAFTA SONU KONTROLÜ SONU ---
+          paymentDate.setHours(10, 0, 0, 0);
+          const startTime = paymentDate;
+          const endTime = new Date(startTime.getTime());
+          endTime.setHours(10, 30, 0, 0);
 
-        installmentDate.setHours(10, 0, 0, 0); // Saati 10:00 yapalım (örnek)
+          const startTimeIsoForApi = startTime.toISOString();
+          const endTimeIsoForApi = endTime.toISOString();
 
-        const startTime = installmentDate;
-        const endTime = new Date(startTime.getTime());
-        endTime.setHours(10, 30, 0, 0);
+          const installmentNumber = i + 1;
+          const summary = `Kredi Taksidi - ${loan.bankName} - Taksit ${installmentNumber}/${loan.termMonths}`;
+          const description = `Tutar: ${formatCurrency(loan.installmentAmount)}
+Banka: ${loan.bankName}
+Kaynak: ${loan.source.toUpperCase()}`;
+          
+          const installmentKey = generateAppId(loan, installmentNumber);
+          if (!installmentKey) {
+              console.warn(`Could not generate AppID for installment ${installmentNumber} of loan:`, loan);
+              errorCount++;
+              continue;
+          }
+          
+          const finalDescription = `${description}\n\n${installmentKey}`;
 
-        const startTimeIsoForApi = startTime.toISOString();
-        const endTimeIsoForApi = endTime.toISOString();
-        const targetDateForSearch = formatTargetDate(installmentDate);
+          try {
+              if (calendarEventStatus[installmentKey] === true) {
+                  console.log(`Installment ${installmentKey} already exists in calendar (checked from state).`);
+                  skippedCount++;
+                  continue;
+              }
 
-        const summary = `Kredi Taksidi - ${loan.bankName} - Taksit ${i + 1}/${loan.termMonths}`;
-        let description = `Banka: ${loan.bankName}`;
-        if (loan.installmentAmount !== null && loan.installmentAmount !== undefined) {
-            description += `\nTaksit Tutarı: ${formatCurrency(loan.installmentAmount)}`;
-        }
-         if (loan.loanAmount !== null && loan.loanAmount !== undefined) {
-            description += `\nToplam Kredi: ${formatCurrency(loan.loanAmount)}`;
-        }
-        if (loan.accountNumber) {
-             description += `\nHesap No: ...${loan.accountNumber.slice(-4)}`;
-        }
-        description += `\nKaynak: ${loan.source.toUpperCase()}`;
+              const exists = await calendarService.searchEvents(installmentKey);
+              if (exists) {
+                  console.log(`Installment ${installmentKey} already exists in calendar (checked via API).`);
+                  setCalendarEventStatus(prevStatus => ({ ...prevStatus, [installmentKey]: true }));
+                  skippedCount++;
+                  continue;
+              }
 
-        try {
-            const exists = await calendarService.searchEvents(summary, targetDateForSearch, timeZone);
+              console.log(`Adding installment to calendar: ${summary} for ${installmentKey}`);
+              await calendarService.createEvent(summary, finalDescription, startTimeIsoForApi, endTimeIsoForApi);
+              setCalendarEventStatus(prevStatus => ({ ...prevStatus, [installmentKey]: true }));
+              addedCount++;
 
-            if (exists) {
-                console.log(`Installment ${i + 1} already exists for ${loan.bankName}. Skipping.`);
-                skippedCount++;
-            } else {
-                console.log(`Adding installment ${i + 1} for ${loan.bankName} on ${targetDateForSearch}`);
-                await calendarService.createEvent(summary, description, startTimeIsoForApi, endTimeIsoForApi, timeZone);
-                addedCount++;
-            }
-
-            await new Promise(resolve => setTimeout(resolve, 250));
-
-        } catch (error: any) {
-             console.error(`Error processing installment ${i + 1} for ${loan.bankName}:`, error);
-             dispatch(addToast({ message: `${i + 1}. taksit işlenirken hata: ${error.message || 'Bilinmeyen hata'}. Diğer taksitler deneniyor.`, duration: 4000, color: 'danger', })); 
-             skippedCount++;
-        }
+          } catch (searchCreateError: any) {
+              console.error(`Error searching/creating calendar event for installment ${installmentKey}:`, searchCreateError);
+              errorCount++;
+          }
       }
-
-      let finalMessage = '';
-      if (addedCount > 0 && skippedCount > 0) {
-          finalMessage = `${addedCount} taksit başarıyla eklendi, ${skippedCount} taksit zaten mevcuttu veya hata oluştu.`;
-      } else if (addedCount > 0) {
-          finalMessage = `${addedCount} taksit başarıyla takvime eklendi.`;
-      } else if (skippedCount > 0) {
-           finalMessage = `Tüm ${skippedCount} taksit zaten takviminizde mevcut veya işlenirken hata oluştu.`;
-      } else {
-           finalMessage = 'Taksit ekleme işlemi tamamlandı ancak hiçbir taksit eklenmedi veya bulunamadı.';
-    }
-      dispatch(addToast({ message: finalMessage, duration: 3000, color: addedCount > 0 ? 'success' : 'warning', })); 
-
-    } catch (globalError: any) {
-        console.error('General error adding installments:', globalError);
-        dispatch(addToast({ message: `Taksitler eklenirken genel bir hata oluştu: ${globalError.message || 'Bilinmeyen hata'}`, duration: 3000, color: 'danger', })); 
+    } catch (loopError: any) {
+        console.error('Error processing installments:', loopError);
+        dispatch(addToast({ message: `Taksitler işlenirken bir hata oluştu: ${loopError.message || 'Bilinmeyen hata'}`, duration: 3000, color: 'danger', }));
     } finally {
+        dispatch(stopGlobalLoading());
         setIsAddingInstallments(false);
+        let resultMessage = "";
+        if (addedCount > 0) resultMessage += `${addedCount} taksit başarıyla eklendi. `; 
+        if (skippedCount > 0) resultMessage += `${skippedCount} taksit zaten mevcuttu. `; 
+        if (errorCount > 0) resultMessage += `${errorCount} taksit eklenirken hata oluştu.`;
+        if (!resultMessage) resultMessage = 'İşlem tamamlandı, eklenen veya güncellenen taksit yok.';
+        
+        dispatch(addToast({ 
+            message: resultMessage.trim(), 
+            duration: 4000, 
+            color: errorCount > 0 ? 'danger' : (addedCount > 0 ? 'success' : 'warning') 
+        }));
     }
   };
 

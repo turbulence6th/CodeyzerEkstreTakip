@@ -20,7 +20,8 @@ import {
     calendarOutline,
     chatbubbleEllipsesOutline,
     documentTextOutline,
-    trashOutline
+    trashOutline,
+    addOutline
 } from 'ionicons/icons';
 
 // Tipler
@@ -28,8 +29,9 @@ import type { ParsedStatement, ParsedLoan } from '../services/sms-parsing/types'
 import type { ManualEntry } from '../types/manual-entry.types';
 
 // Yeni utils'leri import et
-import { formatDate, formatCurrency, formatTargetDate } from '../utils/formatting';
-import { isStatement, isManualEntry } from '../utils/typeGuards';
+import { formatDate, formatCurrency } from '../utils/formatting';
+import { isStatement, isManualEntry, isLoan } from '../utils/typeGuards';
+import { generateAppId } from '../utils/identifiers';
 
 type DisplayItem = ParsedStatement | ParsedLoan | ManualEntry;
 
@@ -65,41 +67,23 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
             {items.length > 0 && (
                 <IonList lines="none">
                     {items.map((item, index) => {
-                        // Bu bileşene özgü anahtar oluşturma
-                        const key = `${item.source}-${item.source === 'manual' ? item.id : (item as any).bankName || 'unknown'}-${index}`;
-                        
-                        // Takvim durumu için anahtar ve durum kontrolleri
-                        let itemKeyForCalendarStatus = "";
-                        let isItemAddedToCalendar = false; // Ekstre/Manuel için
-                        let isFirstInstallmentAdded = false; // Kredi için
+                        const listKey = `${item.source}-${item.source === 'manual' ? item.id : (item as any).bankName || 'unknown'}-${index}`;
 
-                        try {
-                           if(isManualEntry(item)) {
-                                itemKeyForCalendarStatus = `manual-${item.id}`;
-                                isItemAddedToCalendar = !!calendarEventStatus[itemKeyForCalendarStatus];
-                            } else if (isStatement(item) && item.dueDate) {
-                                const targetDateForSearch = formatTargetDate(new Date(item.dueDate));
-                                itemKeyForCalendarStatus = `${item.bankName}-${targetDateForSearch}-${item.last4Digits || 'null'}`;
-                                isItemAddedToCalendar = !!calendarEventStatus[itemKeyForCalendarStatus];
-                            } else if (!isStatement(item) && !isManualEntry(item) && item.firstPaymentDate && item.termMonths) {
-                                const loan = item as ParsedLoan;
-                                if (loan.firstPaymentDate) {
-                                    const targetDateForSearch = formatTargetDate(new Date(loan.firstPaymentDate));
-                                    // Anahtar, takvim kontrolü sırasında kullanılanla aynı olmalı
-                                    itemKeyForCalendarStatus = `loan-${loan.bankName}-${targetDateForSearch}-${loan.termMonths}`;
-                                    isFirstInstallmentAdded = !!calendarEventStatus[itemKeyForCalendarStatus];
-                                }
-                            }
-                        } catch(e) {
-                            console.error("Error calculating calendar status key/check:", item, e);
-                        }
+                        // Takvim durumu için AppID'yi oluştur
+                        const appId = generateAppId(item);
+                        // Kredi taksitleri için ilk taksitin ID'sini oluştur (AddAll butonu için)
+                        const firstInstallmentAppId = isLoan(item) ? generateAppId(item, 1) : null;
+
+                        // Prop'tan gelen status objesini kullanarak durumu belirle
+                        const isAdded = appId ? !!calendarEventStatus[appId] : false;
+                        const isFirstInstallmentAdded = firstInstallmentAppId ? !!calendarEventStatus[firstInstallmentAppId] : false;
 
                         return (
-                            <IonItemSliding key={key}>
+                            <IonItemSliding key={listKey}>
                                 <IonItem onClick={() => onItemClick(item)} button detail={false}>
                                     <IonIcon
                                         slot="start"
-                                        icon={isManualEntry(item) ? documentTextOutline : item.source === 'email' ? mailOutline : item.source === 'sms' && isStatement(item) ? chatbubbleEllipsesOutline : cashOutline}
+                                        icon={isManualEntry(item) ? documentTextOutline : isStatement(item) && item.source === 'email' ? mailOutline : isStatement(item) && item.source === 'sms' ? chatbubbleEllipsesOutline : isLoan(item) ? cashOutline : addOutline}
                                         color={isManualEntry(item) ? "tertiary" : isStatement(item) ? "primary" : "success"}
                                     />
                                     <IonLabel>
@@ -115,13 +99,13 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                                                 <p>Son Ödeme: <strong>{formatDate(item.dueDate)}</strong></p>
                                                 <p>Tutar: <strong>{formatCurrency(item.amount)}</strong></p>
                                             </>
-                                        ) : (
+                                        ) : isLoan(item) ? (
                                             <>
                                                 <p>İlk Ödeme: <strong>{formatDate(item.firstPaymentDate)}</strong></p>
                                                 <p>Taksit Tutarı: <strong>{formatCurrency(item.installmentAmount)}</strong></p>
                                                 <p>Vade: <strong>{item.termMonths ? `${item.termMonths} Ay` : '-'}</strong></p>
                                             </>
-                                        )}
+                                        ) : null}
                                     </IonLabel>
                                     {(isStatement(item) || isManualEntry(item)) && (
                                         <IonButton
@@ -129,26 +113,26 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                                             fill="clear"
                                             size="small"
                                             onClick={(e) => { e.stopPropagation(); onAddToCalendar(item); }}
-                                            disabled={isItemAddedToCalendar || isCheckingCalendar || !item.dueDate}
+                                            disabled={isCheckingCalendar || isAdded || !item.dueDate}
                                             className="calendar-button"
                                         >
-                                            {isCheckingCalendar ? (
+                                            {isCheckingCalendar && appId && calendarEventStatus[appId] === undefined ? (
                                                 <IonSpinner name="crescent" style={{ width: '16px', height: '16px' }} />
                                             ) : (
-                                                <IonIcon slot="icon-only" icon={calendarOutline} color={isItemAddedToCalendar ? 'medium' : (isManualEntry(item) ? 'tertiary' : 'primary')} />
+                                                <IonIcon slot="icon-only" icon={calendarOutline} color={isAdded ? 'medium' : (isManualEntry(item) ? 'tertiary' : 'primary')} />
                                             )}
                                         </IonButton>
                                     )}
-                                    {!isStatement(item) && !isManualEntry(item) && item.termMonths && item.firstPaymentDate && (
+                                    {isLoan(item) && item.termMonths && item.firstPaymentDate && (
                                         <IonButton
                                             slot="end"
                                             fill="clear"
                                             size="small"
                                             onClick={(e) => { e.stopPropagation(); onAddAllInstallments(item); }}
-                                            disabled={isAddingInstallments || isCheckingCalendar || !item.firstPaymentDate || !item.termMonths || isFirstInstallmentAdded}
+                                            disabled={isAddingInstallments || isCheckingCalendar || isFirstInstallmentAdded || !item.firstPaymentDate || !item.termMonths}
                                             className="calendar-button"
                                         >
-                                            {isCheckingCalendar ? (
+                                            {isCheckingCalendar && firstInstallmentAppId && calendarEventStatus[firstInstallmentAppId] === undefined ? (
                                                 <IonSpinner name="crescent" style={{ width: '16px', height: '16px' }} />
                                             ) : (
                                                 <IonIcon slot="icon-only" icon={calendarOutline} color={isFirstInstallmentAdded ? 'medium' : 'success'} />

@@ -24,4 +24,15 @@ export function isStatement(item: DisplayItem): item is ParsedStatement {
  */
 export function isManualEntry(item: DisplayItem): item is ManualEntry {
     return item.source === 'manual';
+}
+
+/**
+ * Verilen öğenin bir ParsedLoan olup olmadığını kontrol eder.
+ */
+export function isLoan(item: DisplayItem): item is ParsedLoan {
+    // Eğer manuel değilse ve ekstre değilse, ParsedLoan olmalı.
+    // Daha kesin kontrol için loanAmount gibi bir özelliğin varlığını da kontrol edebiliriz,
+    // ancak isStatement kontrolü zaten firstPaymentDate'in varlığını dışladığı için
+    // bu genellikle yeterli olacaktır.
+    return !isManualEntry(item) && !isStatement(item);
 } 

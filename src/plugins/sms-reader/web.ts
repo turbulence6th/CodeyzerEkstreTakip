@@ -35,7 +35,7 @@ export class SmsReaderWeb extends WebPlugin implements SmsReaderPlugin {
       {
         id: 'mock_qnb_ekstre_1',
         address: 'QNB',
-        body: 'Bilgi: 3746 ile biten kartinizin borcu 1,800.50 TL, asgari borcu 721.00 TL, son odeme tarihi 24/12/2025. Ekstre detayiniz icin: https://sposta.qnb.com.tr/OeDNcVlo18f2  B002',
+        body: 'Bilgi: 0000 ile biten kartinizin borcu 1,800.50 TL, asgari borcu 721.00 TL, son odeme tarihi 24/12/2025. Ekstre detayiniz icin: https://sposta.qnb.com.tr/OeDNcVlo18f2  B002',
         date: Date.now() - 86400000,
       },
       {
@@ -65,7 +65,13 @@ export class SmsReaderWeb extends WebPlugin implements SmsReaderPlugin {
       {
         id: 'mock_kuveytturk_ekstre_1',
         address: 'KUVEYT TURK',
-        body: 'Degerli musterimiz, 6071 ile biten kartinizin ekstresi kesildi. Toplam Borc: 1.492,42 TL Asgari Odeme Tutari: 1.492,42 TL Son Odeme Tarihi: 10.07.2025 Kuveyt Turk Mobil uygulamanizdan ya da Cagri Merkezi 444 0 123\'u arayarak ayrintili bilgi alabilirsiniz. B002',
+        body: 'Degerli musterimiz, 0000 ile biten kartinizin ekstresi kesildi. Toplam Borc: 1.492,42 TL Asgari Odeme Tutari: 1.492,42 TL Son Odeme Tarihi: 10.07.2025 Kuveyt Turk Mobil uygulamanizdan ya da Cagri Merkezi 444 0 123\'u arayarak ayrintili bilgi alabilirsiniz. B002',
+        date: Date.now() - 8 * 24 * 60 * 60 * 1000,
+      },
+      {
+        id: 'mock_garanti_ekstre_1',
+        address: 'BONUS',
+        body: 'Degerli musterimiz, 0000 ile biten kartinizin 2,120.76 TL ekstresinin minimum tutarini odeyip, kalan kismini aylik %3.50 faizle (vergiler haric) 1 ay ertelemek icin 01.05.2025 tarihine kadar ATLAT yazip kartinizin son 6 hanesini 3340\'a gonderin. SMS almamak icin IPT yazip 3342\'ye ucretsiz gonderin. Mersis:0879001756600379 B001',
         date: Date.now() - 8 * 24 * 60 * 60 * 1000,
       },
     ];

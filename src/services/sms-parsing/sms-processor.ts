@@ -14,7 +14,7 @@ import { KuveytTurkSmsParser } from './parsers/kuveytturk-parser'; // Yeni parse
 
 // Kredi SMS Parser'ları
 import { qnbLoanParser } from './parsers/qnb-parser';
-import { garantiLoanParser } from './parsers/garanti-loan-parser'; // Yeni Garanti kredi parser'ını import et
+import { garantiLoanParser, GarantiParser } from './parsers/garanti-parser'; // Yeni Garanti kredi parser'ını import et
 
 // EMAIL Parser'ları
 import { yapikrediEmailParser } from '../email-parsing/parsers/yapikredi-email-parser';
@@ -46,8 +46,10 @@ export const availableBankProcessors: BankProcessor[] = [
   },
   {
       bankName: 'Garanti BBVA',
-      smsSenderKeywords: ['GARANTIBBVA', 'GARANTiBBVA'], // Kullanıcı tarafından güncellendi
+      smsSenderKeywords: ['GARANTIBBVA', 'GARANTiBBVA', 'BONUS'], // Kullanıcı tarafından güncellendi
+      smsStatementQueryKeyword: 'ekstresinin', // Ekstre için
       smsLoanQueryKeyword: 'ihtiyac krediniz', // Sadece kredi için
+      smsParser: new GarantiParser(),
       loanSmsParser: garantiLoanParser, 
   },
   // --- YENİ EKLENEN KUVEYT TÜRK ---

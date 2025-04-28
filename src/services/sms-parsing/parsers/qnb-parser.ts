@@ -1,32 +1,6 @@
 import { BankSmsParser, ParsedStatement, SmsDetails, ParsedLoan } from "../types";
 import { parseStandardNumber, parseTurkishNumber, parseDMYDate } from "../../../utils/parsing"; 
 
-// DD/MM/YYYY formatını Date objesine çevirme (saat dilimine dikkat!)
-function parseDate(dateStr: string): Date | null {
-  try {
-    const parts = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-    if (!parts) return null;
-    // JavaScript Date ay parametresi 0'dan başlar (0 = Ocak)
-    const day = parseInt(parts[1], 10);
-    const month = parseInt(parts[2], 10) - 1;
-    const year = parseInt(parts[3], 10);
-
-    // Tarihin geçerliliğini basitçe kontrol et (daha detaylı kontrol eklenebilir)
-    if (month < 0 || month > 11 || day < 1 || day > 31) return null;
-
-    // Yerel saat dilimine göre oluştur, saati öğlen yapalım ki gün değişimi sorun olmasın
-    const date = new Date(year, month, day, 12, 0, 0, 0);
-    // Eğer oluşturulan tarih, parse edilen yılla eşleşmiyorsa (örn. 31 Şubat), geçersizdir.
-     if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
-        return null;
-     }
-    return date;
-  } catch (error) {
-    console.error("Error parsing date:", dateStr, error);
-    return null;
-  }
-}
-
 export class QnbSmsParser implements BankSmsParser {
   private bankName = "QNB";
   // Gönderici isimlerini küçük harfe çevirip kontrol edeceğiz

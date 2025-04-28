@@ -45,6 +45,7 @@ key_files:
   - capacitor.config.ts
   - package.json
   - .cursorrules
+  - src/utils/parsing.ts
 
 # Dil/Framework Bilgisi (AI'nın doğru araçları kullanmasına yardımcı olur)
 language: typescript
@@ -70,9 +71,13 @@ platform: capacitor
 #      `gmail.service.ts`'teki `decodeEmailBody` fonksiyonu `Content-Type` başlığındaki `charset` bilgisine göre
 #      (varsayılan UTF-8) `TextDecoder` API'sini kullanarak merkezi olarak çözme işlemi yapar.
 #    - Google Calendar API entegrasyonu yapıldı (`calendar.service.ts`).
-#        - `createEvent`: Yeni takvim etkinliği oluşturur.
-#        - `searchEvents`: Belirli bir başlık ve tarihe sahip etkinliğin var olup olmadığını kontrol eder.
-#        - (Dolaylı olarak AccountTab üzerinden) Kredi taksitlerinin tamamını takvime ekleme yeteneği kazandırıldı.
+#        - **AppID Sistemi:** Takvim etkinliklerini güvenilir bir şekilde tanımlamak ve Türkçe karakter sorunlarını aşmak için,
+#          her ekstre/kredi/manuel kayıt için benzersiz bir `[AppID: ...]` kimliği üretilir (`src/utils/identifiers.ts` içinde `generateAppId`).
+#          Bu ID, Türkçe karakterler yerine İngilizce karşılıklarını içerir (örn. `ö` -> `o`) ve standart bir formatta (`[AppID: tip_isim_YYYY-MM-DD_taksit_N]`) oluşturulur.
+#        - `createEvent`: Yeni takvim etkinliği oluşturur. Etkinliğin **açıklama (description)** alanına ilgili öğenin **AppID**'si eklenir.
+#        - `searchEvents`: Artık başlık/tarih yerine, **AppID**'yi (`[AppID: ...]`) etkinlik açıklamasında arayarak etkinliğin var olup olmadığını kontrol eder.
+#          Arama, AppID içindeki tarihe göre ilgili gün ile sınırlandırılır.
+#        - Kredi taksitlerinin tamamı `AccountTab` üzerinden takvime eklenebilir. Her taksit için ayrı bir AppID (`_taksit_N` eki ile) üretilir ve kontrol edilir.
 
 # 4. Veri Ayrıştırma (Parsing):
 #    - **SMS:**
@@ -81,13 +86,17 @@ platform: capacitor
 #        - `sms-processor.ts` içindeki `fetchAndParseStatements` ve `fetchAndParseLoans` fonksiyonları,
 #          her banka için ayrı ayrı `SmsReader.getMessages` çağrısı yaparak bu native filtrelemeyi kullanır.
 #          Her banka için tanımlı gönderici listesi (`smsSenderKeywords`) ve mesaja özel anahtar kelime
-#          (`smsStatementQueryKeyword` veya `smsLoanQueryKeyword`) filtre olarak gönderilir (Garanti kredi için keyword kaldırıldı, sonra geri alındı).
+#          (`smsStatementQueryKeyword` veya `smsLoanQueryKeyword`) filtre olarak gönderilir.
 #        - Her banka için sadece ilgili filtreye uyan *en yeni* SMS mesajı (ekstre veya kredi) işlenir.
 #        - Belirli bankalardan (QNB, Garanti BBVA) gelen ekstre ve kredi SMS'lerini ayrıştırmak için parser sınıfları/objeleri
-#          (`qnb-parser.ts`, `garanti-loan-parser.ts`) oluşturuldu.
-#        - QNB parser'ı (`qnb-parser.ts`) ekstre (`1,800.50` formatı için `parseStandardNumber`)
-#          ve kredi (`15.000,00` formatı için `parseTurkishNumber`) SMS'lerindeki farklı sayı formatlarını işler.
-#        - Garanti BBVA kredi parser'ı (`garanti-loan-parser.ts`), taksit tutarı ve ilk ödeme tarihi içermeyen SMS formatını işler.
+#          (`qnb-parser.ts`, `garanti-parser.ts`) oluşturuldu.
+#          * `garanti-parser.ts` içinde:
+#             - `garantiLoanParser` objesi: Kredi onay SMS'lerini (taksit/tarih bilgisi olmayan) işler.
+#             - `GarantiParser` sınıfı: `BONUS` göndericisinden gelen ekstre SMS'lerini işler.
+#        - QNB parser'ı (`qnb-parser.ts`) farklı sayı formatlarını işler (bkz. `utils/parsing.ts`).
+#        - Garanti parser'ları da farklı sayı formatları için `utils/parsing.ts` içindeki yardımcıları kullanır.
+#        - Garanti BBVA kredi parser'ı (`garantiLoanParser`), taksit tutarı ve ilk ödeme tarihi içermeyen SMS formatını işler.
+#        - Garanti Bonus ekstre parser'ı (`GarantiParser`), `BONUS` göndericisinden gelen ve belirli formatta ekstre tutarı/tarihi içeren SMS'leri işler.
 #    - **E-posta:**
 #        - Belirli bankalardan (Yapı Kredi, Ziraat Bankası) gelen ekstre e-postalarını ayrıştırmak için parser sınıfları
 #          (`yapikredi-email-parser.ts`, `ziraat-email-parser.ts`) oluşturuldu.
@@ -119,14 +128,28 @@ platform: capacitor
 #    - Tüm sekmelerde (`AccountTab.tsx`, `ManualEntryTab.tsx`, `SettingsTab.tsx`) başlığın (`<IonHeader>`)
 #      durum çubuğuna çok yakın olmasını önlemek için `className="ion-padding-top"` eklendi.
 #    - **LoginPage:** Google ile giriş yapma butonu içerir.
-#    - **AccountTab (Ekstreler Sekmesi):** Otomatik ayrıştırılmış en yeni ekstre/kredi verilerini VE **manuel olarak eklenen kayıtları** birleşik bir listede gösterir. SMS izni yoksa Ayarlar sekmesine yönlendirme mesajı gösterir. Otomatik ekstreler ve manuel kayıtlar için "Takvime Ekle" butonu içerir. Krediler için "Tüm Taksitleri Ekle" butonu bulunur (**bu buton, kredinin tüm taksitlerini hesaplar, hafta sonuna denk gelenleri Cuma'ya ayarlar ve her birini takvimde var olup olmadığını kontrol ederek ekler**). Öğelere tıklandığında detayları (orijinal mesaj içeriği dahil) gösteren bir modal açılır. **Manuel kayıtlarda sola kaydırarak silme özelliği vardır (`IonItemSliding`).**
-#    - **ManualEntryTab (Ekle Sekmesi):** Eskiden SMS listesiydi. Artık kullanıcıların manuel olarak ödeme/ekstre kaydı (Açıklama, Tutar, Son Ödeme Tarihi) girmesi için bir form içerir. Girilen kayıtları Redux'a (`dataSlice`) kaydeder.
+#    - **AccountTab (Ekstreler Sekmesi):** Otomatik ayrıştırılmış en yeni ekstre/kredi verilerini VE **manuel olarak eklenen kayıtları** birleşik bir listede gösterir. SMS izni yoksa Ayarlar sekmesine yönlendirme mesajı gösterir.
+#        - **Takvim Entegrasyonu:** Öğelerin yanında takvim ikonu bulunur.
+#          - İkonun durumu (`calendarEventStatus` state'i ile), ilgili öğenin (veya kredinin ilk taksitinin) AppID'si kullanılarak takvimde olup olmadığını gösterir.
+#          - "Takvime Ekle" butonu (ekstre/manuel) veya "Tüm Taksitleri Ekle" butonu (kredi) ile etkinlikler oluşturulur.
+#          - Butonlar, etkinlik zaten takvimde varsa veya kontrol ediliyorsa devre dışı bırakılır.
+#        - Öğelere tıklandığında detayları (orijinal mesaj içeriği dahil) gösteren bir modal açılır.
+#        - Manuel kayıtlarda sola kaydırarak silme özelliği vardır (`IonItemSliding`).
+#    - **ManualEntryTab (Ekle Sekmesi):** Kullanıcıların manuel olarak ödeme/ekstre kaydı (Açıklama, Tutar, Son Ödeme Tarihi) girmesi için bir form içerir. Girilen kayıtları Redux'a (`dataSlice`) kaydeder.
 #    - **SettingsTab:** Google hesabından çıkış yapma ve SMS okuma iznini kontrol etme/isteme işlevlerini barındırır.
 #    - Stil düzenlemesi: Bileşenlerdeki inline stiller (`style` prop) ilgili CSS dosyalarına (`*.css`) taşındı ve `className` ile referans verildi.
+#    - **DisplayItemList Component:** `AccountTab` içindeki listeyi göstermek için ayrı bir bileşen (`src/components/DisplayItemList.tsx`) oluşturuldu. Bu bileşen, öğe tipine göre ikonları, verileri ve takvim butonlarını render eder.
 
-# 7. Web Mock'ları:
+# 7. Yardımcı Fonksiyonlar ve Tipler (Utilities):
+#    - **Type Guards (`src/utils/typeGuards.ts`):** Kod içinde `ParsedStatement`, `ParsedLoan`, `ManualEntry` tiplerini ayırt etmek için `isStatement`, `isManualEntry`, `isLoan` type guard fonksiyonları kullanılır. Bu, `if ('property' in object)` gibi manuel kontroller yerine daha merkezi ve okunabilir bir yöntem sağlar.
+#    - **AppID Generator (`src/utils/identifiers.ts`):** `generateAppId` fonksiyonu, takvim etkinliklerini benzersiz şekilde tanımlamak için standart formatta AppID üretir. Ayrıca, Türkçe karakterleri İngilizce karşılıkları ile değiştiren ve metni temizleyen (`normalizeAndSanitizeText`) ortak yardımcı fonksiyonları içerir.
+#    - **Formatting (`src/utils/formatting.ts`):** Tarih (`formatDate`, `formatTargetDate`) ve para birimi (`formatCurrency`) formatlama fonksiyonları içerir.
+#    - **Parsing (`src/utils/parsing.ts`):** Sayı formatlarını (örn. Türkçe `15.000` veya standart `2,120.76`) ayrıştırmak için yardımcı fonksiyonlar (`parseTurkishNumber`, `parseStandardNumber`) içerir.
+
+# 8. Web Mock'ları:
 #    - `sms-reader/web.ts` mock'u güncellenerek Garanti, Yapı Kredi, Ziraat için örnek SMS'ler eklendi ve Garanti mock'u `smsLoanQueryKeyword` filtresine uygun hale getirildi.
 #    - `google-auth/web.ts` mock'unda `trySilentSignIn` metodu aktif hale getirildi.
+#    - **`calendar.service.mock.ts`:** Gerçek servisteki AppID tabanlı `searchEvents` değişikliğini yansıtacak şekilde güncellendi.
 
 # --- Değişiklik Kuralları ---
 # Parser ve Mock Dosyaları: `src/services/` altındaki `*parser.ts` veya `*mock.ts` ile biten dosyalarda değişiklik yapmadan önce kullanıcıdan ONAY ALINMALIDIR.
@@ -134,10 +157,9 @@ platform: capacitor
 # --- Sonraki Adımlar / İyileştirmeler (Olası) ---
 # - Daha fazla banka için SMS ve E-posta parser'ları eklemek.
 # - Yapı Kredi için SMS parser'ı eklemek (hem ekstre hem kredi?).
-# - Ayrıştırılmış **kredi** verilerini de Google Takvim'e etkinlik olarak ekleme özelliği (ilk ödeme tarihi baz alınarak).
-#    - Takvim etkinliği formatını/detaylarını iyileştirmek (örn. tutar, kart no).
+# - Takvim etkinliği formatını/detaylarını iyileştirmek (örn. tutar, kart no).
 # - Arka planda periyodik veri kontrolü ve bildirim gönderme (Capacitor Background Runner / Push Notifications?).
 # - Daha detaylı hata yönetimi ve kullanıcıya geri bildirim (örn. API hataları, parse hataları için).
 # - Ayarlar sekmesini daha işlevsel hale getirmek (örn. hangi bankaların taranacağını seçme, bildirim ayarları, takvim seçimi).
-# - UI/UX iyileştirmeleri (örn. daha iyi yükleme göstergeleri, boş durum mesajları).
-# - Testler yazmak (Unit/Integration), özellikle parser'lar ve servisler için. 
+# - UI/UX iyileştirmeleri (örn. daha iyi yükleme göstergeleri, boş durum mesajları, `DisplayItemList`'teki takvim ikonu durumunun prop'tan okunması).
+# - Testler yazmak (Unit/Integration), özellikle parser'lar, servisler ve bileşenler için. 
