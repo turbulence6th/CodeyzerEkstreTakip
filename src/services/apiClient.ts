@@ -15,11 +15,14 @@ const processQueue = (error: Error | null, token: string | null = null) => {
         if (error || !token) {
             prom.reject(error);
         } else {
-            // Yeni token ile isteği tekrar dene (resolve/reject bu noktada devrediliyor)
-             if(prom.options.headers) {
-                 (prom.options.headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
-             }
-             fetch(prom.url, prom.options).then(prom.resolve).catch(prom.reject);
+            // prom.options, sıraya eklenirken klonlanan seçenekleri içerir
+            // Sıradaki istek için yeni token ile yeni seçenekler oluştur
+            const queuedOptions = { ...prom.options }; // Sıradaki öğenin seçeneklerini klonla
+            const headers = new Headers(queuedOptions.headers); // Başlıkları al
+            headers.set('Authorization', `Bearer ${token}`); // Yeni token ile güncelle
+            queuedOptions.headers = headers;
+
+            fetch(prom.url, queuedOptions).then(prom.resolve).catch(prom.reject); // Klonlanmış ve güncellenmiş seçeneklerle fetch yap
         }
     });
     failedRequestQueue = [];
@@ -35,79 +38,84 @@ const processQueue = (error: Error | null, token: string | null = null) => {
  */
 export const fetchWithAuth = async (url: string, options: RequestInit = {}, retried = false): Promise<Response> => {
     const state = store.getState();
-    const token = state.auth.accessToken;
+    const initialToken = state.auth.accessToken;
 
-    if (!token) {
+    if (!initialToken) {
         console.error('fetchWithAuth: No access token found. Forcing sign out.');
-        // Token yoksa doğrudan çıkış yap (veya login'e yönlendir)
-        store.dispatch(signOutFromGoogleThunk()); 
+        store.dispatch(signOutFromGoogleThunk());
         throw new Error('No access token available.');
     }
 
-    // Authorization başlığını ekle
-    const headers = new Headers(options.headers);
-    headers.set('Authorization', `Bearer ${token}`);
-    options.headers = headers;
+    // --- İlk Deneme için Seçenekleri Klonla ---
+    const firstAttemptOptions = { ...options };
+    const firstAttemptHeaders = new Headers(firstAttemptOptions.headers);
+    firstAttemptHeaders.set('Authorization', `Bearer ${initialToken}`);
+    firstAttemptOptions.headers = firstAttemptHeaders;
 
-    // Eğer şu anda token yenileniyorsa, isteği sıraya al
+    // Eğer token yenileniyorsa, isteği sıraya al (klonlanmış seçeneklerle)
     if (isRefreshing) {
         return new Promise((resolve, reject) => {
-            failedRequestQueue.push({ resolve, reject, url, options });
+            failedRequestQueue.push({ resolve, reject, url, options: firstAttemptOptions });
         });
     }
 
     try {
-        const response = await fetch(url, options);
+        // --- İlk Fetch Çağrısı ---
+        const response = await fetch(url, firstAttemptOptions); // Klonlanmış seçenekleri kullan
 
         if (response.status === 401 && !retried) {
             console.warn('fetchWithAuth: Received 401 Unauthorized. Attempting token refresh...');
-            isRefreshing = true; // Yenileme başladı
+            isRefreshing = true;
 
-            // Diğer istekleri bekletmek için Promise sarmalayıcısı
-             const retryPromise = new Promise<Response>((resolve, reject) => {
+            const retryPromise = new Promise<Response>((resolve, reject) => {
                  GoogleAuth.trySilentSignIn()
                     .then(async (newUser: GoogleUser) => {
                         console.log('fetchWithAuth: Silent sign-in successful. Updating token.');
-                        // Store'u yeni token ile güncelle (yeni action ile)
                         store.dispatch(setRefreshedCredentials(newUser));
-                        // Sıradaki istekleri işle (yeni token ile)
-                        processQueue(null, newUser.accessToken);
-                        // Bu isteği de yeni token ile tekrar dene
-                        if (options.headers) {
-                             (options.headers as Record<string, string>)['Authorization'] = `Bearer ${newUser.accessToken}`;
-                        }
-                         resolve(fetch(url, options)); // Tekrar denenen isteğin sonucunu döndür
+                        const newToken = newUser.accessToken;
+                        processQueue(null, newToken); // Sırayı yeni token ile işle
+
+                        // --- Tekrar Deneme için Seçenekleri Tekrar Klonla ---
+                        const retryOptions = { ...options }; // Orijinal seçenekleri tekrar klonla
+                        const retryHeaders = new Headers(retryOptions.headers);
+                        retryHeaders.set('Authorization', `Bearer ${newToken}`); // Yeni token'ı ayarla
+                        retryOptions.headers = retryHeaders;
+
+                        // --- Tekrar Deneme Fetch Çağrısı ---
+                        resolve(fetch(url, retryOptions)); // Tekrar deneme için klonlanmış seçenekleri kullan
                     })
                     .catch((err) => {
                         console.error('fetchWithAuth: Silent sign-in failed.', err);
                          const requiresLogin = err?.code === 'SIGN_IN_REQUIRED' || err?.message?.includes('SIGN_IN_REQUIRED');
-                         // Sıradaki istekleri hatayla reddet
-                         processQueue(new Error('Token refresh failed'), null);
+                         const refreshError = requiresLogin
+                            ? new Error('Session expired. Please sign in again.')
+                            : new Error('Failed to refresh token.');
+
+                         processQueue(refreshError, null); // Sırayı hata ile reddet
+
                          if (requiresLogin) {
                             console.error('Token refresh requires manual sign in. Signing out...');
                             store.dispatch(signOutFromGoogleThunk());
-                            reject(new Error('Session expired. Please sign in again.'));
-                         } else {
-                            reject(new Error('Failed to refresh token.'));
                          }
+                         reject(refreshError); // Mevcut promise'i reddet
                     })
                     .finally(() => {
-                        isRefreshing = false; // Yenileme bitti
+                        isRefreshing = false;
                     });
              });
-            return await retryPromise; // Yenileme ve tekrar deneme sonucunu bekle
-
+            return await retryPromise;
         } else if (!response.ok) {
-            // 401 dışında bir hata durumu
-            console.error(`fetchWithAuth: Request failed with status ${response.status}`, await response.text().catch(() => ''));
+            console.error(`fetchWithAuth: Request failed with status ${response.status} for URL ${url}`, await response.text().catch(() => '[Could not read response text]'));
             throw new Error(`Request failed with status ${response.status}`);
         }
 
-        // Başarılı yanıt
-        return response;
+        return response; // Başarılı yanıt
 
     } catch (error) {
-        console.error('fetchWithAuth: Network or other error', error);
-        throw error; // Hata tekrar fırlatılıyor
+        // Bizim tarafımızdan fırlatılan bilinen hataları tekrar loglama
+        if (!(error instanceof Error && (error.message.startsWith('Request failed with status') || error.message === 'Session expired. Please sign in again.' || error.message === 'Failed to refresh token.' || error.message === 'No access token available.'))) {
+           console.error('fetchWithAuth: Network or other error', error);
+        }
+        throw error; // Orijinal hatayı tekrar fırlat
     }
-}; 
+};

@@ -77,7 +77,14 @@ platform: capacitor
 #            - Başlangıçta `CapacitorHttp` kullanıldı ancak büyük eklerde veri kesilmesi sorunu yaşandı.
 #            - **Standart `fetch` API\'si (veya `fetchWithAuth` yardımcısı) kullanılarak bu sorun aşıldı.**
 #            - Gmail API\'den gelen ek verisi **Base64URL** formatındadır. Bu veri, native PDF parser\'a gönderilmeden önce TypeScript tarafında standart Base64 formatına (padding dahil) çevrilir (`isbank-email-parser.ts` içinde).
-#            - API çağrıları için gerekli token (`accessToken`) Redux store\'dan (`state.auth.accessToken`) istek anında alınır.
+#            - API çağrıları için gerekli token (`accessToken`) Redux store'dan (`state.auth.accessToken`) istek anında alınır.
+#    - **`apiClient.ts` (`fetchWithAuth`)**:
+#        - Tüm yetkilendirilmiş API istekleri için merkezi bir yardımcıdır.
+#        - Otomatik olarak `Authorization: Bearer <token>` başlığını ekler.
+#        - **Gelişmiş Token Yenileme:** 401 Unauthorized hatası alındığında `GoogleAuth.trySilentSignIn` ile token'ı yenilemeye çalışır.
+#            - Yenileme başarılı olursa, hem 401 alan orijinal isteği hem de o sırada bekleyen (kuyruktaki) diğer istekleri yeni token ile otomatik olarak tekrar dener.
+#            - Yenileme başarısız olursa (örneğin `SIGN_IN_REQUIRED`), kullanıcıyı bilgilendirir ve çıkış yaptırır.
+#            - **Yan Etki Düzeltmesi:** İstek seçenekleri (`options`) her `fetch` çağrısından önce klonlanır. Bu, token yenileme sırasında veya testlerde nesne referanslarının beklenmedik şekilde değiştirilmesini önler.
 #    - Google Calendar API entegrasyonu (`calendar.service.ts`).
 #        - **AppID Sistemi:** Takvim etkinliklerini tanımlamak için kullanılır (`src/utils/identifiers.ts`).
 #        - `createEvent` ve `searchEvents` (AppID ile) metodları.
@@ -105,36 +112,4 @@ platform: capacitor
 # 5. State Yönetimi (Redux):
 #    - Oturum (`accessToken`, `idToken`), izinler, ayrıştırılmış veriler yönetilir.
 #    - `redux-persist` ile state kalıcılığı (`authSlice`, `permissionSlice`, `dataSlice`).
-#    - `dataSlice` manuel kayıtları da tutar (`ManualEntry` tipi, `addManualEntry`, `deleteManualEntry`).
-#    - Tarihler state\'de ISO string olarak saklanır (`fetchAndProcessDataThunk` çevirir).
-#    - `dateTransform` artık rehydration\'da Date\'e çevirmiyor.
-#    - Memoized selector (`selectAllDataWithDates`) ile bileşenlere Date nesneleri sağlanır.
-#    - `ParsedLoan` ve `ParsedStatement` tipleri güncellendi (`source` alanı `'email-pdf'`, `'manual'` gibi değerleri içerebilir).
-
-# 6. Kullanıcı Arayüzü (Ionic):
-#    - Sekmeli arayüz (`App.tsx`, `LoginPage.tsx` yönlendirmesi).
-#    - Sekmeler: `AccountTab` (birleşik liste, takvim entegrasyonu, kaydırarak silme), `ManualEntryTab` (form), `SettingsTab` (çıkış, izin).
-#    - `DisplayItemList` bileşeni listeyi render eder.
-#    - CSS dosyaları ile stil yönetimi.
-
-# 7. Yardımcı Fonksiyonlar ve Tipler (Utilities):
-#    - Type Guards (`src/utils/typeGuards.ts`).
-#    - AppID Generator (`src/utils/identifiers.ts`).
-#    - Formatting (`src/utils/formatting.ts`).
-#    - Parsing (`src/utils/parsing.ts`).
-
-# 8. Web Mock'ları:
-#    - `sms-reader/web.ts`, `google-auth/web.ts`, `calendar.service.mock.ts` güncel.
-#    - `pdf-parser/web.ts` mock'u oluşturuldu.
-
-# --- Değişiklik Kuralları ---
-# Parser ve Mock Dosyaları: `src/services/` altındaki `*parser.ts` veya `*mock.ts` ile biten dosyalarda değişiklik yapmadan önce kullanıcıdan ONAY ALINMALIDIR.
-
-# --- Sonraki Adımlar / İyileştirmeler (Olası) ---
-# - Daha fazla banka için SMS ve E-posta (PDF dahil) parser'ları eklemek.
-# - Takvim etkinliği formatını/detaylarını iyileştirmek.
-# - Arka planda periyodik veri kontrolü ve bildirim gönderme.
-# - Daha detaylı hata yönetimi ve kullanıcıya geri bildirim (özellikle API'den bozuk veri gelmesi durumu).
-# - Ayarlar sekmesini daha işlevsel hale getirmek.
-# - UI/UX iyileştirmeleri.
-# - Testleri genişletmek (özellikle PDF parser ve native plugin için hata durumları). 
+#    - `dataSlice` manuel kayıtları da tutar (`ManualEntry` tipi, `addManualEntry`, `deleteManualEntry`
