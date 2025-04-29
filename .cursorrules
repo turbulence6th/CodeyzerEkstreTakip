@@ -15,6 +15,7 @@ ignore:
   - .idea/
   - *.log
   - coverage/
+  - android/app/src/test/ # Test dosyaları genellikle bağlam için gerekli değil
 
 # --- Bağlam Öncelikleri ---
 
@@ -25,6 +26,7 @@ priority_dirs:
   - src/store/
   - src/services/
   - src/components/
+  - android/app/src/main/java/com/codeyzer/ekstre/ # Native plugin kodları
 
 # Anahtar Dosyalar (Bu dosyalar genellikle önemlidir)
 key_files:
@@ -37,6 +39,7 @@ key_files:
   - src/services/gmail.service.ts
   - src/services/calendar.service.ts
   - src/services/sms-parsing/sms-processor.ts
+  - src/services/email-parsing/parsers/isbank-email-parser.ts # Yeni eklenen PDF parser
   - src/pages/LoginPage.tsx
   - src/pages/AccountTab.tsx
   - src/pages/ManualEntryTab.tsx
@@ -46,6 +49,8 @@ key_files:
   - package.json
   - .cursorrules
   - src/utils/parsing.ts
+  - android/app/src/main/java/com/codeyzer/ekstre/PdfParserPlugin.java # Yeni eklenen native plugin
+  - android/app/build.gradle # Native bağımlılıklar için önemli
 
 # Dil/Framework Bilgisi (AI'nın doğru araçları kullanmasına yardımcı olur)
 language: typescript
@@ -64,102 +69,72 @@ platform: capacitor
 
 # 3. Google Entegrasyonu:
 #    - Google ile OAuth 2.0 girişi yapıldı (`@plugins/google-auth`). Giriş işlemi `LoginPage.tsx` sayfasına taşındı.
-#    - Başarılı giriş sonrası `idToken` alınıp Redux state'inde (`authSlice`) saklanıyor.
+#    - Başarılı giriş sonrası `accessToken` ve `idToken` alınıp Redux state\'inde (`authSlice`) saklanıyor.
 #    - Gmail API kullanılarak e-postaları okuma izni alındı (sadece okuma).
-#    - `gmail.service.ts` ile Gmail API işlemleri (arama, detay alma, içerik çözme) yönetildi.
-#    - E-posta içeriği okunurken karakter kodlama sorunlarını (örn. Türkçe karakterler) önlemek için,
-#      `gmail.service.ts`'teki `decodeEmailBody` fonksiyonu `Content-Type` başlığındaki `charset` bilgisine göre
-#      (varsayılan UTF-8) `TextDecoder` API'sini kullanarak merkezi olarak çözme işlemi yapar.
-#    - Google Calendar API entegrasyonu yapıldı (`calendar.service.ts`).
-#        - **AppID Sistemi:** Takvim etkinliklerini güvenilir bir şekilde tanımlamak ve Türkçe karakter sorunlarını aşmak için,
-#          her ekstre/kredi/manuel kayıt için benzersiz bir `[AppID: ...]` kimliği üretilir (`src/utils/identifiers.ts` içinde `generateAppId`).
-#          Bu ID, Türkçe karakterler yerine İngilizce karşılıklarını içerir (örn. `ö` -> `o`) ve standart bir formatta (`[AppID: tip_isim_YYYY-MM-DD_taksit_N]`) oluşturulur.
-#        - `createEvent`: Yeni takvim etkinliği oluşturur. Etkinliğin **açıklama (description)** alanına ilgili öğenin **AppID**'si eklenir.
-#        - `searchEvents`: Artık başlık/tarih yerine, **AppID**'yi (`[AppID: ...]`) etkinlik açıklamasında arayarak etkinliğin var olup olmadığını kontrol eder.
-#          Arama, AppID içindeki tarihe göre ilgili gün ile sınırlandırılır.
-#        - Kredi taksitlerinin tamamı `AccountTab` üzerinden takvime eklenebilir. Her taksit için ayrı bir AppID (`_taksit_N` eki ile) üretilir ve kontrol edilir.
+#    - `gmail.service.ts` ile Gmail API işlemleri (arama, detay alma, içerik çözme, **ek alma**) yönetildi.
+#        - `decodeEmailBody`: E-posta içeriğini `Content-Type` başlığındaki `charset`\'e göre çözer.
+#        - **`getAttachment`**: E-posta eklerini almak için kullanılır.
+#            - Başlangıçta `CapacitorHttp` kullanıldı ancak büyük eklerde veri kesilmesi sorunu yaşandı.
+#            - **Standart `fetch` API\'si (veya `fetchWithAuth` yardımcısı) kullanılarak bu sorun aşıldı.**
+#            - Gmail API\'den gelen ek verisi **Base64URL** formatındadır. Bu veri, native PDF parser\'a gönderilmeden önce TypeScript tarafında standart Base64 formatına (padding dahil) çevrilir (`isbank-email-parser.ts` içinde).
+#            - API çağrıları için gerekli token (`accessToken`) Redux store\'dan (`state.auth.accessToken`) istek anında alınır.
+#    - Google Calendar API entegrasyonu (`calendar.service.ts`).
+#        - **AppID Sistemi:** Takvim etkinliklerini tanımlamak için kullanılır (`src/utils/identifiers.ts`).
+#        - `createEvent` ve `searchEvents` (AppID ile) metodları.
 
 # 4. Veri Ayrıştırma (Parsing):
 #    - **SMS:**
-#        - Native Android SMS okuyucu eklentisi (`SmsReaderPlugin.java`), belirtilen göndericilerden (`senders`)
-#          ve mesaj içeriğinde belirli bir anahtar kelime (`query`) geçen mesajları filtreleyerek getirme yeteneği kazandı.
-#        - `sms-processor.ts` içindeki `fetchAndParseStatements` ve `fetchAndParseLoans` fonksiyonları,
-#          her banka için ayrı ayrı `SmsReader.getMessages` çağrısı yaparak bu native filtrelemeyi kullanır.
-#          Her banka için tanımlı gönderici listesi (`smsSenderKeywords`) ve mesaja özel anahtar kelime
-#          (`smsStatementQueryKeyword` veya `smsLoanQueryKeyword`) filtre olarak gönderilir.
-#        - Her banka için sadece ilgili filtreye uyan *en yeni* SMS mesajı (ekstre veya kredi) işlenir.
-#        - Belirli bankalardan (QNB, Garanti BBVA) gelen ekstre ve kredi SMS'lerini ayrıştırmak için parser sınıfları/objeleri
-#          (`qnb-parser.ts`, `garanti-parser.ts`) oluşturuldu.
-#          * `garanti-parser.ts` içinde:
-#             - `garantiLoanParser` objesi: Kredi onay SMS'lerini (taksit/tarih bilgisi olmayan) işler.
-#             - `GarantiParser` sınıfı: `BONUS` göndericisinden gelen ekstre SMS'lerini işler.
-#        - QNB parser'ı (`qnb-parser.ts`) farklı sayı formatlarını işler (bkz. `utils/parsing.ts`).
-#        - Garanti parser'ları da farklı sayı formatları için `utils/parsing.ts` içindeki yardımcıları kullanır.
-#        - Garanti BBVA kredi parser'ı (`garantiLoanParser`), taksit tutarı ve ilk ödeme tarihi içermeyen SMS formatını işler.
-#        - Garanti Bonus ekstre parser'ı (`GarantiParser`), `BONUS` göndericisinden gelen ve belirli formatta ekstre tutarı/tarihi içeren SMS'leri işler.
+#        - Native SMS okuyucu eklentisi (`SmsReaderPlugin.java`) ile native filtreleme.
+#        - `sms-processor.ts` ile banka bazlı SMS işleme (`fetchAndParseStatements`, `fetchAndParseLoans`).
+#        - QNB, Garanti için SMS parser\'ları (`qnb-parser.ts`, `garanti-parser.ts`).
 #    - **E-posta:**
-#        - Belirli bankalardan (Yapı Kredi, Ziraat Bankası) gelen ekstre e-postalarını ayrıştırmak için parser sınıfları
-#          (`yapikredi-email-parser.ts`, `ziraat-email-parser.ts`) oluşturuldu.
-#        - Ziraat parser'ı DD/MM/YYYY tarih formatını, dönem borcunu ve spesifik "<Ay Adı> Ayı E-Ekstre Servisi"
-#          konu başlığını işler. Regex'ler HTML yapısını ve olası hatalı etiketleri dikkate alır.
-#        - Yapı Kredi parser'ı "DD Ay YYYY" formatındaki tarihi ve toplam borcu ayrıştırır.
-#        - E-posta parser'larındaki manuel karakter kodlama düzeltmeleri ve esnek regex'ler (merkezi çözümleme sonrası) kaldırıldı.
-#    - `sms-processor.ts` içinde `statementProcessor` sınıfı ile hem SMS hem de e-posta kaynaklı ekstre/kredi verileri merkezi olarak işlendi.
-#    - Banka bazlı yapılandırmalar (`availableBankProcessors`) tanımlandı (SMS göndericileri, SMS sorgu anahtar kelimeleri (ekstre/kredi için ayrı),
-#      e-posta sorguları, parser'lar).
+#        - Yapı Kredi, Ziraat için HTML içerik parser\'ları (`yapikredi-email-parser.ts`, `ziraat-email-parser.ts`).
+#        - **İş Bankası için PDF Ek Parser\'ı (`isbank-email-parser.ts`):**
+#            - E-postada PDF eki olup olmadığını kontrol eder.
+#            - `gmail.service.ts` kullanarak eki Base64URL olarak alır, standart Base64\'e çevirir.
+#            - **Native PDF Parser Eklentisi (`PdfParserPlugin.java`)**\'nı çağırır.
+#            - **Native Plugin:**
+#                - Android uyumlu **`com.tom-roush:pdfbox-android`** kütüphanesini kullanır (`android/app/build.gradle` içinde bağımlılık olarak eklenmiştir). Standart `org.apache.pdfbox` Android\'de çalışmaz (`java.awt` bağımlılığı).
+#                - **Önemli:** Plugin\'in düzgün çalışması için, plugin kodunda (`PdfParserPlugin.java`) `onCreate` veya metot çağrılmadan önce **`PDFBoxResourceLoader.init(getContext());`** çağrısı yapılmalıdır. Bu, `glyphlist.txt` gibi gerekli kaynak dosyalarının yüklenmesini sağlar. Aksi takdirde `GlyphList ... not found` hatası alınır.
+#                - Kod küçültme (ProGuard/R8) aktifse, `pdfbox-android` ve kaynak dosyalarının korunması için `proguard-rules.pro` dosyasına `-keep` kuralları eklenmelidir.
+#            - Native plugin\'den dönen metin içinde "Son Ödeme Tarihi" ve "Hesap Özeti Borcu" regex ile aranır ve veriler ayrıştırılır (`parseExtractedPdfText` fonksiyonu).
+#            - **API Veri Sorunları:** Gmail API\'den alınan Base64 verisinin **bazen bozuk veya eksik olabileceği** tespit edildi (örn. Base64 padding hatası, PDF trailer hatası). Bu durumlar `try-catch` ile yakalanır, hata loglanır ve ilgili e-posta atlanır (`null` döndürülür). Bozuk veriyi düzeltmek mümkün değildir.
+#    - `sms-processor.ts` içinde `statementProcessor` sınıfı ile tüm veriler merkezi olarak işlenir.
+#    - Banka bazlı yapılandırmalar (`availableBankProcessors`).
 
 # 5. State Yönetimi (Redux):
-#    - Kullanıcı oturumu (`idToken`), izinler ve ayrıştırılmış verileri yönetmek için Redux (`@reduxjs/toolkit`, `react-redux`) entegre edildi.
-#    - State'in kalıcılığı için `redux-persist` kullanıldı.
-#        - `authSlice` (kullanıcı/token), `permissionSlice` (SMS izni) ve `dataSlice` (ekstre/kredi listesi) kalıcı olarak depolandı (`localStorage`).
-#        - `dataSlice` artık otomatik ayrıştırılan ekstre/kredilere ek olarak manuel girilen kayıtları da (`ManualEntry` tipi) tutar.
-#        - `dataSlice` içinde manuel kayıt ekleme (`addManualEntry`) ve silme (`deleteManualEntry`) reducer'ları bulunur.
-#        - **`dataSlice` içindeki tarih alanları (`dueDate`, `firstPaymentDate`) artık Redux state'inde serialize edilebilir ISO string formatında saklanıyor.** Bu, "non-serializable value" uyarılarını önler.
-#        - **`fetchAndProcessDataThunk`, parser'lardan gelen `Date` nesnelerini state'e yazmadan önce ISO string'e çevirmekle sorumludur.**
-#        - `redux-persist` için kullanılan özel `dateTransform` (`src/store/transforms/dateTransform.ts`) basitleştirildi; artık state yüklenirken (rehydration) string'leri `Date` nesnesine geri **dönüştürmüyor**, çünkü state'in string formatında kalması hedefleniyor.
-#    - **Memoized Selector:** `dataSlice` içinde `createSelector` kullanılarak `selectAllDataWithDates` adında memoize edilmiş bir selector oluşturuldu. Bu selector, state'deki ISO tarih string'lerini okuyup bileşenlerin kullanması için tekrar `Date` nesnelerine çevirir ve gereksiz yeniden render'ları (re-renders) engeller. Bileşenler (`AccountTab.tsx` vb.) state'den veri okurken bu selector'ü kullanır.
-#    - `ParsedLoan` tipi, `installmentAmount` ve `firstPaymentDate` alanlarının `null` olmasına izin verecek şekilde güncellendi.
-#    - Bileşenlerde local state yerine Redux hook'ları (`useSelector`, `useDispatch`) kullanıldı.
-#    - `gmailService` ve `calendarService`, API istekleri için gerekli token bilgisini Redux store'dan (`state.auth.accessToken` içinde saklanan `idToken`) aldı.
+#    - Oturum (`accessToken`, `idToken`), izinler, ayrıştırılmış veriler yönetilir.
+#    - `redux-persist` ile state kalıcılığı (`authSlice`, `permissionSlice`, `dataSlice`).
+#    - `dataSlice` manuel kayıtları da tutar (`ManualEntry` tipi, `addManualEntry`, `deleteManualEntry`).
+#    - Tarihler state\'de ISO string olarak saklanır (`fetchAndProcessDataThunk` çevirir).
+#    - `dateTransform` artık rehydration\'da Date\'e çevirmiyor.
+#    - Memoized selector (`selectAllDataWithDates`) ile bileşenlere Date nesneleri sağlanır.
+#    - `ParsedLoan` ve `ParsedStatement` tipleri güncellendi (`source` alanı `'email-pdf'`, `'manual'` gibi değerleri içerebilir).
 
 # 6. Kullanıcı Arayüzü (Ionic):
-#    - Ionic Framework bileşenleri kullanılarak sekmeli bir arayüz oluşturuldu (`App.tsx`).
-#    - Uygulama başlangıcında kullanıcı giriş yapmamışsa `LoginPage.tsx` gösterilir, giriş yapılmışsa sekmeli arayüz gösterilir (`App.tsx` içinde yönlendirme).
-#    - Tüm sekmelerde (`AccountTab.tsx`, `ManualEntryTab.tsx`, `SettingsTab.tsx`) başlığın (`<IonHeader>`)
-#      durum çubuğuna çok yakın olmasını önlemek için `className="ion-padding-top"` eklendi.
-#    - **LoginPage:** Google ile giriş yapma butonu içerir.
-#    - **AccountTab (Ekstreler Sekmesi):** Otomatik ayrıştırılmış en yeni ekstre/kredi verilerini VE **manuel olarak eklenen kayıtları** birleşik bir listede gösterir. SMS izni yoksa Ayarlar sekmesine yönlendirme mesajı gösterir.
-#        - **Takvim Entegrasyonu:** Öğelerin yanında takvim ikonu bulunur.
-#          - İkonun durumu (`calendarEventStatus` state'i ile), ilgili öğenin (veya kredinin ilk taksitinin) AppID'si kullanılarak takvimde olup olmadığını gösterir.
-#          - "Takvime Ekle" butonu (ekstre/manuel) veya "Tüm Taksitleri Ekle" butonu (kredi) ile etkinlikler oluşturulur.
-#          - Butonlar, etkinlik zaten takvimde varsa veya kontrol ediliyorsa devre dışı bırakılır.
-#        - Öğelere tıklandığında detayları (orijinal mesaj içeriği dahil) gösteren bir modal açılır.
-#        - Manuel kayıtlarda sola kaydırarak silme özelliği vardır (`IonItemSliding`).
-#    - **ManualEntryTab (Ekle Sekmesi):** Kullanıcıların manuel olarak ödeme/ekstre kaydı (Açıklama, Tutar, Son Ödeme Tarihi) girmesi için bir form içerir. Girilen kayıtları Redux'a (`dataSlice`) kaydeder.
-#    - **SettingsTab:** Google hesabından çıkış yapma ve SMS okuma iznini kontrol etme/isteme işlevlerini barındırır.
-#    - Stil düzenlemesi: Bileşenlerdeki inline stiller (`style` prop) ilgili CSS dosyalarına (`*.css`) taşındı ve `className` ile referans verildi.
-#    - **DisplayItemList Component:** `AccountTab` içindeki listeyi göstermek için ayrı bir bileşen (`src/components/DisplayItemList.tsx`) oluşturuldu. Bu bileşen, öğe tipine göre ikonları, verileri ve takvim butonlarını render eder.
+#    - Sekmeli arayüz (`App.tsx`, `LoginPage.tsx` yönlendirmesi).
+#    - Sekmeler: `AccountTab` (birleşik liste, takvim entegrasyonu, kaydırarak silme), `ManualEntryTab` (form), `SettingsTab` (çıkış, izin).
+#    - `DisplayItemList` bileşeni listeyi render eder.
+#    - CSS dosyaları ile stil yönetimi.
 
 # 7. Yardımcı Fonksiyonlar ve Tipler (Utilities):
-#    - **Type Guards (`src/utils/typeGuards.ts`):** Kod içinde `ParsedStatement`, `ParsedLoan`, `ManualEntry` tiplerini ayırt etmek için `isStatement`, `isManualEntry`, `isLoan` type guard fonksiyonları kullanılır. Bu, `if ('property' in object)` gibi manuel kontroller yerine daha merkezi ve okunabilir bir yöntem sağlar.
-#    - **AppID Generator (`src/utils/identifiers.ts`):** `generateAppId` fonksiyonu, takvim etkinliklerini benzersiz şekilde tanımlamak için standart formatta AppID üretir. Ayrıca, Türkçe karakterleri İngilizce karşılıkları ile değiştiren ve metni temizleyen (`normalizeAndSanitizeText`) ortak yardımcı fonksiyonları içerir.
-#    - **Formatting (`src/utils/formatting.ts`):** Tarih (`formatDate`, `formatTargetDate`) ve para birimi (`formatCurrency`) formatlama fonksiyonları içerir.
-#    - **Parsing (`src/utils/parsing.ts`):** Sayı formatlarını (örn. Türkçe `15.000` veya standart `2,120.76`) ayrıştırmak için yardımcı fonksiyonlar (`parseTurkishNumber`, `parseStandardNumber`) içerir.
+#    - Type Guards (`src/utils/typeGuards.ts`).
+#    - AppID Generator (`src/utils/identifiers.ts`).
+#    - Formatting (`src/utils/formatting.ts`).
+#    - Parsing (`src/utils/parsing.ts`).
 
 # 8. Web Mock'ları:
-#    - `sms-reader/web.ts` mock'u güncellenerek Garanti, Yapı Kredi, Ziraat için örnek SMS'ler eklendi ve Garanti mock'u `smsLoanQueryKeyword` filtresine uygun hale getirildi.
-#    - `google-auth/web.ts` mock'unda `trySilentSignIn` metodu aktif hale getirildi.
-#    - **`calendar.service.mock.ts`:** Gerçek servisteki AppID tabanlı `searchEvents` değişikliğini yansıtacak şekilde güncellendi.
+#    - `sms-reader/web.ts`, `google-auth/web.ts`, `calendar.service.mock.ts` güncel.
+#    - `pdf-parser/web.ts` mock'u oluşturuldu.
 
 # --- Değişiklik Kuralları ---
 # Parser ve Mock Dosyaları: `src/services/` altındaki `*parser.ts` veya `*mock.ts` ile biten dosyalarda değişiklik yapmadan önce kullanıcıdan ONAY ALINMALIDIR.
 
 # --- Sonraki Adımlar / İyileştirmeler (Olası) ---
-# - Daha fazla banka için SMS ve E-posta parser'ları eklemek.
-# - Yapı Kredi için SMS parser'ı eklemek (hem ekstre hem kredi?).
-# - Takvim etkinliği formatını/detaylarını iyileştirmek (örn. tutar, kart no).
-# - Arka planda periyodik veri kontrolü ve bildirim gönderme (Capacitor Background Runner / Push Notifications?).
-# - Daha detaylı hata yönetimi ve kullanıcıya geri bildirim (örn. API hataları, parse hataları için).
-# - Ayarlar sekmesini daha işlevsel hale getirmek (örn. hangi bankaların taranacağını seçme, bildirim ayarları, takvim seçimi).
-# - UI/UX iyileştirmeleri (örn. daha iyi yükleme göstergeleri, boş durum mesajları, `DisplayItemList`'teki takvim ikonu durumunun prop'tan okunması).
-# - Testler yazmak (Unit/Integration), özellikle parser'lar, servisler ve bileşenler için. 
+# - Daha fazla banka için SMS ve E-posta (PDF dahil) parser'ları eklemek.
+# - Takvim etkinliği formatını/detaylarını iyileştirmek.
+# - Arka planda periyodik veri kontrolü ve bildirim gönderme.
+# - Daha detaylı hata yönetimi ve kullanıcıya geri bildirim (özellikle API'den bozuk veri gelmesi durumu).
+# - Ayarlar sekmesini daha işlevsel hale getirmek.
+# - UI/UX iyileştirmeleri.
+# - Testleri genişletmek (özellikle PDF parser ve native plugin için hata durumları). 
