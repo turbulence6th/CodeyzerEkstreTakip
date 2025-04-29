@@ -1,63 +1,58 @@
 import type { BankEmailParser, EmailDetails, ParsedStatement, DecodedEmailBody } from '../../sms-parsing/types'; // DecodedEmailBody import edildi
-import { parseTurkishDate, parseTurkishNumber } from "../../../utils/parsing"; // parseTurkishNumber da eklendi
+import { parseTurkishDate } from "../../../utils/parsing"; // parseTurkishNumber kaldırıldı
 
 export const yapikrediEmailParser: BankEmailParser = {
     bankName: 'Yapı Kredi',
 
     // canParse imzası güncellendi, body parametresi yeni tipi kullanıyor
     canParse(sender: string, subject: string, body: DecodedEmailBody): boolean {
-        return sender.includes('ekstre.yapikredi.com.tr') && 
+        // Gönderen ve konu kontrolü genellikle yeterlidir.
+        // Bu email formatında gövdede spesifik bir anahtar kelimeye gerek yok.
+        return sender.includes('yapikredi.com.tr') && // Daha genel bir kontrol
                subject.includes('Hesap Özeti');
-        // body içeriğine bakmaya gerek yok, gönderen ve konu yeterli
     },
 
     parse(email: EmailDetails): ParsedStatement | null {
         // HTML içeriğini önceliklendir
         const content = email.htmlBody || email.plainBody;
 
-        if (!content) return null;
+        if (!content) {
+            console.warn('Yapı Kredi Email Parser: Email content is empty.');
+            return null;
+        }
 
-        // --- Son Ödeme Tarihi --- 
+        // --- Son Ödeme Tarihi ---
         // "... son ödeme tarihi DD Ay YYYY olan ..." formatını ara
+        // "o" ve "ö" harflerini tolere et
         const dateMatch = content.match(/son [oö]deme tarihi (\d{1,2}\s+\S+\s+\d{4})\s+olan/i);
         const dateTr = dateMatch ? dateMatch[1] : null;
         const dueDate = dateTr ? parseTurkishDate(dateTr) : null;
 
         if (!dueDate) {
-            console.error('Yapı Kredi Email Parser: Could not parse due date.');
+            // Bu e-posta türünün ana bilgisi tarih olduğu için tarih bulunamazsa null dönmek mantıklı.
+            console.warn(`Yapı Kredi Email Parser (${email.id}): Could not parse due date from content.`);
             return null;
         }
 
-        // --- Toplam Borç --- 
-        // "Toplam Borç: 1.234,56 TL" formatını ara
-        const amountMatch = content.match(/Toplam Bor[cç]:?\s*([\d.,]+)\s*TL/i);
-        let amount: number | null = null;
-        if (amountMatch && amountMatch[1]) {
-            try {
-                // parseTurkishNumber kullanmaya gerek yok, standart parse yeterli
-                const amountStr = amountMatch[1].replace(/\./g, '').replace(/,/g, '.');
-                amount = parseFloat(amountStr);
-            } catch (e) {
-                console.error('Yapı Kredi Email Parser: Error parsing amount string:', amountMatch[1], e);
-            }
+        // --- Toplam Borç ---
+        // Bu email formatında tutar bilgisi bulunmuyor.
+        const amount: number | null = null;
+
+        // --- Kart Numarası (Son 4 Hane) ---
+        // "XXXXXX******XXXX numaralı kartınıza" formatını ara
+        const cardMatch = content.match(/(\d{6})\*{6}(\d{4})\s+numaral[ıi]/i); // İlk 6 ve son 4 haneyi yakalar
+        const last4Digits = cardMatch && cardMatch[2] ? cardMatch[2] : undefined; // İkinci grup son 4 hanedir
+
+        if (!last4Digits) {
+             console.warn(`Yapı Kredi Email Parser (${email.id}): Could not parse last 4 digits of card number.`);
         }
 
-        // Kart Numarası (opsiyonel) - Genellikle e-postalarda tam olmaz
-        // Örnek: "Kart Numarası: XXXX XXXX XXXX 1234"
-        const cardMatch = content.match(/Kart Numaras[ıi]:?\s*.*(\d{4})\s*</i); // Son 4 hane
-        const last4Digits = cardMatch ? cardMatch[1] : null;
-
-        if (amount === null) {
-             console.warn('Yapı Kredi Email Parser: Could not parse amount.');
-             // Tutar bulunamasa bile tarihi loglayabiliriz belki?
-             // return null; // Tutar yoksa null dönebiliriz veya tutarı 0 varsayabiliriz.
-        }
-
+        // Tarih bulunduğundan ve tutar zaten beklenmediğinden, bilgileri döndür.
         return {
             bankName: this.bankName,
             dueDate: dueDate,
-            amount: amount, // null olabilir
-            last4Digits: last4Digits === null ? undefined : last4Digits, // null ise undefined yap
+            amount: amount, // Tutar bu formatta bulunmadığı için her zaman null olacak
+            last4Digits: last4Digits, // Bulunduysa eklenir, bulunmadıysa undefined olur
             source: 'email',
             originalMessage: email,
         };

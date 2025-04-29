@@ -5,7 +5,7 @@ import { yapikrediEmailParser } from '../yapikredi-email-parser'; // Parser'ı i
 import type { EmailDetails, DecodedEmailBody } from '../../../sms-parsing/types';
 
 // Mock HTML dosyasının yolu
-const mockHtmlPath = path.resolve(__dirname, '../../mocks/yapikredi-ekstre-sample.html');
+const mockHtmlPath = path.resolve(__dirname, 'mocks/yapikredi-ekstre-sample.html');
 
 describe('Yapı Kredi Email Parser', () => {
     let mockHtmlContent: string;
@@ -100,10 +100,11 @@ describe('Yapı Kredi Email Parser', () => {
                      expect(result.dueDate.getFullYear()).toBe(2024);
                      expect(result.dueDate.getMonth()).toBe(4); // 
                      expect(result.dueDate.getDate()).toBe(25);
-                 }
+                }
 
                 // Tutarın null olmasını bekle (çünkü mock HTML'de Toplam Borç yok)
                 expect(result.amount).toBeNull(); 
+                expect(result.last4Digits).toBe('0000')
             }
         });
     });

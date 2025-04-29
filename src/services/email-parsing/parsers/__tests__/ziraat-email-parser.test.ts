@@ -5,7 +5,7 @@ import { ziraatEmailParser } from '../ziraat-email-parser'; // Parser'ı import 
 import type { EmailDetails, DecodedEmailBody } from '../../../sms-parsing/types';
 
 // Mock HTML dosyasının yolu (test dosyasının konumuna göre ayarla)
-const mockHtmlPath = path.resolve(__dirname, '../../mocks/ziraat-ekstre-sample.html');
+const mockHtmlPath = path.resolve(__dirname, 'mocks/ziraat-ekstre-sample.html');
 
 describe('Ziraat Email Parser', () => {
     let mockHtmlContent: string;
