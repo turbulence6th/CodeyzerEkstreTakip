@@ -44,7 +44,11 @@ describe('IsbankEmailParser', () => {
     Some footer text.
   `;
 
-  const mockBase64PdfData = 'dGVzdF9wZGZfY29udGVudA=='; // Dummy base64 data
+  // Mock Base64 data returned by getAttachment (needs to be Base64URL format initially)
+  const mockBase64UrlPdfData = 'dGVzdF9wZGZfY29udGVudA'; // No padding, URL safe
+  // The parser converts this to standard Base64 before sending to the plugin
+  const expectedBase64StandardPdfData = 'dGVzdF9wZGZfY29udGVudA==';
+
 
   const sampleEmail: EmailDetails = {
     id: 'isbank-test-123',
@@ -59,7 +63,7 @@ describe('IsbankEmailParser', () => {
         parts: [
           { mimeType: 'text/plain', body: { size: 100 } },
           {
-            mimeType: 'application/pdf',
+            mimeType: 'application/octet-stream',
             filename: 'hesap_ozeti_isbank.pdf',
             body: { attachmentId: 'att-isbank-pdf-1' },
           },
@@ -70,18 +74,24 @@ describe('IsbankEmailParser', () => {
 
    const expectedDate = new Date(Date.UTC(2025, 6, 22)); // July 22, 2025 (Month is 0-indexed)
 
-  const expectedStatement: Omit<ParsedStatement, 'originalMessage'> = {
-    bankName: 'İş Bankası',
-    dueDate: expectedDate,
-    amount: 2001.44,
-    source: 'email', // Source should be 'email' according to the updated parser logic
-  };
+   // Updated expectedStatement to include last4Digits from mockPdfText
+   const expectedStatement: Omit<ParsedStatement, 'originalMessage'> = {
+     bankName: 'İş Bankası',
+     dueDate: expectedDate,
+     amount: 2001.44,
+     source: 'email', // Source should be 'email'
+     last4Digits: '0000', // Extracted from mockPdfText "0000********0000"
+   };
 
   // --- Happy Path Test --- //
 
   it('should parse statement correctly when PDF attachment is present and valid', async () => {
     // Arrange: Setup mock implementations
-    vi.mocked(gmailService.getAttachment).mockResolvedValue({ data: mockBase64PdfData });
+    // Mock getAttachment to return both size and data (as base64url)
+    vi.mocked(gmailService.getAttachment).mockResolvedValue({
+        data: mockBase64UrlPdfData,
+        size: mockBase64UrlPdfData.length // Add size property
+    });
 
     const mockParseResult: ParsePdfResult = {
       text: mockPdfText,
@@ -93,18 +103,24 @@ describe('IsbankEmailParser', () => {
 
     // Assert: Check the results
     expect(result).not.toBeNull();
-    expect(result?.bankName).toBe(expectedStatement.bankName);
-    expect(result?.amount).toBe(expectedStatement.amount);
-    // Compare date timestamps for reliable comparison
+    // Use partial object matching to avoid issues if originalMessage differs slightly in mocks
+    expect(result).toMatchObject({
+        bankName: expectedStatement.bankName,
+        amount: expectedStatement.amount,
+        source: expectedStatement.source,
+        last4Digits: expectedStatement.last4Digits,
+    });
+    // Compare date timestamps separately
     expect(result?.dueDate?.getTime()).toBe(expectedStatement.dueDate.getTime());
-    expect(result?.source).toBe(expectedStatement.source);
-    // Check original message is passed correctly
+    // Check original message is passed correctly (optional, but good practice)
     expect(result?.originalMessage).toEqual(sampleEmail);
+
 
     // Verify mocks were called
     expect(gmailService.getAttachment).toHaveBeenCalledOnce();
     expect(gmailService.getAttachment).toHaveBeenCalledWith(sampleEmail.id, 'att-isbank-pdf-1');
     expect(PdfParser.parsePdfText).toHaveBeenCalledOnce();
-    expect(PdfParser.parsePdfText).toHaveBeenCalledWith({ base64Data: mockBase64PdfData });
+    // Verify it's called with the standard base64 version after conversion
+    expect(PdfParser.parsePdfText).toHaveBeenCalledWith({ base64Data: expectedBase64StandardPdfData });
   });
-}); 
+});

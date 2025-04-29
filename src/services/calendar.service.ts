@@ -34,14 +34,12 @@ class CalendarService {
                 dateTime: endTimeIso,
                 timeZone: timeZone,
             },
-            // İsteğe bağlı: Hatırlatıcı ekleyebilirsiniz
-            // reminders: {
-            //   useDefault: false,
-            //   overrides: [
-            //     { method: 'popup', minutes: 30 }, // 30 dakika önce bildirim
-            //     { method: 'email', minutes: 60 } // 1 saat önce e-posta
-            //   ],
-            // },
+            reminders: {
+                useDefault: false,
+                overrides: [
+                  { method: 'popup', minutes: 0 }, // Etkinlik zamanında popup bildirimi
+                ],
+              },
         };
 
         const url = `${this.calendarApiBaseUrl}/calendars/primary/events`;

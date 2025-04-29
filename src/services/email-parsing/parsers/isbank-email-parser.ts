@@ -1,7 +1,6 @@
 import { BankEmailParser, ParsedStatement, EmailDetails, DecodedEmailBody } from '../../sms-parsing/types'; // Tipleri sms-parsing'den alıyoruz
 import { gmailService } from '../../index'; // Gmail servisi
 // import { Plugins } from '@capacitor/core'; // Eski import
-import { registerPlugin } from '@capacitor/core'; // Yeni import
 import { parseTurkishNumber } from '../../../utils/parsing'; // Sayı ayrıştırma yardımcısını ekle
 
 // Varsayımsal PdfParser plugin tanımını import edelim
@@ -13,9 +12,20 @@ async function parseExtractedPdfText(pdfText: string, emailDetails: EmailDetails
 
     const dueDateRegex = /Son Ödeme Tarihi\s*:\s*(\d{2}\.\d{2}\.\d{4})/i;
     const amountRegex = /Hesap Özeti Borcu\s*:\s*([\d.,]+)\s*TL/i;
+    // Kart numarasının son 4 hanesini yakalamak için regex (XXXX********XXXX formatı)
+    const cardLast4Regex = /\b(\d{4})\s*\*{4}\s*\*{4}\s*(\d{4})\b/; // İlk 4 ve son 4'ü yakalar
 
     const dueDateMatch = pdfText.match(dueDateRegex);
     const amountMatch = pdfText.match(amountRegex);
+    const cardMatch = pdfText.match(cardLast4Regex);
+
+    let last4Digits: string | undefined = undefined;
+    if (cardMatch && cardMatch[2]) {
+        last4Digits = cardMatch[2];
+        console.log(`[Isbank PDF Parser - ${emailId}] Found last 4 digits: ${last4Digits}`);
+    } else {
+        console.warn(`[Isbank PDF Parser - ${emailId}] Could not find card number pattern (XXXX********XXXX) in extracted PDF text.`);
+    }
 
     if (dueDateMatch && dueDateMatch[1] && amountMatch && amountMatch[1]) {
         try {
@@ -44,13 +54,16 @@ async function parseExtractedPdfText(pdfText: string, emailDetails: EmailDetails
              }
 
             console.log(`[Isbank PDF Parser - ${emailId}] Successfully parsed from PDF.`);
-            return {
+            // Dönüş objesine last4Digits'i ekle (varsa)
+            const parsedData: ParsedStatement = {
                 bankName: 'İş Bankası',
                 amount: amount,
                 dueDate: dueDate,
                 source: 'email',
-                originalMessage: emailDetails
+                originalMessage: emailDetails,
+                last4Digits: last4Digits
             };
+            return parsedData;
 
         } catch (e) {
             console.error(`[Isbank PDF Parser - ${emailId}] Error parsing extracted values from PDF:`, e);
