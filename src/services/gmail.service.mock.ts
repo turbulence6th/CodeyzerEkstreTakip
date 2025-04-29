@@ -153,6 +153,25 @@ class GmailServiceMock {
          console.warn('[Mock] decodeEmailBody did not find mockBody in received structure:', emailDetailsResponse);
          return { plainBody: null, htmlBody: null };
     }
+
+    // Mock getAttachment metodu
+    async getAttachment(messageId: string, attachmentId: string): Promise<any> {
+        console.log(`[Mock] GmailService.getAttachment called for messageId: ${messageId}, attachmentId: ${attachmentId}`);
+
+        // Hangi mesaj ve ek için sahte veri döndüreceğimizi belirleyebiliriz.
+        // Şimdilik basit bir base64 kodlu "Mock PDF Content" döndürelim.
+        if (messageId === 'isbank-pdf-test-id' && attachmentId === 'isbank-pdf-attachment-id') {
+            const mockBase64Pdf = btoa("Mock PDF Content for Isbank"); // Metni base64'e çevir
+            return Promise.resolve({
+                size: mockBase64Pdf.length,
+                data: mockBase64Pdf.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_') // base64url formatına çevir
+            });
+        }
+
+        // Başka durumlar için hata veya boş data
+        // throw new Error('[Mock] Attachment not found');
+        return Promise.resolve({ size: 0, data: '' });
+    }
 }
 
 // Sahte servisin bir örneğini dışa aktar

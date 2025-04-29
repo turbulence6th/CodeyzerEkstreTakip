@@ -57,7 +57,7 @@ export interface EmailDetails {
   date: Date;
   plainBody: string | null;
   htmlBody: string | null;
-  originalResponse: any; // Gmail API'den gelen tam yanıtı saklayabiliriz
+  originalResponse?: any; // Ekin alınması için tüm yanıtı saklayalım
 }
 
 // E-posta içeriği (düz metin ve HTML)
@@ -78,8 +78,8 @@ export type ParsedEmailStatement = ParsedStatement & {
 export interface BankEmailParser {
   bankName: string;
   // canParse imzası güncellendi
-  canParse(sender: string, subject: string, body: DecodedEmailBody): boolean;
-  parse(email: EmailDetails): ParsedStatement | null;
+  canParse(sender: string, subject: string, body: DecodedEmailBody, emailDetails?: EmailDetails): Promise<boolean> | boolean;
+  parse(email: EmailDetails): Promise<ParsedStatement | null> | ParsedStatement | null;
 }
 
 // --- Loan Parsing Types (Common for SMS/Email if applicable) --- //

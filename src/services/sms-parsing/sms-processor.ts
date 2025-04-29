@@ -19,6 +19,7 @@ import { garantiLoanParser, GarantiParser } from './parsers/garanti-parser'; // 
 // EMAIL Parser'ları
 import { yapikrediEmailParser } from '../email-parsing/parsers/yapikredi-email-parser';
 import { ziraatEmailParser } from '../email-parsing/parsers/ziraat-email-parser'; // Yeni parser import edildi
+import { isbankEmailParser } from '../email-parsing/parsers/isbank-email-parser'; // <-- YENİ İŞ BANKASI PARSER IMPORTU
 
 // --- Banka İşlemci Yapılandırması --- //
 // Her banka için SMS, Kredi ve E-posta parser'larını ve Gmail sorgusunu burada tanımlayalım
@@ -26,23 +27,23 @@ import { ziraatEmailParser } from '../email-parsing/parsers/ziraat-email-parser'
 export const availableBankProcessors: BankProcessor[] = [
   {
     bankName: 'QNB',
-    smsSenderKeywords: ['QNB'], 
+    smsSenderKeywords: ['QNB'],
     smsStatementQueryKeyword: 'borcu', // Ekstre için
     smsLoanQueryKeyword: 'krediniz', // Kredi için
     smsParser: new QnbSmsParser(),
-    loanSmsParser: qnbLoanParser, 
+    loanSmsParser: qnbLoanParser,
   },
   {
     bankName: 'Yapı Kredi',
     smsSenderKeywords: ['YAPIKREDI', 'YKB', 'WORLD'], // Güncellendi
-    emailParser: yapikrediEmailParser, 
-    gmailQuery: 'from:(ekstre@ekstre.yapikredi.com.tr) subject:("Hesap Özeti")', 
+    emailParser: yapikrediEmailParser,
+    gmailQuery: 'from:(ekstre@ekstre.yapikredi.com.tr) subject:("Hesap Özeti")',
   },
   {
     bankName: 'Ziraat Bankası',
     smsSenderKeywords: ['ZIRAATBANK', 'ZRYBNK'],
-    emailParser: ziraatEmailParser, 
-    gmailQuery: 'from:(ziraat@ileti.ziraatbank.com.tr) subject:("e-ekstre")', 
+    emailParser: ziraatEmailParser,
+    gmailQuery: 'from:(ziraat@ileti.ziraatbank.com.tr) subject:("e-ekstre")',
   },
   {
       bankName: 'Garanti BBVA',
@@ -50,16 +51,20 @@ export const availableBankProcessors: BankProcessor[] = [
       smsStatementQueryKeyword: 'ekstresinin', // Ekstre için
       smsLoanQueryKeyword: 'ihtiyac krediniz', // Sadece kredi için
       smsParser: new GarantiParser(),
-      loanSmsParser: garantiLoanParser, 
+      loanSmsParser: garantiLoanParser,
   },
-  // --- YENİ EKLENEN KUVEYT TÜRK ---
   {
     bankName: 'Kuveyt Türk',
     smsSenderKeywords: ['KUVEYT TURK'], // Büyük harf olabilir, SMS başlığına göre düzelt
     smsStatementQueryKeyword: 'ekstresi kesildi', // Kuveyt Türk ekstre SMS'i için anahtar kelime
-    // smsLoanQueryKeyword: '', // Kuveyt Türk kredi SMS formatı bilinmiyor, şimdilik null bırakılabilir veya yorum satırı yapılabilir
     smsParser: new KuveytTurkSmsParser(), // Yeni eklenen SMS parser
-    // loanSmsParser: null, // Henüz kredi parser'ı yok
+  },
+  // --- YENİ EKLENEN İŞ BANKASI ---
+  {
+    bankName: 'İş Bankası',
+    emailParser: isbankEmailParser, // Yeni PDF işleyecek parser
+    // Gmail sorgusu: gönderen ve konu başlangıcına göre (kart no/tarih kısmı değişken olabilir)
+    gmailQuery: 'from:(bilgilendirme@ileti.isbank.com.tr) subject:("Maximum Kredi Kartı Hesap Özeti")',
   },
   // ... Diğer bankalar eklenebilir
 ];
@@ -111,14 +116,14 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
             // Sadece SMS parser'ı ve gönderici listesi olanları işle
             if (processor.smsParser && processor.smsSenderKeywords && processor.smsSenderKeywords.length > 0) {
                 console.log(`Fetching statements for ${processor.bankName}...`);
-                const fetchOptions: any = { 
-                    maxCount: 5, 
+                const fetchOptions: any = {
+                    maxCount: 5,
                     senders: processor.smsSenderKeywords,
                     query: processor.smsStatementQueryKeyword // Ekstre keyword'ünü kullan
                 };
 
                 try {
-                    const result = await SmsReader.getMessages(fetchOptions); 
+                    const result = await SmsReader.getMessages(fetchOptions);
                     const messages: SmsDetails[] = (result.messages || []).map(msg => ({
                         sender: msg.address || 'Unknown',
                         body: msg.body || '',
@@ -133,7 +138,7 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
                             const statement = processor.smsParser.parse(message);
                             if (statement) {
                                 console.log(` -> Successfully parsed newest SMS statement for ${statement.bankName}`);
-                                parsedStatements.push({ ...statement, source: 'sms' }); 
+                                parsedStatements.push({ ...statement, source: 'sms' });
                                 break; // Bu banka için en yeniyi bulduk, sonraki mesajlara bakma
                             }
                          } else {
@@ -149,33 +154,38 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
       console.warn('SMS permission not granted. Skipping SMS statement check.');
     }
 
-    // --- E-posta İşleme --- 
+    // --- E-posta İşleme ---
     console.log("Starting email statement parsing...");
     const processedEmailBanks = new Set<string>();
     try {
         for (const processor of availableBankProcessors) {
             if (processor.emailParser && processor.gmailQuery) {
                 console.log(`Searching emails for ${processor.bankName} using query: ${processor.gmailQuery}`);
+                // searchEmails Promise döndürdüğü için await kullan
                 const emailInfos = await gmailService.searchEmails(processor.gmailQuery, 10);
                 console.log(`Found ${emailInfos.length} potential email(s) for ${processor.bankName}`);
 
                 // emailInfos artık {id, threadId}[] tipinde
-                for (const emailInfo of emailInfos) { 
-                    const messageId = emailInfo.id; // messageId'yi string olarak al
+                for (const emailInfo of emailInfos) {
+                    // Linter Hatası Düzeltmesi: emailInfo.id null/undefined olabilir, kontrol et
+                    const messageId = emailInfo?.id;
+                    if (!messageId) {
+                        console.warn(`SmsProcessor: Found emailInfo without an ID for ${processor.bankName}, skipping.`);
+                        continue;
+                    }
 
                     if (processedEmailBanks.has(processor.bankName)) {
-                        continue; 
+                        continue;
                     }
 
                     // --- YENİ LOG VE TRY...CATCH --- //
                     let emailDetailsResponse: any = null;
                     try {
-                        // console.log(`SmsProcessor: Attempting getEmailDetails for ID: ${messageId}`); // Bu log kaldırıldı
+                        // getEmailDetails Promise döndürdüğü için await kullan
                         emailDetailsResponse = await gmailService.getEmailDetails(messageId);
-                        // Detay alındıktan sonra payload var mı kontrol et
-                        if (!emailDetailsResponse || !emailDetailsResponse.payload) {
+                        // Detay alındıktan sonra payload var mı kontrol et (optional chaining ile)
+                        if (!emailDetailsResponse?.payload) {
                             console.warn(`SmsProcessor: Received empty or payload-less response for ID: ${messageId}`);
-                            // İsteğe bağlı: Bu durumda döngünün başına dönebiliriz
                              continue; // Boş yanıt gelirse sonraki e-postayı dene
                         }
                     } catch (detailError) {
@@ -184,17 +194,17 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
                     }
                     // --- YENİ LOG VE TRY...CATCH SONU --- //
 
-                    // emailDetailsResponse null değilse devam et (try..catch sonrası)
-                    if (emailDetailsResponse) {
+                    // emailDetailsResponse ve payload kontrolü (try..catch sonrası)
+                    if (emailDetailsResponse?.payload) {
                         // decodeEmailBody artık { plainBody, htmlBody } döndürüyor
                         const decodedBody = gmailService.decodeEmailBody(emailDetailsResponse.payload); // Payload'ı kullan
-                        const headers = emailDetailsResponse.payload?.headers || [];
+                        const headers = emailDetailsResponse.payload?.headers || []; // Optional chaining
                         const senderHeader = headers.find((h: any) => h.name === 'From');
                         const subjectHeader = headers.find((h: any) => h.name === 'Subject');
                         const dateHeader = headers.find((h: any) => h.name === 'Date');
 
-                        const sender = senderHeader?.value || 'Unknown';
-                        const subject = subjectHeader?.value || 'No Subject';
+                        const sender = senderHeader?.value || 'Unknown'; // Optional chaining
+                        const subject = subjectHeader?.value || 'No Subject'; // Optional chaining
                         let emailDate = new Date();
                         try { if (dateHeader?.value) { emailDate = new Date(dateHeader.value); } } catch {}
 
@@ -203,26 +213,30 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
                             sender: sender,
                             subject: subject,
                             date: emailDate,
-                            // decodeEmailBody'nin yeni dönüş yapısını kullan
                             plainBody: decodedBody.plainBody,
                             htmlBody: decodedBody.htmlBody,
-                            originalResponse: emailDetailsResponse
+                            originalResponse: emailDetailsResponse // <- Ekin alınması için bu önemli
                         };
 
-                        // canParse'a yeni decodedBody yapısını gönder
-                        if (processor.emailParser.canParse(sender, subject, decodedBody)) {
+                        // Linter Hatası Düzeltmesi: canParse artık emailDetails almamalı (interface'e uygun)
+                        // PDF kontrolü IsbankEmailParser.parse içine taşındı.
+                        const canParseResult = await processor.emailParser.canParse(sender, subject, decodedBody);
+                        if (canParseResult) {
                             console.log(`Attempting to parse newest email (${messageId}) for ${processor.bankName}...`);
-                            const statement = processor.emailParser.parse(emailData);
-                            processedEmailBanks.add(processor.bankName);
+                            const statement = await processor.emailParser.parse(emailData);
+                            processedEmailBanks.add(processor.bankName); // En yeni işlendi olarak işaretle
                             if (statement) {
                                 console.log(`Successfully parsed EMAIL statement for ${statement.bankName}`);
-                                parsedStatements.push({ ...statement, source: 'email' });
+                                // source'u kontrol et, parser kendi içinde belirlemeli (örn. 'email-pdf')
+                                parsedStatements.push({ ...statement, source: statement.source || 'email' });
                             } else {
                                  console.warn(`Email Parser for ${processor.bankName} identified email but failed to parse content (ID: ${messageId}).`);
                             }
+                             // İş Bankası için sadece en yeni PDF'i işlemek istiyorsak burada break edebiliriz.
+                             // break;
                         }
                     }
-                } 
+                }
             }
         }
     } catch (error) {
@@ -249,14 +263,14 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
             // Sadece KREDİ SMS parser'ı ve gönderici listesi olanları işle
             if (processor.loanSmsParser && processor.smsSenderKeywords && processor.smsSenderKeywords.length > 0) {
                 console.log(`Fetching loans for ${processor.bankName}...`);
-                const fetchLoanOptions: any = { 
-                    maxCount: 5, 
+                const fetchLoanOptions: any = {
+                    maxCount: 5,
                     senders: processor.smsSenderKeywords,
                     query: processor.smsLoanQueryKeyword // Kredi keyword'ünü kullan
                 };
-                
+
                 try {
-                    const result = await SmsReader.getMessages(fetchLoanOptions); 
+                    const result = await SmsReader.getMessages(fetchLoanOptions);
                     const messages: SmsDetails[] = (result.messages || []).map(msg => ({
                         sender: msg.address || 'Unknown',
                         body: msg.body || '',
@@ -284,7 +298,7 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
       console.warn('SMS permission not granted. Cannot fetch loans.');
     }
 
-    // --- E-posta Kredileri (Gelecekte eklenebilir) --- 
+    // --- E-posta Kredileri (Gelecekte eklenebilir) ---
 
     // --- Sonuçları Birleştirme ve Sıralama ---
     console.log(`Loan parsing complete. Found ${parsedLoans.length} loans (SMS only, newest per bank).`);

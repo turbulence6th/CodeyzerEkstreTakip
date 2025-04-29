@@ -66,15 +66,15 @@ describe('Yapı Kredi Email Parser', () => {
     });
 
     // --- parse Testleri --- (Sadece Happy Path)
-    describe('parse', () => {
-        it('should correctly parse date and card from the mock Yapı Kredi notification HTML (amount should be null)', () => {
+    describe('parse', async () => {
+        it('should correctly parse date and card from the mock Yapı Kredi notification HTML (amount should be null)', async () => {
             // Mock HTML okunamadıysa testi atla
             if (!mockHtmlContent) {
                  console.warn(`Skipping parse test because mock file could not be read: ${mockHtmlPath}`);
                  return;
              }
 
-            const result = yapikrediEmailParser.parse(mockEmailDetails);
+            const result = await yapikrediEmailParser.parse(mockEmailDetails);
 
             // Sonucun null olmadığını kontrol et (Tarih parse edilebildiği için)
             expect(result).not.toBeNull();

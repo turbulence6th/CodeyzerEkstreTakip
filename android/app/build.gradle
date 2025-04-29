@@ -22,6 +22,16 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+
+    packaging {
+        resources {
+            excludes += '/META-INF/DEPENDENCIES'
+        }
+    }
 }
 
 dependencies {
@@ -35,6 +45,15 @@ dependencies {
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation 'com.google.android.gms:play-services-auth:21.2.0'
     implementation 'com.google.firebase:firebase-auth:23.0.0'
+
+     // --- YENİ PDF PARSER İÇİN GEREKLİ BAĞIMLILIKLAR ---
+    implementation 'com.tom-roush:pdfbox-android:2.0.27.0' // <-- PDFBox Android versiyonunu ekleyin
+
+    implementation 'com.github.jai-imageio:jai-imageio-core:1.4.0' // Android'de PDFBox için genellikle gerekli
+
+    testImplementation 'org.mockito:mockito-core:5.11.0' // Veya daha güncel stabil 5.x sürümü
+    testImplementation 'org.mockito:mockito-inline:5.2.0'
+    testImplementation 'commons-io:commons-io:2.11.0' // Veya projenle uyumlu en son sürüm
 }
 
 apply from: 'capacitor.build.gradle'

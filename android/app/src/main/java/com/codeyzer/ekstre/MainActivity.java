@@ -8,7 +8,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(GoogleAuthPlugin.class);
         registerPlugin(SmsReaderPlugin.class);
-
+        registerPlugin(PdfParserPlugin.class);
+        
         super.onCreate(savedInstanceState);
     }
 }

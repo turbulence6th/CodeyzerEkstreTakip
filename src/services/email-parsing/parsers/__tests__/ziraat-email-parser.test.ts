@@ -67,14 +67,14 @@ describe('Ziraat Email Parser', () => {
 
     // --- parse Testleri ---
     describe('parse', () => {
-        it('should correctly parse the mock Ziraat ekstre HTML', () => {
+        it('should correctly parse the mock Ziraat ekstre HTML', async () => {
             // Mock HTML okunamadıysa testi atla
             if (!mockHtmlContent) {
                  console.warn(`Skipping parse test because mock file could not be read: ${mockHtmlPath}`);
                  return; // Veya expect(true).toBe(false) ile testi fail ettir.
              }
 
-            const result = ziraatEmailParser.parse(mockEmailDetails);
+            const result = await ziraatEmailParser.parse(mockEmailDetails);
 
             // Sonucun null olmadığını kontrol et
             expect(result).not.toBeNull();
