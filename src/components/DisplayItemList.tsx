@@ -59,12 +59,8 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
     onDeleteManualEntry
 }) => {
     return (
-        <IonCard>
-            <IonCardHeader>
-                <IonCardTitle>Bulunan Ekstreler ve Krediler</IonCardTitle>
-                {/* Takvim kontrol notu kaldırıldı, ikonlar durumu gösterecek */}
-            </IonCardHeader>
-            {items.length > 0 && (
+        <>
+            {items.length > 0 ? (
                 <IonList lines="none">
                     {items.map((item, index) => {
                         const listKey = `${item.source}-${item.source === 'manual' ? item.id : (item as any).bankName || 'unknown'}-${index}`;
@@ -155,13 +151,12 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                         );
                     })}
                 </IonList>
-            )}
-            {items.length === 0 && (
-                <IonCardContent>
+            ) : (
+                <IonItem lines="none">
                     <p className="empty-list-message">Görüntülenecek aktif ekstre veya kredi bilgisi bulunamadı. Geçmiş kayıtlar otomatik olarak gizlenir. Yeni veri getirmeyi deneyebilirsiniz.</p>
-                </IonCardContent>
+                </IonItem>
             )}
-        </IonCard>
+        </>
     );
 };
 

@@ -10,10 +10,7 @@ import {
     IonInput,
     IonDatetime,
     IonButton,
-    IonCard,
-    IonCardHeader,
     IonCardContent,
-    useIonToast,
     IonDatetimeButton, // Datetime butonu için
     IonModal, // Datetime modalı için
     IonNote
@@ -23,6 +20,7 @@ import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '../store';
 import { addManualEntry } from '../store/slices/dataSlice'; // Yorum kaldırıldı
 import { startGlobalLoading, stopGlobalLoading } from '../store/slices/loadingSlice';
+import { addToast } from '../store/slices/toastSlice';
 
 // Yeni tipi import edelim (Doğru yol)
 import type { ManualEntry } from '../types/manual-entry.types';
@@ -31,7 +29,6 @@ import type { ManualEntry } from '../types/manual-entry.types';
 
 const ManualEntryTab: React.FC = () => {
     const dispatch = useDispatch<AppDispatch>();
-    const [presentToast] = useIonToast();
 
     // Form state'leri
     const [description, setDescription] = useState('');
@@ -60,13 +57,13 @@ const ManualEntryTab: React.FC = () => {
     const handleSave = () => {
         // TODO: Validasyon ekle (description ve dueDate zorunlu, amount sayı olmalı)
         if (!description || !dueDate || !amount) {
-             presentToast({ message: 'Lütfen tüm alanları doldurun.', duration: 3000, color: 'warning' });
+             dispatch(addToast({ message: 'Lütfen tüm alanları doldurun.', duration: 3000, color: 'warning' }));
             return;
         }
 
         const parsedAmount = parseFloat(amount.replace(',', '.')); // Virgülü noktaya çevir
         if (isNaN(parsedAmount)) {
-             presentToast({ message: 'Lütfen geçerli bir tutar girin.', duration: 3000, color: 'warning' });
+             dispatch(addToast({ message: 'Lütfen geçerli bir tutar girin.', duration: 3000, color: 'warning' }));
             return;
         }
         
@@ -94,18 +91,18 @@ const ManualEntryTab: React.FC = () => {
              // Loglama kaldırılabilir veya bırakılabilir
              // console.log("Dispatching addManualEntry with:", newEntry);
              
-             presentToast({ 
+             dispatch(addToast({ 
                 message: 'Kayıt başarıyla eklendi.', 
                 duration: 2000, 
                 color: 'success' 
-             });
+             }));
             // Formu temizle
             setDescription('');
             setAmount('');
             setDueDate(undefined);
         } catch (error: any) {
              console.error('Error saving manual entry:', error);
-             presentToast({ message: `Kayıt kaydedilirken hata: ${error.message || 'Bilinmeyen hata'}`, duration: 3000, color: 'danger' });
+             dispatch(addToast({ message: `Kayıt kaydedilirken hata: ${error.message || 'Bilinmeyen hata'}`, duration: 3000, color: 'danger' }));
         } finally {
             dispatch(stopGlobalLoading());
         }
@@ -125,63 +122,56 @@ const ManualEntryTab: React.FC = () => {
                     </IonToolbar>
                 </IonHeader>
 
-                <IonCard>
-                    <IonCardHeader>
-                         <IonCardContent>Yeni bir ödeme veya ekstre bilgisi girin:</IonCardContent>
-                    </IonCardHeader>
-                    <IonCardContent>
-                        <IonList>
-                            <IonItem>
-                                <IonInput
-                                    label="Açıklama / Banka Adı"
-                                    labelPlacement="stacked"
-                                    value={description}
-                                    onIonInput={(e) => setDescription(e.detail.value!)}
-                                    placeholder="Örn: Kira Ödemesi, Ziraat Ekstre"
-                                    clearInput
-                                ></IonInput>
-                            </IonItem>
-                            <IonItem>
-                                <IonInput
-                                    label="Tutar (TL)"
-                                    labelPlacement="stacked"
-                                    type="number" // Klavye için
-                                    inputmode='decimal' // Daha iyi mobil klavye
-                                    value={amount}
-                                    onIonInput={(e) => setAmount(e.detail.value!)}
-                                    placeholder="Örn: 1500.50"
-                                    clearInput
-                                ></IonInput>
-                            </IonItem>
-                            <IonItem lines="none">
-                                 <IonLabel>Son Ödeme Tarihi</IonLabel>
-                                 <div slot="end" style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-                                     <IonDatetimeButton datetime="dueDate"></IonDatetimeButton>
-                                     <IonModal keepContentsMounted={true}>
-                                         <IonDatetime 
-                                            id="dueDate" 
-                                            value={dueDate} 
-                                            onIonChange={(e) => setDueDate(e.detail.value?.toString())} 
-                                            presentation="date"
-                                            showDefaultButtons={true}
-                                            doneText="Tamam"
-                                            cancelText="İptal"
-                                            firstDayOfWeek={1}
-                                        ></IonDatetime>
-                                     </IonModal>
-                                 </div>
-                            </IonItem>
-                        </IonList>
-                         <IonButton 
-                            expand="block" 
-                            onClick={handleSave} 
-                            style={{ marginTop: '20px' }}
-                            disabled={!description || !dueDate || !amount} // Basit buton pasifleştirme
-                         >
-                            Kaydet
-                         </IonButton>
-                    </IonCardContent>
-                </IonCard>
+                <IonList>
+                    <IonItem>
+                        <IonInput
+                            label="Açıklama / Banka Adı"
+                            labelPlacement="stacked"
+                            value={description}
+                            onIonInput={(e) => setDescription(e.detail.value!)}
+                            placeholder="Örn: Kira Ödemesi, Ziraat Ekstre"
+                            clearInput
+                        ></IonInput>
+                    </IonItem>
+                    <IonItem>
+                        <IonInput
+                            label="Tutar (TL)"
+                            labelPlacement="stacked"
+                            type="number" // Klavye için
+                            inputmode='decimal' // Daha iyi mobil klavye
+                            value={amount}
+                            onIonInput={(e) => setAmount(e.detail.value!)}
+                            placeholder="Örn: 1500.50"
+                            clearInput
+                        ></IonInput>
+                    </IonItem>
+                    <IonItem lines="none">
+                         <IonLabel>Son Ödeme Tarihi</IonLabel>
+                         <div slot="end" style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+                             <IonDatetimeButton datetime="dueDate"></IonDatetimeButton>
+                             <IonModal keepContentsMounted={true}>
+                                 <IonDatetime 
+                                    id="dueDate" 
+                                    value={dueDate} 
+                                    onIonChange={(e) => setDueDate(e.detail.value?.toString())} 
+                                    presentation="date"
+                                    showDefaultButtons={true}
+                                    doneText="Tamam"
+                                    cancelText="İptal"
+                                    firstDayOfWeek={1}
+                                ></IonDatetime>
+                             </IonModal>
+                         </div>
+                    </IonItem>
+                </IonList>
+                 <IonButton 
+                    expand="block" 
+                    onClick={handleSave} 
+                    style={{ marginTop: '20px' }}
+                    disabled={!description || !dueDate || !amount} // Basit buton pasifleştirme
+                 >
+                    Kaydet
+                 </IonButton>
             </IonContent>
         </IonPage>
     );

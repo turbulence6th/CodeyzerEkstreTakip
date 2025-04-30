@@ -1,4 +1,4 @@
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonCard, IonCardContent, IonButton, useIonToast } from '@ionic/react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, /*IonCard,*/ /*IonCardContent,*/ IonButton, useIonToast } from '@ionic/react';
 // import './Tab3.css'; // CSS dosyasının adı da değişmeli mi? Şimdilik bırakıyorum.
 import './SettingsTab.css'; // Updated CSS import
 
@@ -115,47 +115,41 @@ const SettingsTab: React.FC = () => {
         {/* ExploreContainer kaldırıldı */}
         {/* <ExploreContainer name="Ayarlar page" /> */}
 
-        {/* Giriş yapılmışsa Hesap Yönetimi Kartı göster */} 
+        {/* Giriş yapılmışsa Hesap Yönetimi Kartı göster */}
         {userInfo && (
-            <IonCard>
-                <IonCardContent>
-                    <p style={{ marginBottom: '10px'}}>Giriş Yapılan Hesap: {userInfo.email}</p>
-                    <IonButton expand="block" color="danger" onClick={handleSignOut}>
-                        Google Hesabından Çıkış Yap
-                    </IonButton>
-                </IonCardContent>
-            </IonCard>
+            <div style={{ marginBottom: '15px' }}> 
+                <p style={{ marginBottom: '10px'}}>Giriş Yapılan Hesap: {userInfo.email}</p>
+                <IonButton expand="block" color="danger" onClick={handleSignOut}>
+                    Google Hesabından Çıkış Yap
+                </IonButton>
+            </div> 
         )}
 
         {/* Giriş yapılmışsa İzin Yönetimi Kartı göster */} 
         {userInfo && (
-            <IonCard>
-                <IonCardContent>
-                    <p style={{ marginBottom: '10px' }}>
-                      SMS Okuma İzin Durumu: <strong>{translatePermissionStatus(smsPermission?.readSms)}</strong>
-                      <IonButton fill="clear" size="small" onClick={checkPermission} style={{ marginLeft: '10px' }}>
-                         Kontrol Et
-                      </IonButton>
-                    </p>
-                    {smsPermission?.readSms !== 'granted' && (
-                      <IonButton expand="block" onClick={requestPermission} style={{ marginBottom: '5px' }}>
-                        SMS Okuma İzni İste
-                      </IonButton>
-                    )}
-                    {permissionError && (
-                      <p style={{ color: 'var(--ion-color-danger)', marginTop: '10px' }}>İzin Hatası: {permissionError}</p>
-                    )}
-                </IonCardContent>
-            </IonCard>
+            <div style={{ marginBottom: '15px' }}> 
+                <p style={{ marginBottom: '10px' }}>
+                  SMS Okuma İzin Durumu: <strong>{translatePermissionStatus(smsPermission?.readSms)}</strong>
+                  <IonButton fill="clear" size="small" onClick={checkPermission} style={{ marginLeft: '10px' }}>
+                     Kontrol Et
+                  </IonButton>
+                </p>
+                {smsPermission?.readSms !== 'granted' && (
+                  <IonButton expand="block" onClick={requestPermission} style={{ marginBottom: '5px' }}>
+                    SMS Okuma İzni İste
+                  </IonButton>
+                )}
+                {permissionError && (
+                  <p style={{ color: 'var(--ion-color-danger)', marginTop: '10px' }}>İzin Hatası: {permissionError}</p>
+                )}
+            </div> 
         )}
 
         {/* Giriş yapılmamışsa bilgi mesajı */}
         {!userInfo && (
-             <IonCard>
-                <IonCardContent>
-                    <p>Hesap ve izin ayarlarını yönetmek için lütfen giriş yapın.</p>
-                </IonCardContent>
-            </IonCard>
+             <div style={{ marginBottom: '15px' }}> 
+                <p>Hesap ve izin ayarlarını yönetmek için lütfen giriş yapın.</p>
+            </div> 
         )}
 
         {/* Diğer ayarlar buraya eklenebilir */}
