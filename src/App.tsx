@@ -57,8 +57,8 @@ import { persistor } from './store';
 setupIonicReact();
 
 const App: React.FC = () => {
-  // Global loading state'ini al
-  const isGlobalLoading = useSelector((state: RootState) => state.loading.isActive);
+  // Global loading state'ini ve mesajını al
+  const { isActive: isGlobalLoading, message: loadingMessage } = useSelector((state: RootState) => state.loading);
   // Kullanıcının giriş yapıp yapmadığını kontrol et
   const isAuthenticated = useSelector((state: RootState) => !!state.auth.accessToken);
 
@@ -121,7 +121,8 @@ const App: React.FC = () => {
       {/* Global Loading Göstergesi */}
       <IonLoading 
           isOpen={isGlobalLoading} 
-          message={'Lütfen bekleyin...'}
+          // Mesajı Redux state'inden al, null ise varsayılanı kullanma (reducer hallediyor)
+          message={loadingMessage || ''} 
       />
   </IonApp>
 );

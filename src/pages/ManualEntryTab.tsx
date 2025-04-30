@@ -83,7 +83,8 @@ const ManualEntryTab: React.FC = () => {
             source: 'manual'
         };
 
-        dispatch(startGlobalLoading());
+        // Mesaj eklendi
+        dispatch(startGlobalLoading('Kaydediliyor...')); 
         try {
              // Dispatch işlemi aktifleştirildi
              dispatch(addManualEntry(newEntry)); 

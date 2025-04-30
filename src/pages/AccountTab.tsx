@@ -1,4 +1,4 @@
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonList, IonItem, IonLabel, IonSpinner, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonIcon, IonNote, useIonToast, IonLoading, IonModal, IonButtons, IonFooter, IonItemSliding, IonItemOptions, IonItemOption, IonRefresher, IonRefresherContent, RefresherEventDetail, useIonViewWillEnter, IonAlert } from '@ionic/react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonList, IonItem, IonLabel, IonSpinner, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonIcon, IonNote, useIonToast, IonModal, IonButtons, IonFooter, IonItemSliding, IonItemOptions, IonItemOption, IonRefresher, IonRefresherContent, RefresherEventDetail, useIonViewWillEnter, IonAlert } from '@ionic/react';
 import './AccountTab.css';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { GoogleAuth } from '@plugins/google-auth';
@@ -58,8 +58,6 @@ const AccountTab: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const [presentToast] = useIonToast();
   const [calendarEventStatus, setCalendarEventStatus] = useState<Record<string, boolean>>({});
-  const [isCheckingCalendar, setIsCheckingCalendar] = useState(false);
-  const [isAddingInstallments, setIsAddingInstallments] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalContent, setModalContent] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState<string>("Detay");
@@ -113,7 +111,7 @@ const AccountTab: React.FC = () => {
         return;
       }
 
-      setIsCheckingCalendar(true);
+      dispatch(startGlobalLoading('Takvim kontrol ediliyor...'));
       const newStatus: Record<string, boolean> = {};
 
       for (const item of displayItems) {
@@ -136,7 +134,7 @@ const AccountTab: React.FC = () => {
       }
       console.log("AccountTab Effect: calendar status checked:", newStatus);
       setCalendarEventStatus(newStatus);
-      setIsCheckingCalendar(false);
+      dispatch(stopGlobalLoading());
     };
 
     checkCalendarEvents();
@@ -179,7 +177,7 @@ const AccountTab: React.FC = () => {
         return;
     }
 
-    dispatch(startGlobalLoading());
+    dispatch(startGlobalLoading('Takvime ekleniyor...'));
     try {
       const dueDate = new Date(itemDate);
       dueDate.setHours(10, 0, 0, 0);
@@ -245,8 +243,7 @@ Tutar: ${formatCurrency(item.amount)}`;
         return;
     }
 
-    setIsAddingInstallments(true);
-    dispatch(startGlobalLoading());
+    dispatch(startGlobalLoading('Taksitler ekleniyor...'));
     let addedCount = 0;
     let skippedCount = 0;
     let errorCount = 0;
@@ -318,7 +315,6 @@ Kaynak: ${loan.source.toUpperCase()}`;
         dispatch(addToast({ message: `Taksitler işlenirken bir hata oluştu: ${loopError.message || 'Bilinmeyen hata'}`, duration: 3000, color: 'danger', }));
     } finally {
         dispatch(stopGlobalLoading());
-        setIsAddingInstallments(false);
         let resultMessage = "";
         if (addedCount > 0) resultMessage += `${addedCount} taksit başarıyla eklendi. `; 
         if (skippedCount > 0) resultMessage += `${skippedCount} taksit zaten mevcuttu. `; 
@@ -368,24 +364,20 @@ Kaynak: ${loan.source.toUpperCase()}`;
   };
 
   const handleDeleteManualEntry = (id: string) => {
-      console.log(`Deleting manual entry with ID: ${id}`);
-      // TODO: Kullanıcıdan onay almak için bir Alert eklenebilir.
-      try {
-          dispatch(deleteManualEntry(id));
-          dispatch(addToast({ message: 'Kayıt başarıyla silindi.', duration: 2000, color: 'success', }));
-      } catch (error: any) {
-           console.error("Error deleting manual entry:", error);
-           dispatch(addToast({ message: `Kayıt silinirken hata oluştu: ${error.message || 'Bilinmeyen hata'}`, duration: 3000, color: 'danger', }));
-      }
-      // Sliding item'ı kapatmaya gerek yok, Redux state'i güncelleyince kaybolacak.
+    dispatch(startGlobalLoading('Kayıt siliniyor...'));
+    try {
+        dispatch(deleteManualEntry(id));
+        dispatch(addToast({ message: 'Manuel kayıt başarıyla silindi.', duration: 2000, color: 'success' }));
+    } catch (error: any) {
+        console.error('Error deleting manual entry:', error);
+        dispatch(addToast({ message: `Kayıt silinirken hata: ${error.message || 'Bilinmeyen hata'}`, duration: 3000, color: 'danger' }));
+    } finally {
+        dispatch(stopGlobalLoading());
+    }
   };
 
   return (
     <IonPage>
-      <IonLoading
-        isOpen={isLoading || isAddingInstallments || isCheckingCalendar}
-        message={isAddingInstallments ? 'Taksitler takvime ekleniyor...' : isCheckingCalendar ? 'Takvim kontrol ediliyor...' : 'Veriler işleniyor...'}
-      />
       <DetailsModal 
         isOpen={isModalOpen}
         title={modalTitle}
@@ -432,8 +424,6 @@ Kaynak: ${loan.source.toUpperCase()}`;
              <DisplayItemList 
                 items={displayItems}
                 calendarEventStatus={calendarEventStatus}
-                isCheckingCalendar={isCheckingCalendar}
-                isAddingInstallments={isAddingInstallments}
                 onItemClick={handleItemClick}
                 onAddToCalendar={handleAddToCalendar}
                 onAddAllInstallments={handleAddAllInstallments}

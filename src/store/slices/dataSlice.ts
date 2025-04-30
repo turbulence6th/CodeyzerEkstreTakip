@@ -4,6 +4,8 @@ import type { ManualEntry } from '../../types/manual-entry.types.ts';
 import { statementProcessor } from '../../services/sms-parsing/sms-processor';
 import { startGlobalLoading, stopGlobalLoading } from './loadingSlice';
 import type { RootState } from '../index';
+// Type guard importları eklendi
+import { isStatement, isLoan, isManualEntry as isTypeGuardManualEntry } from '../../utils/typeGuards'; 
 // import { Capacitor } from '@capacitor/core'; // Capacitor import edildi
 
 // DisplayItem tipini eski haline getir
@@ -52,7 +54,7 @@ export const fetchAndProcessDataThunk = createAsyncThunk<
       return rejectWithValue("Lütfen önce Google ile giriş yapın.");
     }
 
-    dispatch(startGlobalLoading());
+    dispatch(startGlobalLoading("Veriler işleniyor..."));
     try {
       console.log("Fetching and parsing statements & loans (Thunk). Filter disabled.");
       const [parsedStatements, parsedLoans] = await Promise.all([
@@ -75,20 +77,24 @@ export const fetchAndProcessDataThunk = createAsyncThunk<
            }
 
           // ID'yi oluştur (parser'dan gelmiyorsa)
-          const generatedId = `auto_${Date.now()}_${Math.random()}`;
-          const baseItem = { ...item, id: generatedId };
+          const generatedId = `auto_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+          // baseItem oluşturmaya gerek kalmadı, doğrudan item kullanabiliriz
 
-          if ('dueDate' in baseItem && baseItem.dueDate instanceof Date) { // ParsedStatement
+          // Type guard'lar ile kontrol
+          if (isStatement(item)) { // ParsedStatement kontrolü
               const serializedItem: SerializableStatement = {
-                  ...baseItem,
-                  dueDate: baseItem.dueDate.toISOString(),
+                  ...item, // Spread ParsedStatement özellikleri
+                  id: generatedId,
+                  dueDate: item.dueDate.toISOString(), // Guard sayesinde güvenli erişim
                   originalMessage: serializableOriginalMessage,
               };
               serializableFetchedItems.push(serializedItem);
-          } else if ('firstPaymentDate' in baseItem) { // ParsedLoan
+          } else if (isLoan(item)) { // ParsedLoan kontrolü
                const serializedItem: SerializableLoan = {
-                   ...baseItem,
-                   firstPaymentDate: baseItem.firstPaymentDate instanceof Date ? baseItem.firstPaymentDate.toISOString() : null,
+                   ...item, // Spread ParsedLoan özellikleri
+                   id: generatedId,
+                   // Guard sayesinde güvenli erişim, Date kontrolü hala gerekli
+                   firstPaymentDate: item.firstPaymentDate instanceof Date ? item.firstPaymentDate.toISOString() : null, 
                    originalMessage: serializableOriginalMessage,
                };
                serializableFetchedItems.push(serializedItem);
