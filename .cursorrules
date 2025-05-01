@@ -112,6 +112,7 @@ platform: capacitor
 #            - Native plugin\'den dönen metin içinde "Son Ödeme Tarihi" ve "Hesap Özeti Borcu" regex ile aranır ve veriler ayrıştırılır (`parseExtractedPdfText` fonksiyonu).
 #            - **API Veri Sorunları:** Gmail API\'den alınan Base64 verisinin **bazen bozuk veya eksik olabileceği** tespit edildi (örn. Base64 padding hatası, PDF trailer hatası). Bu durumlar `try-catch` ile yakalanır, hata loglanır ve ilgili e-posta atlanır (`null` döndürülür). Bozuk veriyi düzeltmek mümkün değildir.
 #    - `sms-processor.ts` içinde `statementProcessor` sınıfı ile tüm veriler merkezi olarak işlenir.
+#        - Aynı banka/kart için hem SMS hem de e-posta ile gelen ekstre bildirimleri arasında sadece en son gelen (mesaj tarihine göre) dikkate alınır, diğeri filtrelenir.
 #    - Banka bazlı yapılandırmalar (`availableBankProcessors`).
 
 # 5. State Yönetimi (Redux):

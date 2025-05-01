@@ -247,11 +247,45 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
         console.error('Error fetching or parsing EMAIL statement messages:', error);
     }
 
-    // --- Sonuçları Birleştirme ve Sıralama ---
-    console.log(`Total parsing complete. Found ${parsedStatements.length} statements (SMS+Email, newest per bank).`);
-    // En son ekstreleri tarihe göre sırala
-    parsedStatements.sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime());
-    return parsedStatements;
+    // --- Sonuçları Birleştirme, Filtreleme ve Sıralama (YENİ MANTIK) ---
+
+    // 1. Gruplama ve En Yeniyi Seçme
+    const latestStatementsMap = new Map<string, ParsedStatement>();
+
+    for (const currentStatement of parsedStatements) {
+        // Geliş tarihini al (SMS: number, Email: Date)
+        const arrivalTime = currentStatement.originalMessage.date instanceof Date
+                            ? currentStatement.originalMessage.date.getTime()
+                            : currentStatement.originalMessage.date;
+
+        // Gruplama anahtarı oluştur (dueDateString KULLANILMIYOR)
+        const groupKey = `${currentStatement.bankName}-${currentStatement.last4Digits || 'N/A'}`;
+
+        const existingStatement = latestStatementsMap.get(groupKey);
+
+        if (existingStatement) {
+            const existingArrivalTime = existingStatement.originalMessage.date instanceof Date
+                                      ? existingStatement.originalMessage.date.getTime()
+                                      : existingStatement.originalMessage.date;
+
+            if (arrivalTime > existingArrivalTime) {
+                latestStatementsMap.set(groupKey, currentStatement);
+            }
+        } else {
+            latestStatementsMap.set(groupKey, currentStatement);
+        }
+    }
+
+    // 2. Map'ten nihai listeyi oluştur
+    const finalStatements = Array.from(latestStatementsMap.values());
+
+    // Orijinal logu geri getir
+    console.log(`Filtered down to ${finalStatements.length} latest statements.`);
+
+    // 3. En son ekstreleri tarihe göre sırala (dueDate)
+    finalStatements.sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime());
+
+    return finalStatements;
   }
 
   // --- Kredileri Getir ve Ayrıştır --- //
