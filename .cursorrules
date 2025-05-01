@@ -96,6 +96,11 @@ platform: capacitor
 #        - QNB, Garanti için SMS parser\'ları (`qnb-parser.ts`, `garanti-parser.ts`).
 #    - **E-posta:**
 #        - Yapı Kredi, Ziraat için HTML içerik parser\'ları (`yapikredi-email-parser.ts`, `ziraat-email-parser.ts`).
+#        - Kuveyt Türk için HTML içerik parser'ı (`kuveytturk-email-parser.ts`):
+#            - HTML içeriğindeki tablo yapısını (`<td>`, `<span>`) dikkate alan spesifik regex'ler kullanılarak ayrıştırma yapıldı.
+#            - Son 4 kart hanesi, son ödeme tarihi (`parseDottedDate` ile) ve ekstre tutarı (`parseStandardNumber` ile) ayrıştırıldı.
+#            - `ParsedStatement` tipine uygun olarak, son ödeme tarihi bulunamazsa `null` döndürülür.
+#            - Test için mock HTML (`kuveytturk-ekstre-sample.html`) ve test dosyası (`kuveytturk-email-parser.test.ts`) oluşturuldu.
 #        - **İş Bankası için PDF Ek Parser\'ı (`isbank-email-parser.ts`):**
 #            - E-postada PDF eki olup olmadığını kontrol eder.
 #            - `gmail.service.ts` kullanarak eki Base64URL olarak alır, standart Base64\'e çevirir.

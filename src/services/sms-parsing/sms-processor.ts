@@ -20,6 +20,7 @@ import { garantiLoanParser, GarantiParser } from './parsers/garanti-parser'; // 
 import { yapikrediEmailParser } from '../email-parsing/parsers/yapikredi-email-parser';
 import { ziraatEmailParser } from '../email-parsing/parsers/ziraat-email-parser'; // Yeni parser import edildi
 import { isbankEmailParser } from '../email-parsing/parsers/isbank-email-parser'; // <-- YENİ İŞ BANKASI PARSER IMPORTU
+import { kuveytturkEmailParser } from 'services/email-parsing/parsers/kuveytturk-email-parser';
 
 // --- Banka İşlemci Yapılandırması --- //
 // Her banka için SMS, Kredi ve E-posta parser'larını ve Gmail sorgusunu burada tanımlayalım
@@ -46,18 +47,20 @@ export const availableBankProcessors: BankProcessor[] = [
     gmailQuery: 'from:(ziraat@ileti.ziraatbank.com.tr) subject:("e-ekstre")',
   },
   {
-      bankName: 'Garanti BBVA',
-      smsSenderKeywords: ['GARANTIBBVA', 'GARANTiBBVA', 'BONUS'], // Kullanıcı tarafından güncellendi
-      smsStatementQueryKeyword: 'ekstresinin', // Ekstre için
-      smsLoanQueryKeyword: 'ihtiyac krediniz', // Sadece kredi için
-      smsParser: new GarantiParser(),
-      loanSmsParser: garantiLoanParser,
+    bankName: 'Garanti BBVA',
+    smsSenderKeywords: ['GARANTIBBVA', 'GARANTiBBVA', 'BONUS'], // Kullanıcı tarafından güncellendi
+    smsStatementQueryKeyword: 'ekstresinin', // Ekstre için
+    smsLoanQueryKeyword: 'ihtiyac krediniz', // Sadece kredi için
+    smsParser: new GarantiParser(),
+    loanSmsParser: garantiLoanParser,
   },
   {
     bankName: 'Kuveyt Türk',
     smsSenderKeywords: ['KUVEYT TURK'], // Büyük harf olabilir, SMS başlığına göre düzelt
     smsStatementQueryKeyword: 'ekstresi kesildi', // Kuveyt Türk ekstre SMS'i için anahtar kelime
     smsParser: new KuveytTurkSmsParser(), // Yeni eklenen SMS parser
+    emailParser: kuveytturkEmailParser,
+    gmailQuery: 'from:(bilgilendirme@kuveytturk.com.tr) subject:("Kuveyt Türk Kredi Kartı Hesap Ekstreniz")',
   },
   // --- YENİ EKLENEN İŞ BANKASI ---
   {
