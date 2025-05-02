@@ -162,3 +162,10 @@ platform: capacitor
 #        - `gmail.service.ts` ve `calendar.service.ts`'i güncelle:
 #            - Ham `fetch` çağrılarını kaldırıp, native plugin'in yeni metodlarını (örn. `searchGmailNative`, `createCalendarEventNative`) çağıracak şekilde düzenle.
 #        - Hata yönetimini ve token yenileme mantığını (varsa, istemci kütüphaneleri genellikle bunu kısmen halleder) gözden geçir.
+
+# 4. Gizlilik Politikası URL'si Sağlama:
+#    - **Amaç:** Google Play Store politikalarına uymak ve kullanıcılara veri işleme pratikleri hakkında şeffaf bilgi vermek.
+#    - **Adımlar:**
+#        - Uygulamanın veri toplama ve kullanma pratiklerini (özellikle SMS ve Gmail okuma, veri saklama, paylaşım durumu vb.) detaylıca açıklayan bir gizlilik politikası metni oluştur.
+#        - Bu metni web üzerinde erişilebilir bir URL'de barındır (örn. web sitesi, GitHub Pages, gizlilik politikası servisi).
+#        - Bu URL'yi Google Play Console'daki uygulama listeleme ayarlarında ilgili alana ekle.
