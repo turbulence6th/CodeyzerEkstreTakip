@@ -119,3 +119,46 @@ platform: capacitor
 #    - Oturum (`accessToken`, `idToken`), izinler, ayrıştırılmış veriler yönetilir.
 #    - `redux-persist` ile state kalıcılığı (`authSlice`, `permissionSlice`, `dataSlice`).
 #    - `dataSlice` manuel kayıtları da tutar (`ManualEntry` tipi, `addManualEntry`, `deleteManualEntry`
+
+# --- Yapılacaklar (To-Do) ---
+
+# 1. SMS İzin Gerekçesini Güçlendirme (Dinamik Native Filtreleme):
+#    - **Amaç:** Google Play Store onayı için SMS izni talebini daha savunulabilir hale getirmek.
+#    - **Adımlar:**
+#        - **JS:** `availableBankProcessors`'dan türetilen merkezi filtre listeleri oluştur:
+#            - `allRelevantSenders`: Tüm bankaların `smsSenderKeywords` listelerinin birleşimi (tekilleştirilmiş, büyük harf).
+#            - `allRelevantKeywords`: Genel finansal SMS anahtar kelimeleri listesi (küçük harf, tekilleştirilmiş, örn. "ekstre", "kredi", "borc", "ödeme").
+#        - **Native Plugin (SmsReaderPlugin):**
+#            - Plugin'e (Java ve TS tanımı) yeni bir metot ekle: `configureFilters(options: { senders: string[]; keywords: string[] })`. Bu metot, JS'den gelen listeleri alıp native değişkende saklayacak.
+#            - Native SMS alıcısını (BroadcastReceiver) güncelle:
+#                - Gelen her SMS için, plugin'de saklanan `allowedSenders` ve `requiredKeywords` listeleriyle gönderici ve mesaj içeriği kontrolü yap.
+#                - Karşılaştırmaları esnek yap (örn. gönderici için `contains` veya `endsWith`, kelimeler için `toLowerCase().contains()`).
+#                - **Sadece** her iki filtreyi de geçen SMS'leri `notifyListeners` ile JS tarafına gönder.
+#        - **JS (Uygulama Başlangıcı):**
+#            - `App.tsx` veya uygun bir başlangıç noktasında, SMS izni alındıktan sonra `SmsReader.configureFilters` metodunu çağırarak `allRelevantSenders` ve `allRelevantKeywords` listelerini native tarafa ilet.
+
+# 2. Redux Persist Verilerini Şifreleme:
+#    - **Amaç:** Cihazda saklanan hassas finansal verilerin (ekstre, kredi, token vb.) güvenliğini sağlamak ve Google Play Veri Güvenliği politikalarına uymak.
+#    - **Adımlar:**
+#        - **Kütüphane Ekleme:** `redux-persist-transform-encrypt` ve `crypto-js` kütüphanelerini yükle.
+#        - **Güvenli Anahtar Yönetimi (ÖNEMLİ):**
+#            - Şifreleme anahtarını kod içine GÖMME!
+#            - Android Keystore kullanarak anahtar oluşturup/saklayıp/almak için bir Capacitor eklentisi kullan (örn. `@capacitor-community/storage` secure mode veya özel bir Keystore eklentisi).
+#            - Uygulama başlangıcında bu anahtarı güvenli bir şekilde al.
+#        - **Transform Oluşturma:** Alınan güvenli anahtar ile `encryptTransform` kullanarak şifreleyici (`encryptor`) oluştur.
+#        - **Redux Persist Yapılandırması:** `encryptor`'ı `persistConfig` içindeki `transforms` dizisine ekle (`src/store/index.ts` veya benzeri).
+#        - **Geçiş (Migration) Yönetimi:** Önceden şifrelenmemiş veri varsa, uygulama güncellemesinde oluşacak hataları önlemek için geçiş stratejisi belirle (uygulama verisini temizle veya `redux-persist` migrate özelliği/`onError` callback kullan).
+#        - **Test ve Doğrulama:** Şifrelemenin çalıştığını ve verilerin diskte okunamaz olduğunu doğrula.
+
+# 3. OAuth Modernizasyonu (Google API İstemci Kütüphaneleri):
+#    - **Amaç:** Eski `GoogleAuthUtil.getToken` kullanımını kaldırıp, Google'ın önerdiği modern ve daha güvenli API istemci kütüphanelerini kullanmak.
+#    - **Adımlar:**
+#        - İlgili Google API İstemci Kütüphanelerini (örn. `com.google.api.services.gmail`, `com.google.api.services.calendar`) Android projesine bağımlılık olarak ekle (`android/app/build.gradle`).
+#        - `GoogleAuthPlugin.java`'yı yeniden yapılandır:
+#            - `fetchAccessTokenInBackground` ve `GoogleAuthUtil.getToken` kullanımını kaldır.
+#            - Başarılı `GoogleSignInAccount` alındıktan sonra, bu hesabı kullanarak Google API İstemci Kütüphanelerini (Gmail, Calendar) başlat.
+#            - `accessToken`'ı doğrudan JS tarafına göndermek yerine, API isteklerini (e-posta arama, detay alma, ek alma, takvim işlemi vb.) doğrudan native tarafta bu kütüphaneler aracılığıyla yap.
+#            - Sadece gerekli işlenmiş veriyi (örn. `ParsedStatement`, `ParsedLoan`, takvim etkinliği sonucu) JS tarafına `PluginCall.resolve()` ile gönder.
+#        - `gmail.service.ts` ve `calendar.service.ts`'i güncelle:
+#            - Ham `fetch` çağrılarını kaldırıp, native plugin'in yeni metodlarını (örn. `searchGmailNative`, `createCalendarEventNative`) çağıracak şekilde düzenle.
+#        - Hata yönetimini ve token yenileme mantığını (varsa, istemci kütüphaneleri genellikle bunu kısmen halleder) gözden geçir.
