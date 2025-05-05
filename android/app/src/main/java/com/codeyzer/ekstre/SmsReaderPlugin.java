@@ -15,19 +15,16 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
-import com.getcapacitor.annotation.PermissionCallback;
 
 import org.json.JSONException;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 @CapacitorPlugin(
     name = "SmsReader",
     permissions = {
-        // SMS okuma iznini burada belirtelim
         @Permission(alias = "readSms", strings = { Manifest.permission.READ_SMS })
     }
 )
@@ -35,102 +32,122 @@ public class SmsReaderPlugin extends Plugin {
 
     private static final String TAG = "SmsReaderPlugin";
 
-    // Echo metodu kaldırıldı
+    // Global filtre listeleri kaldırıldı
+    // private List<String> allowedSenders = new ArrayList<>();
+    // private List<String> requiredKeywords = new ArrayList<>();
 
-    // checkPermissions ve requestPermissions metodları Capacitor tarafından sağlanır,
-    // biz sadece @Permission annotation'ı ile izni belirtiyoruz.
+    // configureFilters metodu kaldırıldı
+    // @PluginMethod
+    // public void configureFilters(PluginCall call) { ... }
 
     @PluginMethod
     public void getMessages(PluginCall call) {
         if (getPermissionState("readSms") != PermissionState.GRANTED) {
-            call.reject("READ_SMS permission is required to read messages.");
+             call.reject("READ_SMS permission is required to read messages.");
             return;
         }
 
-        // Opsiyonel filtreleri alalım
-        Integer maxCount = call.getInt("maxCount", 50); 
-        JSArray sendersArray = call.getArray("senders"); 
-        String query = call.getString("query"); // İçerik sorgusunu al
+        JSArray sendersArray = call.getArray("senders");
+        JSArray keywordsArray = call.getArray("keywords");
+        Integer maxCount = call.getInt("maxCount", 5);
 
-        List<String> selectionParts = new ArrayList<>();
-        List<String> selectionArgsList = new ArrayList<>();
+        List<String> currentAllowedSenders = new ArrayList<>();
+        List<String> currentRequiredKeywords = new ArrayList<>();
+        List<String> finalSelectionArgs = new ArrayList<>(); // Tüm argümanları toplayacak liste
 
-        // 1. Gönderen filtresini oluştur (varsa)
+        // Sender listesini oluştur (Büyük harf)
         if (sendersArray != null) {
-            List<String> sendersList = new ArrayList<>();
             try {
-                 for (int i = 0; i < sendersArray.length(); i++) {
-                     sendersList.add(sendersArray.getString(i));
-        }
-                 if (!sendersList.isEmpty()) {
-                     String placeholders = String.join(",", Collections.nCopies(sendersList.size(), "?"));
-                     selectionParts.add(Telephony.Sms.ADDRESS + " IN (" + placeholders + ")");
-                     selectionArgsList.addAll(sendersList);
-                     Log.d(TAG, "Adding sender filter: " + sendersList.toString());
-                 } else {
-                     Log.d(TAG, "Senders array provided but empty.");
-                 }
+                for (int i = 0; i < sendersArray.length(); i++) {
+                    String sender = sendersArray.getString(i);
+                    if (sender != null && !sender.isEmpty()) {
+                        currentAllowedSenders.add(sender);
+                    }
+                }
             } catch (JSONException e) {
-                 Log.e(TAG, "Error parsing senders array", e);
-                 call.reject("Invalid senders array format.");
-                 return;
+                call.reject("Invalid senders array format in call."); return;
             }
-    }
-
-        // 2. İçerik filtresini oluştur (varsa)
-        if (query != null && !query.trim().isEmpty()) {
-            selectionParts.add(Telephony.Sms.BODY + " LIKE ?");
-            selectionArgsList.add("%" + query + "%"); // LIKE için %query%
-            Log.d(TAG, "Adding body filter: %" + query + "%");
+        }
+        // Keyword listesini oluştur (Küçük harf)
+        if (keywordsArray != null) {
+             try {
+                for (int i = 0; i < keywordsArray.length(); i++) {
+                    String keyword = keywordsArray.getString(i);
+                    if (keyword != null && !keyword.isEmpty()) {
+                        currentRequiredKeywords.add(keyword);
+                    }
+                }
+            } catch (JSONException e) {
+                call.reject("Invalid keywords array format in call."); return;
+            }
         }
 
-        // 3. Selection string ve argümanlarını birleştir
-        String selection = null;
-        String[] selectionArgs = null;
-        if (!selectionParts.isEmpty()) {
-            selection = String.join(" AND ", selectionParts);
-            selectionArgs = selectionArgsList.toArray(new String[0]);
+        StringBuilder selectionBuilder = new StringBuilder();
+
+        // 1. Sender filtresini oluştur (Case-sensitive)
+        if (!currentAllowedSenders.isEmpty()) {
+            String placeholders = String.join(", ", Collections.nCopies(currentAllowedSenders.size(), "?"));
+            selectionBuilder.append(Telephony.Sms.ADDRESS).append(" IN (").append(placeholders).append(")");
+            finalSelectionArgs.addAll(currentAllowedSenders);
         }
 
-        Log.d(TAG, "Final selection: " + selection);
-        Log.d(TAG, "Final selection args: " + selectionArgsList.toString());
-        Log.d(TAG, "Fetching SMS messages with maxCount: " + maxCount);
+        // 2. Keyword filtresini oluştur (Case-sensitive using GLOB)
+        if (!currentRequiredKeywords.isEmpty()) {
+            // Eğer sender filtresi de varsa, araya " AND " ekle
+            if (selectionBuilder.length() > 0) {
+                selectionBuilder.append(" AND ");
+            }
+            // Keyword koşullarını parantez içine al: (body GLOB ? OR ...)
+            selectionBuilder.append("(");
+            for (int i = 0; i < currentRequiredKeywords.size(); i++) {
+                if (i > 0) {
+                    selectionBuilder.append(" OR ");
+                }
+                selectionBuilder.append(Telephony.Sms.BODY).append(" GLOB ?");
+                // GLOB için argümanları * ile sarmala
+                finalSelectionArgs.add("*" + currentRequiredKeywords.get(i) + "*");
+            }
+            selectionBuilder.append(")");
+        }
+
+        String selection = selectionBuilder.length() > 0 ? selectionBuilder.toString() : null;
+        String[] selectionArgs = finalSelectionArgs.isEmpty() ? null : finalSelectionArgs.toArray(new String[0]);
 
         JSObject result = new JSObject();
         JSArray messages = new JSArray();
         ContentResolver contentResolver = getContext().getContentResolver();
         Cursor cursor = null;
+        int messagesAdded = 0;
 
         try {
             Uri inboxUri = Telephony.Sms.Inbox.CONTENT_URI;
             String[] projection = { Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.DATE };
-            String sortOrder = Telephony.Sms.DATE + " DESC";
+            String sortOrder = Telephony.Sms.DATE + " DESC LIMIT " + maxCount; // LIMIT'i direkt query'ye ekleyelim
 
-            // Sorguyu oluşturulan selection ve selectionArgs ile yap
+            // Filtreleme yaparak sorgula
             cursor = contentResolver.query(inboxUri, projection, selection, selectionArgs, sortOrder);
 
             if (cursor != null) {
-                int count = 0;
-                while (cursor.moveToNext() && count < maxCount) {
-                    JSObject msg = new JSObject();
+                // Cursor zaten filtrelenmiş ve limitlenmiş geldiği için sadece okuyup ekleyeceğiz
+                while (cursor.moveToNext()) { // maxCount kontrolü artık sortOrder'da
                     String address = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS));
                     String body = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY));
                     long date = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE));
 
+                    // Döngü içinde ekstra filtreleme yok
+                    JSObject msg = new JSObject();
                     msg.put("address", address);
                     msg.put("body", body);
                     msg.put("date", date);
-                    // msg.put("id", cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms._ID))); // Gerekirse ID
                     messages.put(msg);
-                    count++;
+                    messagesAdded++; // Gerçekte eklenen mesaj sayısını tutalım
                 }
-                 Log.d(TAG, "Fetched " + count + " messages.");
             } else {
-                Log.w(TAG, "Cursor is null, could not query SMS inbox.");
+                Log.w(TAG, "Cursor is null, query failed or returned no results.");
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error reading SMS messages", e);
-            call.reject("Failed to read SMS messages.", e);
+            Log.e(TAG, "Error querying SMS messages", e);
+            call.reject("Failed to query SMS messages.", e);
             return;
         } finally {
             if (cursor != null) {

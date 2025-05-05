@@ -78,11 +78,4 @@ export class SmsReaderWeb extends WebPlugin implements SmsReaderPlugin {
 
     return Promise.resolve({ messages: mockMessages });
   }
-
-  // configureFilters metodunu implemente et (Web için mock)
-  async configureFilters(options: import('./definitions').SmsNativeFilterConfig): Promise<void> {
-    console.log('SmsReaderWeb: Mock Configure Filters with options:', options);
-    // Web platformunda filtreleme uygulanmaz, sadece logla ve tamamla
-    return Promise.resolve();
-  }
 } 

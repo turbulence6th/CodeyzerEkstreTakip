@@ -16,21 +16,22 @@ export interface SmsMessage {
 
 // Mesajları filtrelemek için opsiyonlar
 export interface SmsFilterOptions {
-  address?: string; // Belirli bir gönderenden filtrele (tam eşleşme)
-  addressRegex?: string; // Gönderen regex ile filtrele
-  body?: string; // Mesaj içeriğinde ara (tam eşleşme)
-  bodyRegex?: string; // Mesaj içeriğinde regex ile ara
+  // address?: string; // Belirli bir gönderenden filtrele (tam eşleşme) - Native artık IN kullanıyor
+  // addressRegex?: string; // Gönderen regex ile filtrele - Kaldırıldı
+  // body?: string; // Mesaj içeriğinde ara (tam eşleşme) - Native artık LIKE kullanıyor
+  // bodyRegex?: string; // Mesaj içeriğinde regex ile ara - Kaldırıldı
   minDate?: number; // Minimum tarih (timestamp ms)
   maxDate?: number; // Maksimum tarih (timestamp ms)
   maxCount?: number; // Döndürülecek maksimum mesaj sayısı
+
+  // Native tarafta SQL sorgusu için kullanılacak filtreler
+  senders?: string[]; // İzin verilen gönderici adresleri (tam eşleşme, case-insensitive yapılacak)
+  keywords?: string[]; // Mesaj gövdesinde bulunması gereken anahtar kelimeler (case-insensitive yapılacak)
+
   // indexFrom?: number; // Sayfalama için başlangıç indeksi (şimdilik eklenmedi)
 }
 
-// Native filtreleme için yapılandırma seçenekleri
-export interface SmsNativeFilterConfig {
-  senders: string[]; // İzin verilen gönderici listesi (Büyük harf)
-  keywords: string[]; // Gerekli anahtar kelime listesi (Küçük harf)
-}
+// Native filtreleme için yapılandırma seçenekleri - KALDIRILDI
 
 // Pluginimizin metodlarını tanımlayan interface
 export interface SmsReaderPlugin {
@@ -46,18 +47,11 @@ export interface SmsReaderPlugin {
 
   /**
    * Belirtilen filtrelere göre SMS mesajlarını getirir.
-   * @param options Filtreleme seçenekleri (örn. maxCount)
+   * @param options Filtreleme seçenekleri (örn. maxCount, senders, keywords)
    */
   getMessages(options?: SmsFilterOptions): Promise<{ messages: SmsMessage[] }>;
 
-  /**
-   * Native taraftaki SMS alıcısının kullanacağı gönderici ve anahtar kelime
-   * filtrelerini ayarlar. Bu, sadece ilgili SMS'lerin JS tarafına
-   * bildirilmesini sağlar, Google Play politikalarına uyumluluğu artırır.
-   *
-   * @param options Gönderici ve anahtar kelime listelerini içeren nesne.
-   */
-  configureFilters(options: SmsNativeFilterConfig): Promise<void>;
+  // configureFilters metodu kaldırıldı
 
   // Belki gelen SMS'leri dinlemek için:
   // addListener(eventName: 'smsReceived', listenerFunc: (message: SmsMessage) => void): Promise<PluginListenerHandle> & PluginListenerHandle;

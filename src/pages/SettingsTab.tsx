@@ -1,4 +1,4 @@
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, /*IonCard,*/ /*IonCardContent,*/ IonButton, useIonToast } from '@ionic/react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, /*IonCard,*/ /*IonCardContent,*/ IonButton, useIonToast, useIonAlert } from '@ionic/react';
 import React/*, { useEffect }*/ from 'react'; // useEffect kaldırıldı
 import './SettingsTab.css';
 
@@ -17,11 +17,6 @@ import { signOutFromGoogleThunk } from '../store/slices/authSlice';
 import { clearData } from '../store/slices/dataSlice';
 import { addToast } from '../store/slices/toastSlice';
 
-// Filtre ayarlama fonksiyonunu import et
-// import { SmsReader } from '../plugins/sms-reader'; // Artık burada gerek yok
-// import { allRelevantSenders, allRelevantKeywords } from '../services/sms-parsing/sms-processor'; // Artık burada gerek yok
-import { setupNativeSmsFilters } from '../services/sms-parsing/sms-processor'; // Yeni yardımcıyı import et
-
 // İzin durumlarını Türkçe'ye çeviren helper fonksiyonu
 const translatePermissionStatus = (status: string | undefined): string => {
   if (!status) return 'Bilinmiyor';
@@ -36,6 +31,7 @@ const translatePermissionStatus = (status: string | undefined): string => {
 
 const SettingsTab: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
+  const [presentAlert] = useIonAlert();
 
   const { user: userInfo } = useSelector((state: RootState) => state.auth);
   const { sms: smsPermission, error: permissionError } = useSelector((state: RootState) => state.permissions);
@@ -85,8 +81,8 @@ const SettingsTab: React.FC = () => {
       });
   };
 
-  // İzin İsteme Fonksiyonu (setupNativeSmsFilters çağrısı kaldırıldı)
-  const requestPermission = async () => {
+  // ASIL İzin İsteme Thunk'ını çağıran fonksiyon
+  const dispatchPermissionRequest = () => {
     dispatch(clearSmsPermissionError());
     dispatch(requestSmsPermissionThunk())
       .unwrap()
@@ -95,17 +91,6 @@ const SettingsTab: React.FC = () => {
         const message = `SMS İzin İsteği Sonucu: ${translatePermissionStatus(status.readSms)}`;
         const color = status.readSms === 'granted' ? 'success' : 'warning';
         dispatch(addToast({ message, duration: 2000, color }));
-
-        // Filtre yapılandırması artık App.tsx'teki useEffect tarafından handle ediliyor.
-        /*
-        if (status.readSms === 'granted') {
-          setupNativeSmsFilters()
-            .catch(err => {
-              console.error('[SettingsTab] Error calling setupNativeSmsFilters after request:', err);
-              dispatch(addToast({ message: `Filtre ayarlanırken hata oluştu: ${err.message || err}`, duration: 3000, color: 'danger' }));
-            });
-        }
-        */
       })
       .catch((error) => {
         console.error('[SettingsTab] SMS Permission Request Thunk Error:', error);
@@ -115,6 +100,31 @@ const SettingsTab: React.FC = () => {
           color: 'danger'
         }));
       });
+  };
+
+  // İzin isteme düğmesine basıldığında Alert gösteren fonksiyon
+  const presentPermissionAlert = () => {
+    presentAlert({
+      header: 'SMS İzni Açıklaması',
+      message: 'Uygulamanın çalışabilmesi için bankalardan gelen ekstre ve kredi SMS\'lerini okuyarak son ödeme ve taksit tarihlerini otomatik olarak finansal takviminize eklemesi gerekir. \n\nUygulama SADECE bankalara ait olduğu anlaşılan (gönderici adı ve içerik filtrelemesi ile) ve finansal bilgi içeren SMS\'leri okur, diğer mesajlarınıza erişmez. Okunan veriler sadece cihazınızda işlenir ve KESİNLİKLE paylaşılmaz.',
+      buttons: [
+        {
+          text: 'İptal',
+          role: 'cancel',
+          handler: () => {
+            console.log('SMS permission request cancelled by user.');
+          },
+        },
+        {
+          text: 'Anladım, İzin Ver',
+          handler: () => {
+            console.log('User agreed to permission request. Dispatching thunk...');
+            dispatchPermissionRequest(); // Kullanıcı onaylarsa asıl isteği yap
+          },
+        },
+      ],
+      backdropDismiss: false // Arka plana tıklayarak kapatmayı engelle
+    });
   };
 
   return (
@@ -153,7 +163,7 @@ const SettingsTab: React.FC = () => {
                   </IonButton>
                 </p>
                 {smsPermission?.readSms !== 'granted' && (
-                  <IonButton expand="block" onClick={requestPermission} style={{ marginBottom: '5px' }}>
+                  <IonButton expand="block" onClick={presentPermissionAlert} style={{ marginBottom: '5px' }}>
                     SMS Okuma İzni İste
                   </IonButton>
                 )}

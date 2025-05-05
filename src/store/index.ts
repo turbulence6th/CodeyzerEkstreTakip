@@ -15,6 +15,7 @@ import storage from 'redux-persist/lib/storage'; // localStorage'ı kullanır
 import dateTransform from './transforms/dateTransform'; // Oluşturduğumuz transformu import et
 // import encryptTransform from 'redux-persist-transform-encrypt'; // Eski import kaldırıldı
 import * as RPTEncrypt from 'redux-persist-transform-encrypt';
+// import { createTransform } from 'redux-persist'; // createTransform kaldırıldı
 
 // Kendi güvenli depolama eklentimizi import edelim
 import { SecureStorage } from '../plugins/secure-storage';
@@ -65,9 +66,11 @@ export const initializeStore = (encryptionKey: string) => {
   console.log('[Store Init] Initializing store with encryption key.');
 
   // Create encrypt transform (sağlanan anahtarla)
+  // encryptor tekrar etkinleştirildi, transform whitelist'i kaldırıldı
   const encryptor = encryptTransform({
     secretKey: encryptionKey,
     onError: (err: Error) => console.error('[Encrypt Transform] Error:', err),
+    // whitelist: ['auth'] // Bu satır kaldırıldı, tüm gelen slice'lar şifrelenecek
   });
 
   // 1. Ana reducer'ı oluştur
@@ -86,8 +89,9 @@ export const initializeStore = (encryptionKey: string) => {
   const persistConfig = {
     key: 'root',
     storage,
-    whitelist: ['auth', 'permissions', 'data'],
-    transforms: [encryptor, dateTransform]
+    whitelist: ['auth', 'permissions', 'data'], // Hepsini persist et
+    // encryptor tekrar eklendi, dateTransform'dan sonra
+    transforms: [dateTransform, encryptor]
   };
 
   // 4. Kalıcı reducer'ı oluştur (RootState tipini kullanarak)

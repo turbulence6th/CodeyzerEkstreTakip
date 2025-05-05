@@ -91,9 +91,11 @@ platform: capacitor
 
 # 4. Veri Ayrıştırma (Parsing):
 #    - **SMS:**
-#        - Native SMS okuyucu eklentisi (`SmsReaderPlugin.java`) ile native filtreleme.
+#        - Native SMS okuyucu eklentisi (`SmsReaderPlugin.java`) ile **çağrı bazlı, büyük/küçük harfe duyarlı (GLOB) native filtreleme**.
+#            - `getMessages` metodu, gönderici listesi (`IN`) ve anahtar kelime listesi (`GLOB`) filtrelerini parametre olarak alır.
+#            - Filtreleme doğrudan Android `ContentResolver` sorgusunda (`WHERE` koşulu) yapılır.
 #        - `sms-processor.ts` ile banka bazlı SMS işleme (`fetchAndParseStatements`, `fetchAndParseLoans`).
-#        - QNB, Garanti için SMS parser\'ları (`qnb-parser.ts`, `garanti-parser.ts`).
+#        - QNB, Garanti için SMS parser'ları (`qnb-parser.ts`, `garanti-parser.ts`).
 #    - **E-posta:**
 #        - Yapı Kredi, Ziraat için HTML içerik parser\'ları (`yapikredi-email-parser.ts`, `ziraat-email-parser.ts`).
 #        - Kuveyt Türk için HTML içerik parser'ı (`kuveytturk-email-parser.ts`):
@@ -118,41 +120,43 @@ platform: capacitor
 # 5. State Yönetimi (Redux):
 #    - Oturum (`accessToken`, `idToken`), izinler, ayrıştırılmış veriler yönetilir.
 #    - `redux-persist` ile state kalıcılığı (`authSlice`, `permissionSlice`, `dataSlice`).
-#    - `dataSlice` manuel kayıtları da tutar (`ManualEntry` tipi, `addManualEntry`, `deleteManualEntry`
+#        - **Şifreleme:** `redux-persist-transform-encrypt` kullanılarak `auth`, `permissions` ve `data` slice'ları şifrelenir.
+#            - Anahtar yönetimi: JS'de üretilen anahtar, native `SecureStorage` (Android Keystore destekli) ile şifrelenip Capacitor Preferences'ta saklanır.
+#            - **Android Otomatik Yedekleme:** Veri tutarsızlığı ve ilk açılış sorunlarını önlemek için `AndroidManifest.xml` içinde `android:allowBackup="false"` olarak ayarlandı.
+#    - `dataSlice` manuel kayıtları da tutar (`ManualEntry` tipi, `addManualEntry`, `deleteManualEntry`)
 
 # --- Yapılacaklar (To-Do) ---
 
-# 1. SMS İzin Gerekçesini Güçlendirme (Dinamik Native Filtreleme): [TS Tamamlandı, Native Beklemede]
+# 1. SMS İzin Gerekçesini Güçlendirme (Dinamik Native Filtreleme): [Tamamlandı]
 #    - **Amaç:** Google Play Store onayı için SMS izni talebini daha savunulabilir hale getirmek.
-#    - **Adımlar:**
-#        - **JS (Tamamlandı):** `availableBankProcessors`'dan türetilen merkezi filtre listeleri oluşturuldu (`sms-processor.ts`):
-#            - `allRelevantSenders`: Tüm bankaların `smsSenderKeywords` listelerinin birleşimi (tekilleştirilmiş, büyük harf).
-#            - `allRelevantKeywords`: Tüm bankaların `smsStatementQueryKeyword` ve `smsLoanQueryKeyword` değerlerinin birleşimi (küçük harf, tekilleştirilmiş).
-#        - **Native Plugin (Beklemede):**
-#            - Plugin'e (Java ve TS tanımı) yeni bir metot ekle: `configureFilters(options: { senders: string[]; keywords: string[] })`. Bu metot, JS'den gelen listeleri alıp native değişkende saklayacak.
-#            - Native SMS alıcısını (BroadcastReceiver) güncelle:
-#                - Gelen her SMS için, plugin'de saklanan `allowedSenders` ve `requiredKeywords` listeleriyle gönderici ve mesaj içeriği kontrolü yap.
-#                - Karşılaştırmaları esnek yap (örn. gönderici için `contains` veya `endsWith`, kelimeler için `toLowerCase().contains()`).
-#                - **Sadece** her iki filtreyi de geçen SMS'leri `notifyListeners` ile JS tarafına gönder.
-#        - **JS (Uygulama Başlangıcı - Tamamlandı):**
-#            - `App.tsx` içinde, SMS izni durumu `'granted'` olduğunda `setupNativeSmsFilters` (`sms-processor.ts` içinde) çağrılarak filtre listeleri native tarafa iletiliyor.
+#    - **Uygulama:**
+#        - Native `SmsReaderPlugin.java` içindeki `getMessages` metodu güncellendi:
+#            - Artık her çağrıda `senders` (gönderici listesi) ve `keywords` (anahtar kelime listesi) parametrelerini alıyor.
+#            - Filtreleme, doğrudan Android `ContentResolver` sorgusunda, **büyük/küçük harfe duyarlı** olarak yapılır (Gönderenler için `IN`, anahtar kelimeler için `GLOB`).
+#        - `configureFilters` metodu ve global filtre tutma mantığı kaldırıldı.
+#        - `sms-processor.ts` içindeki `getMessages` çağrıları, ilgili bankanın filtrelerini (gönderici, anahtar kelime) dinamik olarak iletecek şekilde güncellendi.
+#        - `setupNativeSmsFilters` ve ilgili JS kodları kaldırıldı.
+#    - **Sonuç:** Uygulama sadece ihtiyaç anında, belirtilen kriterlere uyan SMS'leri native katmanda okur, tüm gelen kutusuna erişmez.
 
 # 2. Redux Persist Verilerini Şifreleme: [Tamamlandı]
 #    - **Amaç:** Cihazda saklanan hassas finansal verilerin güvenliğini sağlamak.
-#    - **Adımlar:**
-#        - **TS/JS Tarafı (Tamamlandı):**
-#            - `redux-persist-transform-encrypt`, `crypto-js` kütüphaneleri yüklendi.
-#            - `encryptTransform` oluşturuldu (`src/store/index.ts`).
-#            - Şifreleme anahtarının `SecureStorage` eklentisinden (yeni yöntemle: JS'de üretilip native'de şifrelenerek saklanan anahtar) asenkron alınması ve store'un anahtar alındıktan SONRA başlatılması sağlandı (`src/main.tsx`, `src/store/index.ts`).
-#            - Anahtar alınamazsa uygulamanın güvenli bir hata ekranıyla başlaması sağlandı (`src/main.tsx`).
-#            - Store'a uygulama genelinde erişim için Dependency Injection kullanıldı (`configureApiClient` ve `initializeStore`).
-#            - `encryptor` transformu `persistConfig`'e eklendi.
-#            - Test/Doğrulama: Verilerin diskte şifrelendiği manuel olarak kontrol edilebilir.
-#        - **Native Tarafı (Tamamlandı):**
-#            - **Güvenli Anahtar Yönetimi:** Android Keystore kullanarak **doğrudan şifreleme/şifre çözme** yapan (`encryptString`/`decryptString` metotları) ve JS'deki `redux-persist-transform-encrypt` anahtarını güvenli bir şekilde saklayan `SecureStorage` Capacitor eklentisi oluşturuldu.
-#        - **~~Geçiş (Migration) Yönetimi:~~** (İptal edildi, yapılmayacak)
+#    - **Uygulama:**
+#        - `redux-persist-transform-encrypt` kütüphanesi kullanıldı.
+#        - **Anahtar Yönetimi:**
+#            - JS tarafında rastgele bir şifreleme anahtarı (`reduxKey`) üretildi.
+#            - Bu anahtar, native `SecureStorage` eklentisi (Android Keystore kullanan) aracılığıyla şifrelendi.
+#            - Şifrelenmiş anahtar Capacitor Preferences içinde saklandı.
+#            - Uygulama başlangıcında Preferences'tan okunup native tarafta çözülerek `encryptTransform`'e verildi.
+#        - **Kapsam:** `auth`, `permissions`, `data` slice'ları persist ediliyor ve şifreleniyor (`encryptTransform`'un `whitelist` seçeneği beklendiği gibi çalışmasa da sonuçta hepsi şifreleniyor).
+#        - **Android Otomatik Yedekleme:** Veri tutarsızlığı ve ilk açılış sorunlarını önlemek için `AndroidManifest.xml` içinde `android:allowBackup="false"` olarak ayarlandı.
 
-# 3. OAuth Modernizasyonu (Google API İstemci Kütüphaneleri): [Beklemede]
+# 3. Redux'ta E-posta Veri Depolamasını Optimize Etme: [Beklemede]
+#    - **Amaç:** Redux state'inde saklanan e-posta verisi miktarını azaltmak.
+#    - **Adımlar:**
+#        - `dataSlice` içinde saklanan `EmailDetails` objelerinden, özellikle ek ayrıştırma (PDF) için artık gerekmeyen `originalResponse` alanını kaldırmayı veya sadece gerekli minimum bilgiyi (örn. ek ID'leri) saklayacak şekilde yeniden yapılandırmayı değerlendir.
+#        - Bu değişiklik, state boyutunu küçültecek, performansı artıracak ve potansiyel serileştirme/persist sorunlarını azaltacaktır.
+
+# 4. OAuth Modernizasyonu (Google API İstemci Kütüphaneleri): [Beklemede]
 #    - **Amaç:** Eski `GoogleAuthUtil.getToken` yerine modern API istemci kütüphanelerini kullanmak.
 #    - **Adımlar:**
 #        - **Native Tarafı (Beklemede):**
@@ -167,7 +171,7 @@ platform: capacitor
 #                - Ham `fetch` çağrıları kaldırılıp, Native plugin'in yeni metodları çağrılmalı.
 #            - Hata yönetimi ve token yenileme mantığı gözden geçirilmeli.
 
-# 4. Gizlilik Politikası URL'si Sağlama: [Beklemede]
+# 5. Gizlilik Politikası URL'si Sağlama: [Beklemede]
 #    - **Amaç:** Google Play Store politikalarına uymak.
 #    - **Adımlar:**
 #        - Gizlilik politikası metni oluşturulmalı.

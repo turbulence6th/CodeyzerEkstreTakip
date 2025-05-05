@@ -1,6 +1,6 @@
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonList, IonItem, IonLabel, IonSpinner, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonIcon, IonNote, useIonToast, IonModal, IonButtons, IonFooter, IonItemSliding, IonItemOptions, IonItemOption, IonRefresher, IonRefresherContent, RefresherEventDetail, useIonViewWillEnter, IonAlert } from '@ionic/react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonList, IonItem, IonLabel, IonSpinner, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonIcon, IonNote, useIonToast, IonModal, IonButtons, IonFooter, IonItemSliding, IonItemOptions, IonItemOption, IonRefresher, IonRefresherContent, RefresherEventDetail, IonAlert } from '@ionic/react';
 import './AccountTab.css';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { GoogleAuth } from '@plugins/google-auth';
 import type { GoogleUser } from '@plugins/google-auth'; 
 
@@ -114,30 +114,30 @@ const AccountTab: React.FC = () => {
       dispatch(startGlobalLoading('Takvim kontrol ediliyor...'));
       const newStatus: Record<string, boolean> = {};
 
+      // Orijinal for...of döngüsü
       for (const item of displayItems) {
-        // Her öğe tipi için doğru AppID'yi üret
-        // Krediler için, sadece ilk taksitin durumunu kontrol etmek UI için yeterli
-        const appIdToCheck = isLoan(item) ? generateAppId(item, 1) : generateAppId(item);
-
-        if (!appIdToCheck) {
+          const appIdToCheck = isLoan(item) ? generateAppId(item, 1) : generateAppId(item);
+          if (!appIdToCheck) {
             console.warn('Could not generate AppID for calendar check:', item);
-            continue; // ID üretilemezse atla
-        }
-
-        try {
-          // Üretilen AppID ile arama yap
-          newStatus[appIdToCheck] = await calendarService.searchEvents(appIdToCheck);
-        } catch (error: any) {
-          console.error(`Error checking calendar status for AppID: ${appIdToCheck}`, item, error);
-          newStatus[appIdToCheck] = false; // Hata durumunda false ata
-        }
+            continue;
+          }
+          try {
+            const status = await calendarService.searchEvents(appIdToCheck);
+            newStatus[appIdToCheck] = status;
+          } catch (error: any) {
+            console.error(`Error checking calendar status for AppID: ${appIdToCheck}`, item, error);
+            newStatus[appIdToCheck] = false; // Hata durumunda false ata
+          }
       }
+
       console.log("AccountTab Effect: calendar status checked:", newStatus);
       setCalendarEventStatus(newStatus);
+      // stopGlobalLoading döngüden sonra çağrılıyor
       dispatch(stopGlobalLoading());
     };
 
     checkCalendarEvents();
+    // dispatch bağımlılığı tekrar kaldırıldı (önceki gibi)
   }, [displayItems, accessToken]);
 
   // YENİ useEffect: İzin durumunu otomatik kontrol et
@@ -416,7 +416,7 @@ Kaynak: ${loan.source.toUpperCase()}`;
                          <IonCardContent className="permission-warning-text ion-text-center">
                              {smsPermission === null
                                ? 'SMS izin durumu kontrol ediliyor...' // Durum null iken mesaj
-                               : 'Ekstre ve kredi bilgilerini otomatik görmek için lütfen Ayarlar sekmesinden SMS okuma iznini verin.'} // Diğer durumlarda mesaj
+                               : 'Ekstre ve kredi bilgilerini otomatik görmek için lütfen Ayarlar sekmesinden SMS okuma iznini verin.'} 
                          </IonCardContent>
                      </IonCard>
                   )}

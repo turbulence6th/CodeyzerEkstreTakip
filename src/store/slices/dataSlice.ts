@@ -56,11 +56,12 @@ export const fetchAndProcessDataThunk = createAsyncThunk<
 
     dispatch(startGlobalLoading("Veriler işleniyor..."));
     try {
-      console.log("Fetching and parsing statements & loans (Thunk). Filter disabled.");
+      console.log("[Thunk] Fetching and parsing statements & loans...");
       const [parsedStatements, parsedLoans] = await Promise.all([
         statementProcessor.fetchAndParseStatements({ maxCount: 100 }),
         statementProcessor.fetchAndParseLoans({ maxCount: 100 })
       ]);
+      console.log("[Thunk] Promise.all for statement/loan fetching completed.");
 
       const fetchedItems: (ParsedStatement | ParsedLoan)[] = [...parsedStatements, ...parsedLoans];
       console.log(`Parsed ${parsedStatements.length} statements and ${parsedLoans.length} loans.`);
@@ -105,15 +106,16 @@ export const fetchAndProcessDataThunk = createAsyncThunk<
       // --- SERIALIZE ETME SONU ---
 
       const totalItems = serializableFetchedItems.length;
-      console.log(`Total new automatic items fetched (no filtering): ${totalItems}`);
+      console.log(`[Thunk] Total new automatic items fetched (no filtering): ${totalItems}`);
 
       // Thunk artık isPaid içermeyen, serileştirilmiş OTOMATİK listeyi döndürür
       return { items: serializableFetchedItems, totalItems: totalItems };
 
     } catch (err: any) {
-      console.error('Error fetching/parsing data (Thunk - Filter Disabled):', err);
+      console.error('[Thunk] !!! Error fetching/parsing data:', err);
        return rejectWithValue(err.message || JSON.stringify(err) || 'Unknown Thunk Error');
     } finally {
+      console.log("[Thunk] fetchAndProcessDataThunk finished (finally block). Stopping global loading.");
       dispatch(stopGlobalLoading());
     }
   }

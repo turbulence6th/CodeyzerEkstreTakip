@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Redirect, Route } from 'react-router-dom';
 import {
   IonApp,
@@ -9,10 +9,10 @@ import {
   IonTabButton,
   IonTabs,
   setupIonicReact,
-  IonLoading
+  IonLoading,
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
-import { addOutline, listCircleOutline, mailOutline, settingsOutline } from 'ionicons/icons';
+import { addOutline, listCircleOutline, settingsOutline } from 'ionicons/icons';
 import AccountTab from './pages/AccountTab';
 import ManualEntryTab from './pages/ManualEntryTab';
 import SettingsTab from './pages/SettingsTab';
@@ -50,35 +50,15 @@ import '@ionic/react/css/palettes/dark.system.css';
 import './theme/variables.css';
 
 // Redux
-import { useSelector, useDispatch } from 'react-redux';
-import type { RootState, AppDispatch } from './store';
-// Filtre ayarlama fonksiyonunu import et
-import { setupNativeSmsFilters } from './services/sms-parsing/sms-processor';
-import { addToast } from './store/slices/toastSlice'; // Hata durumunda toast için
+import { useSelector } from 'react-redux';
+import type { RootState } from './store';
 
 setupIonicReact();
 
 const App: React.FC = () => {
-  const dispatch = useDispatch<AppDispatch>();
-
   // Global state'leri al
   const { isActive: isGlobalLoading, message: loadingMessage } = useSelector((state: RootState) => state.loading);
   const isAuthenticated = useSelector((state: RootState) => !!state.auth.accessToken);
-  const smsPermissionStatus = useSelector((state: RootState) => state.permissions.sms?.readSms);
-
-  // --- SMS Filtrelerini İzin Durumuna Göre Ayarla ---
-  useEffect(() => {
-    // Sadece giriş yapılmışsa ve izin verilmişse çalıştır
-    if (isAuthenticated && smsPermissionStatus === 'granted') {
-      console.log('[App.tsx Effect] SMS permission granted. Configuring filters...');
-      setupNativeSmsFilters()
-        .catch(err => {
-          // Hata durumunda kullanıcıya bildirim göster
-          console.error('[App.tsx Effect] Error calling setupNativeSmsFilters:', err);
-          dispatch(addToast({ message: `SMS filtreleri ayarlanırken bir hata oluştu: ${err.message || err}`, duration: 3500, color: 'danger' }));
-        });
-    }
-  }, [isAuthenticated, smsPermissionStatus, dispatch]); // İzin durumu veya giriş durumu değiştiğinde tekrar kontrol et
 
   return (
   <IonApp>
