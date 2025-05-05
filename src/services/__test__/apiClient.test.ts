@@ -1,13 +1,13 @@
 // src/services/__tests__/apiClient.test.ts
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchWithAuth } from '../apiClient'; // Test edilecek fonksiyon
+import { fetchWithAuth, configureApiClient } from '../apiClient'; // Test edilecek fonksiyon ve configureApiClient'ı da import et
 import { GoogleAuth } from '@plugins/google-auth'; // Mocklanacak plugin
 import type { GoogleUser } from '@plugins/google-auth';
-import { store } from '../../store'; // Mocklanacak store
+// import { store } from '../../store'; // KALDIRILDI
+import * as storeModule from '../../store'; // Store modülünü import et
 import { setRefreshedCredentials, signOutFromGoogleThunk } from '../../store/slices/authSlice'; // Kullanılacak action'lar
-// AuthState tipini import ettiğimizi varsayalım (gerçek yolu kontrol edin)
-// import type { AuthState } from '../../store/slices/authSlice'; 
+import type { RootState } from '../../store'; // RootState tipini import et
 
 // --- Mocking Dependencies ---
 
@@ -15,22 +15,25 @@ import { setRefreshedCredentials, signOutFromGoogleThunk } from '../../store/sli
 vi.mock('@plugins/google-auth', () => ({
   GoogleAuth: {
     trySilentSignIn: vi.fn(),
-    // signIn ve signOut gerekirse eklenebilir
   },
 }));
 
-// Redux store'u mockla (getState ve dispatch)
-vi.mock('../../store', () => ({
-  store: {
-    getState: vi.fn(),
-    dispatch: vi.fn(),
-  },
-}));
+// Redux store modülünü mockla (getStoreState ve getDispatch'i mockla)
+const mockDispatch = vi.fn();
+const mockGetState = vi.fn();
+vi.mock('../../store', async (importOriginal) => {
+  const actual = await importOriginal<typeof storeModule>();
+  return {
+    ...actual,
+    getStoreState: mockGetState, // getStore().getState() yerine bunu mockla
+    getDispatch: vi.fn(() => mockDispatch), // getStore().dispatch yerine bunu mockla
+  };
+});
 
-// authSlice action'larını mockla (dispatch çağrılarını doğrulamak için)
+// authSlice action'larını mockla
 vi.mock('../../store/slices/authSlice', () => ({
   setRefreshedCredentials: vi.fn((payload) => ({ type: 'auth/setRefreshedCredentials', payload })),
-  signOutFromGoogleThunk: vi.fn(() => ({ type: 'auth/signOutFromGoogleThunk/pending' })), // Thunk'ın pending action'ını mockla
+  signOutFromGoogleThunk: vi.fn(() => ({ type: 'auth/signOutFromGoogleThunk/pending' })),
 }));
 
 // Global fetch API'sini mockla
@@ -52,189 +55,160 @@ const mockInitialUser: GoogleUser = {
   id: 'user-000',
   email: 'initial@example.com',
   name: 'Initial User',
-  imageUrl: null, // Eksik alan eklendi
-  idToken: 'initial-id-token', // Eksik alan eklendi (state'den alınabilir)
-  accessToken: 'initial-access-token-xyz', // Token state'den alınabilir
+  imageUrl: null,
+  idToken: 'initial-id-token',
+  accessToken: 'initial-access-token-xyz',
 };
 
 describe('fetchWithAuth', () => {
   const testUrl = 'https://example.com/api/data';
-  const initialToken = mockInitialUser.accessToken!; // initial user'dan alalım
+  const initialToken = mockInitialUser.accessToken!;
 
   beforeEach(() => {
-    // Her testten önce mockları sıfırla
     vi.clearAllMocks();
+    mockGetState.mockClear();
+    mockDispatch.mockClear();
 
-    // Varsayılan olarak geçerli bir token ile state'i mockla (AuthState tipine uygun)
-    vi.mocked(store.getState).mockReturnValue({
+    // API İstemcisini her testten önce yapılandır
+    // configureApiClient, mock fonksiyonları argüman olarak alır.
+    // getDispatch mock'u doğrudan dispatch fonksiyonunu döndürmeli.
+    configureApiClient(mockGetState, mockDispatch);
+
+    // Varsayılan state'i mockla
+    mockGetState.mockReturnValue({
       auth: {
         accessToken: initialToken,
-        user: mockInitialUser, // Düzeltilmiş user objesini kullan
+        user: mockInitialUser,
         error: null,
       },
-      // Diğer slice'lar gerekirse eklenebilir
-      loading: { isActive: false }, // Örnek başka bir slice
-    } as ReturnType<typeof store.getState>); // Type assertion eklendi
+      loading: { isActive: false },
+    } as RootState);
 
-    // Varsayılan fetch yanıtını başarılı (200 OK) olarak ayarla
-    mockFetch.mockReset(); // Her test öncesi fetch mock'unu tamamen sıfırla
+    mockFetch.mockReset();
   });
 
   it('should add Authorization header with existing token', async () => {
-    // Bu test için mock: Başarılı 200 OK
     mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true }) } as Response);
     await fetchWithAuth(testUrl);
     expect(mockFetch).toHaveBeenCalledOnce();
     expect(mockFetch).toHaveBeenCalledWith(testUrl, expect.objectContaining({
-        headers: expect.any(Headers)
+      headers: expect.any(Headers)
     }));
     const headers = mockFetch.mock.calls[0][1]?.headers as Headers;
     expect(headers.get('Authorization')).toBe(`Bearer ${initialToken}`);
   });
 
   it('should return successful response when request is OK', async () => {
-    // Bu test için mock: Başarılı 200 OK (Hatanın olduğu test)
     const mockOkResponse = { ok: true, status: 200, json: async () => ({ success: true }) } as Response;
-    mockFetch.mockResolvedValueOnce(mockOkResponse); // Eksik olan mock eklendi
-
+    mockFetch.mockResolvedValueOnce(mockOkResponse);
     const response = await fetchWithAuth(testUrl);
-
     expect(response.ok).toBe(true);
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true });
-    expect(mockFetch).toHaveBeenCalledOnce(); // Ekstra doğrulama
+    expect(mockFetch).toHaveBeenCalledOnce();
   });
 
   it('should throw error and sign out if no token exists', async () => {
-     // Token olmayan (çıkış yapmış) state'i mockla (AuthState tipine uygun)
-     vi.mocked(store.getState).mockReturnValue({
-       auth: {
-         accessToken: null,
-         user: null, // Eksik alan eklendi
-         error: null, // Eksik alan eklendi
-       },
-       loading: { isActive: false },
-     } as ReturnType<typeof store.getState>); // Type assertion eklendi
+    // Token olmayan state'i mockla
+    mockGetState.mockReturnValue({
+      auth: {
+        accessToken: null,
+        user: null,
+        error: null,
+      },
+      loading: { isActive: false },
+    } as RootState);
 
-     await expect(fetchWithAuth(testUrl)).rejects.toThrow('No access token available.');
-     expect(vi.mocked(store.dispatch)).toHaveBeenCalledOnce();
-     expect(vi.mocked(store.dispatch)).toHaveBeenCalledWith(signOutFromGoogleThunk());
-     expect(mockFetch).not.toHaveBeenCalled();
+    await expect(fetchWithAuth(testUrl)).rejects.toThrow('No access token available.');
+    expect(mockDispatch).toHaveBeenCalledOnce(); // mockDispatch kontrolü
+    expect(mockDispatch).toHaveBeenCalledWith(signOutFromGoogleThunk()); // mockDispatch kontrolü
+    expect(mockFetch).not.toHaveBeenCalled();
   });
-
 
   // --- Token Refresh Scenarios ---
 
   describe('when receiving 401 Unauthorized', () => {
-
     const mock401Response = { ok: false, status: 401, json: async () => ({ error: 'Unauthorized' }), text: async () => '' } as Response;
     const mockSuccessResponse = { ok: true, status: 200, json: async () => ({ data: 'refreshed data' }), text: async () => '' } as Response;
 
     it('should call trySilentSignIn and retry with new token if refresh is successful', async () => {
-      // Mock Sırası: İlk fetch 401, ikinci fetch 200
       mockFetch
         .mockResolvedValueOnce(mock401Response)
         .mockResolvedValueOnce(mockSuccessResponse);
-
-      // trySilentSignIn başarılı dönecek
       vi.mocked(GoogleAuth.trySilentSignIn).mockResolvedValue(mockNewUser);
 
       const response = await fetchWithAuth(testUrl);
 
-      // Doğrulamalar
       expect(mockFetch).toHaveBeenCalledTimes(2);
-      // 1. Çağrı (Eski token)
       expect(mockFetch.mock.calls[0][0]).toBe(testUrl);
-      expect((mockFetch.mock.calls[0][1]?.headers as Headers).get('Authorization')).toBe(`Bearer ${initialToken}`); // Beklenti: Eski token
-      // 2. Çağrı (Yeni token)
+      expect((mockFetch.mock.calls[0][1]?.headers as Headers).get('Authorization')).toBe(`Bearer ${initialToken}`);
       expect(mockFetch.mock.calls[1][0]).toBe(testUrl);
-      expect((mockFetch.mock.calls[1][1]?.headers as Headers).get('Authorization')).toBe(`Bearer ${mockNewUser.accessToken}`); // Beklenti: Yeni token
-
+      expect((mockFetch.mock.calls[1][1]?.headers as Headers).get('Authorization')).toBe(`Bearer ${mockNewUser.accessToken}`);
       expect(vi.mocked(GoogleAuth.trySilentSignIn)).toHaveBeenCalledOnce();
-      expect(vi.mocked(store.dispatch)).toHaveBeenCalledWith(setRefreshedCredentials(mockNewUser));
+      expect(mockDispatch).toHaveBeenCalledWith(setRefreshedCredentials(mockNewUser)); // mockDispatch kontrolü
       expect(response.ok).toBe(true);
       await expect(response.json()).resolves.toEqual({ data: 'refreshed data' });
     });
 
     it('should sign out and reject if refresh fails with SIGN_IN_REQUIRED', async () => {
-       // Mock Sırası: İlk fetch 401
-       mockFetch.mockResolvedValueOnce(mock401Response);
+      mockFetch.mockResolvedValueOnce(mock401Response);
+      const signInRequiredError = new Error("Mock SIGN_IN_REQUIRED") as any;
+      signInRequiredError.code = 'SIGN_IN_REQUIRED';
+      vi.mocked(GoogleAuth.trySilentSignIn).mockRejectedValue(signInRequiredError);
 
-       // trySilentSignIn SIGN_IN_REQUIRED ile başarısız olacak
-       const signInRequiredError = new Error("Mock SIGN_IN_REQUIRED") as any;
-       signInRequiredError.code = 'SIGN_IN_REQUIRED';
-       vi.mocked(GoogleAuth.trySilentSignIn).mockRejectedValue(signInRequiredError);
-
-       // Hata beklentisi
-       await expect(fetchWithAuth(testUrl)).rejects.toThrow('Session expired. Please sign in again.');
-
-       // Doğrulamalar
-       expect(mockFetch).toHaveBeenCalledOnce();
-       expect(vi.mocked(GoogleAuth.trySilentSignIn)).toHaveBeenCalledOnce();
-       expect(vi.mocked(store.dispatch)).toHaveBeenCalledWith(signOutFromGoogleThunk());
+      await expect(fetchWithAuth(testUrl)).rejects.toThrow('Session expired. Please sign in again.');
+      expect(mockFetch).toHaveBeenCalledOnce();
+      expect(vi.mocked(GoogleAuth.trySilentSignIn)).toHaveBeenCalledOnce();
+      expect(mockDispatch).toHaveBeenCalledWith(signOutFromGoogleThunk()); // mockDispatch kontrolü
     });
 
-     it('should reject without signing out if refresh fails with other error', async () => {
-       // Mock Sırası: İlk fetch 401
-       mockFetch.mockResolvedValueOnce(mock401Response);
+    it('should reject without signing out if refresh fails with other error', async () => {
+      mockFetch.mockResolvedValueOnce(mock401Response);
+      const genericError = new Error("Network Error");
+      vi.mocked(GoogleAuth.trySilentSignIn).mockRejectedValue(genericError);
 
-       // trySilentSignIn genel hata ile başarısız olacak
-       const genericError = new Error("Network Error");
-       vi.mocked(GoogleAuth.trySilentSignIn).mockRejectedValue(genericError);
+      await expect(fetchWithAuth(testUrl)).rejects.toThrow('Failed to refresh token.');
+      expect(mockFetch).toHaveBeenCalledOnce();
+      expect(vi.mocked(GoogleAuth.trySilentSignIn)).toHaveBeenCalledOnce();
+      expect(mockDispatch).not.toHaveBeenCalledWith(signOutFromGoogleThunk()); // mockDispatch kontrolü
+    });
 
-       // Hata beklentisi
-       await expect(fetchWithAuth(testUrl)).rejects.toThrow('Failed to refresh token.');
+    it('should queue subsequent requests while refreshing and process them after successful refresh', async () => {
+      const mockSuccessResponse1 = { ok: true, status: 200, json: async () => ({ data: 'url1 refreshed' }) } as Response;
+      const mockSuccessResponse2 = { ok: true, status: 200, json: async () => ({ data: 'url2 refreshed' }) } as Response;
+      mockFetch
+        .mockResolvedValueOnce(mock401Response)
+        .mockResolvedValueOnce(mockSuccessResponse2)
+        .mockResolvedValueOnce(mockSuccessResponse1);
 
-       // Doğrulamalar
-       expect(mockFetch).toHaveBeenCalledOnce();
-       expect(vi.mocked(GoogleAuth.trySilentSignIn)).toHaveBeenCalledOnce();
-       expect(vi.mocked(store.dispatch)).not.toHaveBeenCalledWith(signOutFromGoogleThunk());
-     });
+      vi.mocked(GoogleAuth.trySilentSignIn).mockImplementation(async () => {
+        await new Promise(res => setTimeout(res, 50));
+        return mockNewUser;
+      });
 
-     it('should queue subsequent requests while refreshing and process them after successful refresh', async () => {
-        // Mock Sırası: url1(401) -> url2(200 - kuyruk) -> url1(200 - retry)
-        const mockSuccessResponse1 = { ok: true, status: 200, json: async () => ({ data: 'url1 refreshed' }) } as Response;
-        const mockSuccessResponse2 = { ok: true, status: 200, json: async () => ({ data: 'url2 refreshed' }) } as Response;
-        mockFetch
-            .mockResolvedValueOnce(mock401Response)        // 1. fetch(url1)
-            .mockResolvedValueOnce(mockSuccessResponse2)   // 2. fetch(url2) - processQueue'dan
-            .mockResolvedValueOnce(mockSuccessResponse1);  // 3. fetch(url1) - .then() retry'dan
+      const url1 = 'https://example.com/api/resource1';
+      const url2 = 'https://example.com/api/resource2';
 
-        // trySilentSignIn başarılı ama gecikmeli
-        vi.mocked(GoogleAuth.trySilentSignIn).mockImplementation(async () => {
-            await new Promise(res => setTimeout(res, 50));
-            return mockNewUser;
-        });
+      const promise1 = fetchWithAuth(url1);
+      await new Promise(res => setTimeout(res, 5));
+      const promise2 = fetchWithAuth(url2);
 
-        const url1 = 'https://example.com/api/resource1';
-        const url2 = 'https://example.com/api/resource2';
+      const [response1, response2] = await Promise.all([promise1, promise2]);
 
-        // İstekleri başlat
-        const promise1 = fetchWithAuth(url1);
-        await new Promise(res => setTimeout(res, 5));
-        const promise2 = fetchWithAuth(url2);
-
-        // Sonuçları bekle
-        const [response1, response2] = await Promise.all([promise1, promise2]);
-
-        // Doğrulamalar
-        expect(mockFetch).toHaveBeenCalledTimes(3);
-        // 1. Çağrı: url1, eski token
-        expect(mockFetch.mock.calls[0][0]).toBe(url1);
-        expect((mockFetch.mock.calls[0][1]?.headers as Headers).get('Authorization')).toBe(`Bearer ${initialToken}`); // Beklenti: Eski token
-        // 2. & 3. Çağrılar: url1/url2, yeni token
-        const call2Args = mockFetch.mock.calls[1];
-        const call3Args = mockFetch.mock.calls[2];
-        expect([call2Args[0], call3Args[0]].sort()).toEqual([url1, url2].sort());
-        expect((call2Args[1]?.headers as Headers)?.get('Authorization')).toBe(`Bearer ${mockNewUser.accessToken}`); // Beklenti: Yeni token
-        expect((call3Args[1]?.headers as Headers)?.get('Authorization')).toBe(`Bearer ${mockNewUser.accessToken}`); // Beklenti: Yeni token
-
-        expect(vi.mocked(GoogleAuth.trySilentSignIn)).toHaveBeenCalledOnce();
-        expect(vi.mocked(store.dispatch)).toHaveBeenCalledWith(setRefreshedCredentials(mockNewUser));
-        expect(response1.ok).toBe(true);
-        await expect(response1.json()).resolves.toEqual({ data: 'url1 refreshed' });
-        expect(response2.ok).toBe(true);
-        await expect(response2.json()).resolves.toEqual({ data: 'url2 refreshed' });
-     });
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(mockFetch.mock.calls[0][0]).toBe(url1);
+      expect((mockFetch.mock.calls[0][1]?.headers as Headers).get('Authorization')).toBe(`Bearer ${initialToken}`);
+      const call2Args = mockFetch.mock.calls[1];
+      const call3Args = mockFetch.mock.calls[2];
+      expect([call2Args[0], call3Args[0]].sort()).toEqual([url1, url2].sort());
+      expect((call2Args[1]?.headers as Headers)?.get('Authorization')).toBe(`Bearer ${mockNewUser.accessToken}`);
+      expect((call3Args[1]?.headers as Headers)?.get('Authorization')).toBe(`Bearer ${mockNewUser.accessToken}`);
+      expect(vi.mocked(GoogleAuth.trySilentSignIn)).toHaveBeenCalledOnce();
+      expect(mockDispatch).toHaveBeenCalledWith(setRefreshedCredentials(mockNewUser)); // mockDispatch kontrolü
+      expect(response1.ok).toBe(true);
+      await expect(response1.json()).resolves.toEqual({ data: 'url1 refreshed' });
+      expect(response2.ok).toBe(true);
+      await expect(response2.json()).resolves.toEqual({ data: 'url2 refreshed' });
+    });
   });
 });

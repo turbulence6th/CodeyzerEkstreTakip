@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(GoogleAuthPlugin.class);
         registerPlugin(SmsReaderPlugin.class);
         registerPlugin(PdfParserPlugin.class);
+        registerPlugin(SecureStoragePlugin.class);
         
         super.onCreate(savedInstanceState);
     }
