@@ -122,20 +122,20 @@ platform: capacitor
 
 # --- Yapılacaklar (To-Do) ---
 
-# 1. SMS İzin Gerekçesini Güçlendirme (Dinamik Native Filtreleme):
+# 1. SMS İzin Gerekçesini Güçlendirme (Dinamik Native Filtreleme): [TS Tamamlandı, Native Beklemede]
 #    - **Amaç:** Google Play Store onayı için SMS izni talebini daha savunulabilir hale getirmek.
 #    - **Adımlar:**
-#        - **JS:** `availableBankProcessors`'dan türetilen merkezi filtre listeleri oluştur:
+#        - **JS (Tamamlandı):** `availableBankProcessors`'dan türetilen merkezi filtre listeleri oluşturuldu (`sms-processor.ts`):
 #            - `allRelevantSenders`: Tüm bankaların `smsSenderKeywords` listelerinin birleşimi (tekilleştirilmiş, büyük harf).
-#            - `allRelevantKeywords`: Genel finansal SMS anahtar kelimeleri listesi (küçük harf, tekilleştirilmiş, örn. "ekstre", "kredi", "borc", "ödeme").
-#        - **Native Plugin (SmsReaderPlugin):**
+#            - `allRelevantKeywords`: Tüm bankaların `smsStatementQueryKeyword` ve `smsLoanQueryKeyword` değerlerinin birleşimi (küçük harf, tekilleştirilmiş).
+#        - **Native Plugin (Beklemede):**
 #            - Plugin'e (Java ve TS tanımı) yeni bir metot ekle: `configureFilters(options: { senders: string[]; keywords: string[] })`. Bu metot, JS'den gelen listeleri alıp native değişkende saklayacak.
 #            - Native SMS alıcısını (BroadcastReceiver) güncelle:
 #                - Gelen her SMS için, plugin'de saklanan `allowedSenders` ve `requiredKeywords` listeleriyle gönderici ve mesaj içeriği kontrolü yap.
 #                - Karşılaştırmaları esnek yap (örn. gönderici için `contains` veya `endsWith`, kelimeler için `toLowerCase().contains()`).
 #                - **Sadece** her iki filtreyi de geçen SMS'leri `notifyListeners` ile JS tarafına gönder.
-#        - **JS (Uygulama Başlangıcı):**
-#            - `App.tsx` veya uygun bir başlangıç noktasında, SMS izni alındıktan sonra `SmsReader.configureFilters` metodunu çağırarak `allRelevantSenders` ve `allRelevantKeywords` listelerini native tarafa ilet.
+#        - **JS (Uygulama Başlangıcı - Tamamlandı):**
+#            - `App.tsx` içinde, SMS izni durumu `'granted'` olduğunda `setupNativeSmsFilters` (`sms-processor.ts` içinde) çağrılarak filtre listeleri native tarafa iletiliyor.
 
 # 2. Redux Persist Verilerini Şifreleme: [TS Tamamlandı, Native Beklemede]
 #    - **Amaç:** Cihazda saklanan hassas finansal verilerin güvenliğini sağlamak.

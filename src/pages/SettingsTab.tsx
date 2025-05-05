@@ -1,6 +1,6 @@
 import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, /*IonCard,*/ /*IonCardContent,*/ IonButton, useIonToast } from '@ionic/react';
-// import './Tab3.css'; // CSS dosyasının adı da değişmeli mi? Şimdilik bırakıyorum.
-import './SettingsTab.css'; // Updated CSS import
+import React/*, { useEffect }*/ from 'react'; // useEffect kaldırıldı
+import './SettingsTab.css';
 
 // İzinler için importlar
 import {
@@ -17,6 +17,11 @@ import { signOutFromGoogleThunk } from '../store/slices/authSlice';
 import { clearData } from '../store/slices/dataSlice';
 import { addToast } from '../store/slices/toastSlice';
 
+// Filtre ayarlama fonksiyonunu import et
+// import { SmsReader } from '../plugins/sms-reader'; // Artık burada gerek yok
+// import { allRelevantSenders, allRelevantKeywords } from '../services/sms-parsing/sms-processor'; // Artık burada gerek yok
+import { setupNativeSmsFilters } from '../services/sms-parsing/sms-processor'; // Yeni yardımcıyı import et
+
 // İzin durumlarını Türkçe'ye çeviren helper fonksiyonu
 const translatePermissionStatus = (status: string | undefined): string => {
   if (!status) return 'Bilinmiyor';
@@ -32,8 +37,7 @@ const translatePermissionStatus = (status: string | undefined): string => {
 const SettingsTab: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
 
-  // Gerekli state'leri Redux'tan al
-  const { user: userInfo, accessToken } = useSelector((state: RootState) => state.auth);
+  const { user: userInfo } = useSelector((state: RootState) => state.auth);
   const { sms: smsPermission, error: permissionError } = useSelector((state: RootState) => state.permissions);
 
   // Çıkış Yapma Fonksiyonu (AccountTab'den taşındı)
@@ -61,38 +65,52 @@ const SettingsTab: React.FC = () => {
       });
   };
 
-  // İzin Kontrol Fonksiyonu (AccountTab'den taşındı)
+  // İzin Kontrol Fonksiyonu (Sadece kontrol eder)
   const checkPermission = async () => {
-    dispatch(clearSmsPermissionError()); // Önceki hatayı temizle
+    dispatch(clearSmsPermissionError());
     dispatch(checkSmsPermissionThunk())
       .unwrap()
       .then((status) => {
-        console.log('SettingsTab: SMS Permission Check Thunk Başarılı. Status:', status);
+        console.log('[SettingsTab] SMS Permission Check Thunk Başarılı. Status:', status);
         dispatch(addToast({ message: `SMS İzin Durumu: ${translatePermissionStatus(status.readSms)}`, duration: 2000, color: 'success' }));
+        // Başarılı kontrolde filtre ayarlamaya gerek yok, App.tsx halledecek
       })
       .catch((error) => {
-        console.error('SettingsTab: SMS Permission Check Thunk Hatası:', error);
+        console.error('[SettingsTab] SMS Permission Check Thunk Hatası:', error);
         dispatch(addToast({
-          message: `İzin kontrol hatası: ${error || 'Bilinmeyen bir hata oluştu.'}`,
+          message: `İzin kontrol hatası: ${error || 'Bilinmeyen bir hata oluştu.'}`, 
           duration: 3000,
           color: 'danger'
         }));
       });
   };
 
-  // İzin İsteme Fonksiyonu (AccountTab'den taşındı)
+  // İzin İsteme Fonksiyonu (setupNativeSmsFilters çağrısı kaldırıldı)
   const requestPermission = async () => {
-    dispatch(clearSmsPermissionError()); // Önceki hatayı temizle
+    dispatch(clearSmsPermissionError());
     dispatch(requestSmsPermissionThunk())
       .unwrap()
       .then((status) => {
-        console.log('SettingsTab: SMS Permission Request Thunk Başarılı. Status:', status);
-        dispatch(addToast({ message: `SMS İzin İsteği Sonucu: ${translatePermissionStatus(status.readSms)}`, duration: 2000, color: status.readSms === 'granted' ? 'success' : 'warning' }));
+        console.log('[SettingsTab] SMS Permission Request Thunk Successful. Status:', status);
+        const message = `SMS İzin İsteği Sonucu: ${translatePermissionStatus(status.readSms)}`;
+        const color = status.readSms === 'granted' ? 'success' : 'warning';
+        dispatch(addToast({ message, duration: 2000, color }));
+
+        // Filtre yapılandırması artık App.tsx'teki useEffect tarafından handle ediliyor.
+        /*
+        if (status.readSms === 'granted') {
+          setupNativeSmsFilters()
+            .catch(err => {
+              console.error('[SettingsTab] Error calling setupNativeSmsFilters after request:', err);
+              dispatch(addToast({ message: `Filtre ayarlanırken hata oluştu: ${err.message || err}`, duration: 3000, color: 'danger' }));
+            });
+        }
+        */
       })
       .catch((error) => {
-        console.error('SettingsTab: SMS Permission Request Thunk Hatası:', error);
+        console.error('[SettingsTab] SMS Permission Request Thunk Error:', error);
         dispatch(addToast({
-          message: `İzin isteme hatası: ${error || 'Bilinmeyen bir hata oluştu.'}`,
+          message: `İzin isteme hatası: ${error || 'Bilinmeyen bir hata oluştu.'}`, 
           duration: 3000,
           color: 'danger'
         }));

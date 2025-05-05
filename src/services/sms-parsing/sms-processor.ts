@@ -35,14 +35,13 @@ export const availableBankProcessors: BankProcessor[] = [
     loanSmsParser: qnbLoanParser,
   },
   {
-    bankName: 'Yapı Kredi',
-    smsSenderKeywords: ['YAPIKREDI', 'YKB', 'WORLD'], // Güncellendi
+    bankName: 'Yapı Kredi', 
     emailParser: yapikrediEmailParser,
     gmailQuery: 'from:(ekstre@ekstre.yapikredi.com.tr) subject:("Hesap Özeti")',
   },
   {
     bankName: 'Ziraat Bankası',
-    smsSenderKeywords: ['ZIRAATBANK', 'ZRYBNK'],
+    smsSenderKeywords: ['ZIRAATBANK'],
     emailParser: ziraatEmailParser,
     gmailQuery: 'from:(ziraat@ileti.ziraatbank.com.tr) subject:("e-ekstre")',
   },
@@ -358,3 +357,60 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
 // Servisin tek bir örneğini oluşturup dışa aktarabiliriz
 // export const smsProcessor = new SmsProcessor(); // Eski isim
 export const statementProcessor = new StatementProcessor(); // Yeni isim 
+
+// --- Dinamik Filtre Listeleri Oluşturma ---
+
+/**
+ * `availableBankProcessors` listesindeki tüm bankaların
+ * `smsSenderKeywords` listelerinin birleştirilmiş, tekilleştirilmiş ve büyük harf yapılmış hali.
+ */
+export const allRelevantSenders = Array.from(
+  new Set(
+    availableBankProcessors
+      .flatMap(p => p.smsSenderKeywords || []) // Tüm senderları al, yoksa boş dizi
+      .map(sender => sender.toUpperCase()) // Büyük harfe çevir
+  )
+);
+
+/**
+ * SADECE `availableBankProcessors` listesindeki tüm `smsStatementQueryKeyword` ve `smsLoanQueryKeyword`
+ * değerlerini alır, küçük harfe çevirir ve tekilleştirir.
+ */
+export const allRelevantKeywords = Array.from(
+  new Set(
+    // Sadece Banka özelindeki anahtar kelimeler
+    availableBankProcessors.flatMap(p => [
+        p.smsStatementQueryKeyword,
+        p.smsLoanQueryKeyword
+      ].filter(Boolean) as string[] // null/undefined olanları filtrele
+    )
+    .map(keyword => keyword.toLowerCase()) // Hepsini küçük harfe çevir
+  )
+);
+
+console.log('[SMS Filters] Generated Senders:', allRelevantSenders);
+console.log('[SMS Filters] Generated Keywords (Processor-specific only):', allRelevantKeywords); // Güncellenmiş log
+
+// --- Native Filtreleri Ayarlama Fonksiyonu ---
+
+/**
+ * Native SMS Reader eklentisine dinamik filtreleri gönderir.
+ * Hata durumunda konsola log yazar.
+ * @returns Promise<void>
+ */
+export const setupNativeSmsFilters = async (): Promise<void> => {
+  try {
+    console.log('[SMS Processor] Configuring native SMS filters...');
+    await SmsReader.configureFilters({
+      senders: allRelevantSenders,
+      keywords: allRelevantKeywords,
+    });
+    console.log('[SMS Processor] Native SMS filters configured successfully.');
+  } catch (error) {
+    console.error('[SMS Processor] Error configuring native SMS filters:', error);
+    // Hata yönetimi (örn. Toast gösterme) bu fonksiyonu çağıran yerde yapılmalı.
+    // Burada sadece hatayı tekrar fırlatabilir veya sessiz kalabiliriz.
+    // Şimdilik sadece loglayıp devam edelim, çağıran yer gerekirse kendi hatasını yönetir.
+     // throw error; // Opsiyonel: Hatayı yukarı fırlat
+  }
+}; 
