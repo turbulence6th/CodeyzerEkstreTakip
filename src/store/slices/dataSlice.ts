@@ -44,13 +44,13 @@ export const fetchAndProcessDataThunk = createAsyncThunk<
   async (_, { getState, dispatch, rejectWithValue }) => {
     const state = getState();
     const { sms: smsPermission } = state.permissions;
-    const { user: userInfo, accessToken } = state.auth;
+    const { user: userInfo } = state.auth;
 
     // İzin ve giriş kontrolü
     if (smsPermission?.readSms !== 'granted') {
       return rejectWithValue("Lütfen önce SMS okuma izni verin.");
     }
-    if (!userInfo || !accessToken) {
+    if (!userInfo) {
       return rejectWithValue("Lütfen önce Google ile giriş yapın.");
     }
 
@@ -58,8 +58,8 @@ export const fetchAndProcessDataThunk = createAsyncThunk<
     try {
       console.log("[Thunk] Fetching and parsing statements & loans...");
       const [parsedStatements, parsedLoans] = await Promise.all([
-        statementProcessor.fetchAndParseStatements(accessToken, { maxCount: 100 }),
-        statementProcessor.fetchAndParseLoans(accessToken, { maxCount: 100 })
+        statementProcessor.fetchAndParseStatements({ maxCount: 100 }),
+        statementProcessor.fetchAndParseLoans({ maxCount: 100 })
       ]);
       console.log("[Thunk] Promise.all for statement/loan fetching completed.");
 

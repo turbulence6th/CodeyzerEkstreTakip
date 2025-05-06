@@ -4,7 +4,6 @@ import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { initializeStore, getStore, getPersistor } from './store';
 import { SecureStorage } from './plugins/secure-storage';
-import { configureApiClient } from './services/apiClient';
 import App from './App';
 import { Preferences } from '@capacitor/preferences';
 
@@ -75,9 +74,6 @@ const startApp = async () => {
     initializeStore(reduxSecretKey);
     const store = getStore();
     const persistor = getPersistor();
-
-    // API istemcisini yapılandır
-    configureApiClient(store.getState, store.dispatch);
 
     // Uygulamayı normal şekilde render et
     root.render(

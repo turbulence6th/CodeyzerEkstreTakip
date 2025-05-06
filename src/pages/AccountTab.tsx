@@ -62,7 +62,7 @@ const AccountTab: React.FC = () => {
   const [modalContent, setModalContent] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState<string>("Detay");
 
-  const { user: userInfo, accessToken, error: authError } = useSelector((state: RootState) => state.auth);
+  const { user: userInfo, error: authError } = useSelector((state: RootState) => state.auth);
   const { sms: smsPermission, error: permissionError } = useSelector((state: RootState) => state.permissions);
   const displayItems = useSelector(selectAllDataWithDates);
   const dataError = useSelector((state: RootState) => state.data.error);
@@ -97,16 +97,16 @@ const AccountTab: React.FC = () => {
 
   useEffect(() => {
     // İlk veri çekme
-    if (accessToken && smsPermission?.readSms === 'granted' && lastUpdated === null) {
+    if (userInfo && smsPermission?.readSms === 'granted' && lastUpdated === null) {
         console.log('AccountTab: Initial data fetch triggered.');
         fetchAndProcessData();
     }
     // fetchAndProcessData bağımlılığı güncellendi
-  }, [accessToken, smsPermission, lastUpdated, fetchAndProcessData]);
+  }, [userInfo, smsPermission, lastUpdated, fetchAndProcessData]);
 
   useEffect(() => {
     const checkCalendarEvents = async () => {
-      if (!accessToken || displayItems.length === 0) {
+      if (!userInfo || displayItems.length === 0) {
         setCalendarEventStatus({});
         return;
       }
@@ -122,7 +122,7 @@ const AccountTab: React.FC = () => {
             continue;
           }
           try {
-            const status = await calendarService.searchEvents(accessToken!, appIdToCheck);
+            const status = await calendarService.searchEvents(appIdToCheck);
             newStatus[appIdToCheck] = status;
           } catch (error: any) {
             console.error(`Error checking calendar status for AppID: ${appIdToCheck}`, item, error);
@@ -138,7 +138,7 @@ const AccountTab: React.FC = () => {
 
     checkCalendarEvents();
     // dispatch bağımlılığı tekrar kaldırıldı (önceki gibi)
-  }, [displayItems, accessToken]);
+  }, [displayItems, userInfo, dispatch]);
 
   // YENİ useEffect: İzin durumunu otomatik kontrol et
   useEffect(() => {
@@ -216,7 +216,7 @@ Tutar: ${formatCurrency(item.amount)}`;
         return;
       }
 
-      const exists = await calendarService.searchEvents(accessToken!, itemKey);
+      const exists = await calendarService.searchEvents(itemKey);
       if (exists) {
          console.log(`Event ${itemKey} already exists in calendar (checked via API).`);
          setCalendarEventStatus(prevStatus => ({ ...prevStatus, [itemKey]: true }));
@@ -226,7 +226,7 @@ Tutar: ${formatCurrency(item.amount)}`;
       }
 
       console.log(`Adding to calendar: ${summary} for ${itemKey}`);
-      await calendarService.createEvent(accessToken!, summary, description, startTimeIsoForApi, endTimeIsoForApi);
+      await calendarService.createEvent(summary, description, startTimeIsoForApi, endTimeIsoForApi);
       setCalendarEventStatus(prevStatus => ({ ...prevStatus, [itemKey]: true }));
       dispatch(addToast({ message: 'Etkinlik başarıyla takvime eklendi.', duration: 2000, color: 'success', }));
     } catch (error: any) {
@@ -292,7 +292,7 @@ Kaynak: ${loan.source.toUpperCase()}`;
                   continue;
               }
 
-              const exists = await calendarService.searchEvents(accessToken!, installmentKey);
+              const exists = await calendarService.searchEvents(installmentKey);
               if (exists) {
                   console.log(`Installment ${installmentKey} already exists in calendar (checked via API).`);
                   setCalendarEventStatus(prevStatus => ({ ...prevStatus, [installmentKey]: true }));
@@ -301,7 +301,7 @@ Kaynak: ${loan.source.toUpperCase()}`;
               }
 
               console.log(`Adding installment to calendar: ${summary} for ${installmentKey}`);
-              await calendarService.createEvent(accessToken!, summary, finalDescription, startTimeIsoForApi, endTimeIsoForApi);
+              await calendarService.createEvent(summary, finalDescription, startTimeIsoForApi, endTimeIsoForApi);
               setCalendarEventStatus(prevStatus => ({ ...prevStatus, [installmentKey]: true }));
               addedCount++;
 

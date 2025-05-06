@@ -117,7 +117,7 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
   }
 
   // Belirtilen filtreye göre SMS ve E-postaları getir ve ekstreleri ayrıştır
-  async fetchAndParseStatements(accessToken: string, options: SmsFilterOptions = { maxCount: 100 }): Promise<ParsedStatement[]> {
+  async fetchAndParseStatements(options: SmsFilterOptions = { maxCount: 100 }): Promise<ParsedStatement[]> {
     let parsedStatements: ParsedStatement[] = [];
     const smsPermission = await this.checkSmsPermission();
 
@@ -172,7 +172,7 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
                 // accessToken eklendi ve maxResults düzeltildi
                 // Dönüş tipi açıkça belirtilMİYOR, TS çıkarsın
                 // gmailService yerine localGmailService kullanıldı
-                const emailSearchResult = await localGmailService.searchEmails(accessToken, processor.gmailQuery, 10);
+                const emailSearchResult = await localGmailService.searchEmails(processor.gmailQuery, 10);
                 // emailSearchResult.messages üzerinde iterate et
                 // messages alanı opsiyonel olduğu için kontrol ekleyelim
                 for (const emailInfo of emailSearchResult?.messages || []) {
@@ -193,7 +193,7 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
                         // getEmailDetails Promise döndürdüğü için await kullan
                         // accessToken eklendi
                         // gmailService yerine localGmailService kullanıldı
-                        emailDetailsResponse = await localGmailService.getEmailDetails(accessToken, messageId);
+                        emailDetailsResponse = await localGmailService.getEmailDetails(messageId);
                         // Detay alındıktan sonra payload var mı kontrol et (optional chaining ile)
                         if (!emailDetailsResponse?.payload) {
                             console.warn(`SmsProcessor: Received empty or payload-less response for ID: ${messageId}`);
@@ -239,7 +239,7 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
                             if (canParseResult) {
                                 // console.log(`Attempting to parse newest email (${messageId}) for ${processor.bankName}...`); // Log kaldırıldı
                                 // accessToken eklendi
-                                const statement = await processor.emailParser.parse(emailData, accessToken);
+                                const statement = await processor.emailParser.parse(emailData /*, accessToken */); // accessToken kaldırıldı
                                 processedEmailBanks.add(processor.bankName); // En yeni işlendi olarak işaretle
                                 if (statement) {
                                     // console.log(`Successfully parsed EMAIL statement for ${statement.bankName}`); // Log kaldırıldı
@@ -301,7 +301,7 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
   }
 
   // --- Kredileri Getir ve Ayrıştır --- //
-  async fetchAndParseLoans(accessToken: string, options: SmsFilterOptions = { maxCount: 50 }): Promise<ParsedLoan[]> {
+  async fetchAndParseLoans(options: SmsFilterOptions = { maxCount: 50 }): Promise<ParsedLoan[]> {
     let parsedLoans: ParsedLoan[] = [];
     const smsPermission = await this.checkSmsPermission();
 

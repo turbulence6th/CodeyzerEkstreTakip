@@ -99,7 +99,7 @@ describe('IsbankEmailParser', () => {
     vi.mocked(PdfParser.parsePdfText).mockResolvedValue(mockParseResult);
 
     // Act: Call the parse method
-    const result = await isbankEmailParser.parse(sampleEmail, 'mockAccessToken');
+    const result = await isbankEmailParser.parse(sampleEmail);
 
     // Assert: Check the results
     expect(result).not.toBeNull();

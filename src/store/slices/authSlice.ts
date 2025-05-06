@@ -11,20 +11,17 @@ export const signInWithGoogleThunk = createAsyncThunk(
   async (_, { dispatch, rejectWithValue }) => { 
     dispatch(startGlobalLoading()); 
     try {
-      // Calendar scope'u native plugin kodunda istendi.
-      // const scopes = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/calendar.events'];
-      
       // signIn metoduna argüman göndermiyoruz.
-      const user = await GoogleAuth.signIn(); // Argüman kaldırıldı
+      const user: GoogleUser | undefined = await GoogleAuth.signIn(); // Argüman kaldırıldı, GoogleUser tipi güncellenmiş olmalı
       
       // Dönen kullanıcı objesini loglayalım (debugging için)
       console.log("GoogleAuth.signIn() result:", JSON.stringify(user));
 
      
-      if (user?.accessToken) {
-        return { user, accessToken: user.accessToken }; 
+      if (user && user.idToken) { // user objesi ve idToken var mı diye kontrol edelim
+        return user; // Sadece user objesini döndür
       } else {
-        return rejectWithValue('Giriş başarılı ancak ID Token alınamadı.'); // Hata mesajı güncellendi
+        return rejectWithValue('Google ile giriş başarılı ancak beklenen kullanıcı bilgileri (örn. idToken) alınamadı.');
       }
     } catch (error: any) {
       console.error("Native Google Sign-In Error (Thunk):", error);
@@ -62,13 +59,14 @@ export const signOutFromGoogleThunk = createAsyncThunk(
 
 interface AuthState {
   user: GoogleUser | null;
-  accessToken: string | null; 
+  idToken: string | null; // idToken'ı ayrı saklamak isteyebiliriz veya user objesinde tutulabilir.
+                          // Şimdilik user objesinde olduğunu varsayalım ve idToken'ı ayrıca state'e ekleyelim.
   error: string | null;
 }
 
 const initialState: AuthState = {
   user: null,
-  accessToken: null,
+  idToken: null, // idToken için başlangıç değeri
   error: null,
 };
 
@@ -78,37 +76,36 @@ const authSlice = createSlice({
   reducers: {
     clearAuth: (state) => {
       state.user = null;
-      state.accessToken = null;
+      state.idToken = null;
       state.error = null;
     },
     clearAuthError: (state) => {
         state.error = null;
     },
-    // Yeni action: Token yenileme sonrası bilgileri günceller
-    setRefreshedCredentials: (state, action: PayloadAction<GoogleUser>) => {
-        console.log("AuthSlice: Setting refreshed credentials.");
-        state.user = action.payload; // Tüm kullanıcı bilgisi güncellenebilir
-        state.accessToken = action.payload.accessToken ?? null; // Yeni access token'ı al
-        state.error = null; // Varsa önceki hatayı temizle
+    // setAuthCredentials olarak yeniden adlandıralım, hem ilk giriş hem de yenileme için kullanılabilir.
+    setAuthCredentials: (state, action: PayloadAction<GoogleUser>) => {
+        console.log("AuthSlice: Setting auth credentials.");
+        state.user = action.payload; 
+        state.idToken = action.payload.idToken ?? null;
+        state.error = null; 
     }
   },
   extraReducers: (builder) => {
     builder
-      .addCase(signInWithGoogleThunk.fulfilled, (state, action: PayloadAction<{ user: GoogleUser; accessToken: string }>) => {
-        state.user = action.payload.user;
-        state.accessToken = action.payload.accessToken;
+      .addCase(signInWithGoogleThunk.fulfilled, (state, action: PayloadAction<GoogleUser>) => {
+        state.user = action.payload;
+        state.idToken = action.payload.idToken ?? null;
         state.error = null;
       })
       .addCase(signInWithGoogleThunk.rejected, (state, action) => {
         state.user = null;
-        state.accessToken = null;
+        state.idToken = null;
         state.error = action.payload as string || 'Google ile giriş yapılamadı.'; 
       })
       .addCase(signOutFromGoogleThunk.fulfilled, (state) => {
         state.user = null;
-        state.accessToken = null;
+        state.idToken = null;
         state.error = null;
-        // TODO kaldırıldı.
       })
       .addCase(signOutFromGoogleThunk.rejected, (state, action) => {
         state.error = action.payload as string || "Google'dan çıkış yapılamadı.";
@@ -120,7 +117,7 @@ const authSlice = createSlice({
 export const {
   clearAuth,
   clearAuthError,
-  setRefreshedCredentials // Yeni action'ı export et
+  setAuthCredentials // setRefreshedCredentials yerine setAuthCredentials oldu
 } = authSlice.actions;
 
 export default authSlice.reducer; 

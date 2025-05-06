@@ -24,10 +24,10 @@ import com.google.android.gms.common.api.Scope;
 // Access Token almak için gerekli importlar (GoogleAuthUtil eski ama deneyelim)
 // DEPRECATED WARNING: GoogleAuthUtil is deprecated and may be removed in future SDKs.
 // Consider using server-side auth code exchange or Google Identity Services (Credential Manager).
-import com.google.android.gms.auth.GoogleAuthUtil;
-import com.google.android.gms.auth.GoogleAuthException;
+// import com.google.android.gms.auth.GoogleAuthUtil; // KALDIRILDI
+// import com.google.android.gms.auth.GoogleAuthException; // KALDIRILDI
 import java.io.IOException;
-import android.accounts.Account; // Account nesnesi için
+// import android.accounts.Account; // KALDIRILDI - GoogleSignInAccount.getAccount() kullanılacak
 
 // Firebase importları
 import com.google.firebase.auth.AuthCredential;
@@ -47,14 +47,16 @@ import com.google.api.services.calendar.model.Events;
 
 // GMAIL API için importlar
 import com.google.api.services.gmail.Gmail;
+// import com.google.api.services.gmail.GmailScopes; // Gerekirse scope sabitleri için (Zaten string olarak tanımlı)
 import com.google.api.services.gmail.model.ListMessagesResponse;
 import com.google.api.services.gmail.model.Message;
 import com.google.api.services.gmail.model.MessagePartBody;
 
-// Yeni Google Auth Library importları
-import com.google.auth.http.HttpCredentialsAdapter;
-import com.google.auth.oauth2.AccessToken;
-import com.google.auth.oauth2.GoogleCredentials;
+// Yeni Google Auth Library importları (GoogleAccountCredential için)
+// import com.google.auth.http.HttpCredentialsAdapter; // KALDIRILDI
+// import com.google.auth.oauth2.AccessToken; // KALDIRILDI
+// import com.google.auth.oauth2.GoogleCredentials; // KALDIRILDI
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -69,11 +71,12 @@ public class GoogleAuthPlugin extends Plugin {
     private static final String TAG = "GoogleAuthPlugin";
     private GoogleSignInClient googleSignInClient;
     private FirebaseAuth firebaseAuth;
+    private GoogleSignInAccount currentGoogleAccount; // YENİ: Mevcut Google hesabını saklamak için
     // Scope sabitlerini tanımla
     private static final String GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
     private static final String CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events";
     // Access token için kullanılacak birleşik scope string'i (oauth2: prefixi ile ve boşlukla ayrılmış)
-    private static final String REQUIRED_SCOPES_FOR_TOKEN = "oauth2:" + GMAIL_READONLY_SCOPE + " " + CALENDAR_EVENTS_SCOPE;
+    // private static final String REQUIRED_SCOPES_FOR_TOKEN = "oauth2:" + GMAIL_READONLY_SCOPE + " " + CALENDAR_EVENTS_SCOPE; // GoogleAuthUtil için kullanılıyordu, KALDIRILDI veya yorumlandı
 
     // Sağlanan Web İstemci Kimliği (Firebase ile ilişkili GCP projesindeki Web ID olmalı)
     private static final String WEB_CLIENT_ID = "1008857567754-2s7hevrbudal3m8qju85g31souc8v4g5.apps.googleusercontent.com";
@@ -115,9 +118,34 @@ public class GoogleAuthPlugin extends Plugin {
 
             // --- Access Token Alma Denemesi (AsyncTask ile arka planda) ---
             // Bu, UI thread'ini bloke etmemek için önemlidir.
-            new GetAccessTokenTask(call, account).execute();
+            // new GetAccessTokenTask(call, account).execute(); // KALDIRILDI
 
-            // Firebase ile giriş kısmı AsyncTask içinde yapılacak
+            // Firebase ile giriş kısmı AsyncTask içinde yapılacak // ARTIK BURADA YAPILACAK
+            this.currentGoogleAccount = account; // Hesabı sakla
+
+            if (account.getIdToken() == null) {
+                call.reject("Google ID Token is null, cannot proceed with Firebase sign in.");
+                return;
+            }
+            AuthCredential credential = GoogleAuthProvider.getCredential(account.getIdToken(), null);
+            firebaseAuth.signInWithCredential(credential)
+                .addOnCompleteListener(getActivity(), authTask -> {
+                    if (authTask.isSuccessful()) {
+                        FirebaseUser user = firebaseAuth.getCurrentUser();
+                        Log.d(TAG, "Firebase Sign In successful: " + (user != null ? user.getEmail() : "null user"));
+                        JSObject userResult = new JSObject();
+                        userResult.put("id", account.getId());
+                        userResult.put("name", account.getDisplayName());
+                        userResult.put("email", account.getEmail());
+                        userResult.put("imageUrl", account.getPhotoUrl() != null ? account.getPhotoUrl().toString() : null);
+                        userResult.put("idToken", account.getIdToken()); // Google ID Token
+                        // userResult.put("accessToken", accessToken); // KALDIRILDI
+                        call.resolve(userResult);
+                    } else {
+                        Log.w(TAG, "Firebase Sign In failed", authTask.getException());
+                        call.reject("Firebase Sign In failed: " + (authTask.getException() != null ? authTask.getException().getMessage() : "Unknown error"));
+                    }
+                });
 
         } catch (ApiException e) {
             Log.w(TAG, "Google Sign In failed code=" + e.getStatusCode());
@@ -160,7 +188,9 @@ public class GoogleAuthPlugin extends Plugin {
             Log.d(TAG, "Silent sign in successful (immediately)");
             GoogleSignInAccount account = task.getResult();
             // Access token al ve sonucu döndür
-            new GetAccessTokenTask(call, account).execute();
+            // new GetAccessTokenTask(call, account).execute(); // KALDIRILDI
+            this.currentGoogleAccount = account; // Hesabı sakla
+            signInToFirebaseAndResolve(call, account); // Firebase ile giriş yap ve sonucu döndür
         } else {
             // Görev hemen başarılı değilse, tamamlanmasını bekle
             task.addOnCompleteListener(getActivity(), completedTask -> {
@@ -169,7 +199,9 @@ public class GoogleAuthPlugin extends Plugin {
                         Log.d(TAG, "Silent sign in successful (on complete)");
                         GoogleSignInAccount account = completedTask.getResult();
                         // Access token al ve sonucu döndür
-                        new GetAccessTokenTask(call, account).execute();
+                        // new GetAccessTokenTask(call, account).execute(); // KALDIRILDI
+                        this.currentGoogleAccount = account; // Hesabı sakla
+                        signInToFirebaseAndResolve(call, account); // Firebase ile giriş yap ve sonucu döndür
                     } else {
                         // Sessiz giriş başarısız
                         Log.w(TAG, "Silent sign in failed.", completedTask.getException());
@@ -202,6 +234,7 @@ public class GoogleAuthPlugin extends Plugin {
     // AsyncTask Access Token almak için (güncellenmiş scope ile)
     // DEPRECATED WARNING: AsyncTask is deprecated in API level 30 (Android 11).
     // Consider using standard Java concurrent utilities (e.g., ExecutorService) or Kotlin Coroutines.
+    /* KALDIRILDI
     private class GetAccessTokenTask extends AsyncTask<Void, Void, String> {
         private PluginCall call;
         private GoogleSignInAccount googleAccount;
@@ -278,18 +311,52 @@ public class GoogleAuthPlugin extends Plugin {
                 });
         }
     }
+    */ // GetAccessTokenTask SONU
+
+    // Yeni yardımcı metod: Firebase'e giriş yap ve sonucu JS'e döndür
+    private void signInToFirebaseAndResolve(PluginCall call, GoogleSignInAccount googleAccount) {
+        if (googleAccount.getIdToken() == null) {
+            call.reject("Google ID Token is null, cannot proceed with Firebase sign in.");
+            return;
+        }
+        AuthCredential credential = GoogleAuthProvider.getCredential(googleAccount.getIdToken(), null);
+        firebaseAuth.signInWithCredential(credential)
+            .addOnCompleteListener(getActivity(), authTask -> {
+                if (authTask.isSuccessful()) {
+                    FirebaseUser user = firebaseAuth.getCurrentUser(); // Kullanılabilirliği kontrol et
+                    Log.d(TAG, "Firebase Sign In successful: " + (user != null ? user.getEmail() : "null user"));
+                    JSObject userResult = new JSObject();
+                    userResult.put("id", googleAccount.getId());
+                    userResult.put("name", googleAccount.getDisplayName());
+                    userResult.put("email", googleAccount.getEmail());
+                    userResult.put("imageUrl", googleAccount.getPhotoUrl() != null ? googleAccount.getPhotoUrl().toString() : null);
+                    userResult.put("idToken", googleAccount.getIdToken());
+                    // accessToken GÖNDERİLMEZ
+                    call.resolve(userResult);
+                } else {
+                    Log.w(TAG, "Firebase Sign In failed", authTask.getException());
+                    call.reject("Firebase Sign In failed: " + (authTask.getException() != null ? authTask.getException().getMessage() : "Unknown error"));
+                }
+            });
+    }
 
     @PluginMethod
     public void createCalendarEvent(PluginCall call) {
-        String accessTokenString = call.getString("accessToken");
+        // String accessTokenString = call.getString("accessToken"); // KALDIRILDI
         String summary = call.getString("summary");
         String description = call.getString("description");
         String startTimeIso = call.getString("startTimeIso");
         String endTimeIso = call.getString("endTimeIso");
         String timeZone = call.getString("timeZone", "Europe/Istanbul");
 
+        /* KALDIRILDI
         if (accessTokenString == null || accessTokenString.isEmpty()) {
             call.reject("Access token is required.");
+            return;
+        }
+        */
+        if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
+            call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
             return;
         }
         if (summary == null || startTimeIso == null || endTimeIso == null) {
@@ -300,16 +367,21 @@ public class GoogleAuthPlugin extends Plugin {
         executorService.execute(() -> {
             try {
                 // Yeni Google Auth Library kullanarak Credentials oluştur
+                /* KALDIRILDI
                 AccessToken accessToken = new AccessToken(accessTokenString, null); // Expiration time bilinmiyorsa null
                 GoogleCredentials credentials = GoogleCredentials.create(accessToken);
                 HttpCredentialsAdapter adapter = new HttpCredentialsAdapter(credentials);
+                */
 
+                Calendar service = buildCalendarServiceWithAccount(); // YENİ YARDIMCI METOT KULLANILDI
+                /* ESKİ YAPI
                 Calendar service = new Calendar.Builder(
                         new NetHttpTransport(), // AndroidHttp.newCompatibleTransport() yerine
                         GsonFactory.getDefaultInstance(),
                         adapter) // GoogleCredential yerine adapter kullan
                         .setApplicationName(getContext().getPackageName())
                         .build();
+                */
 
                 Event event = new Event()
                         .setSummary(summary)
@@ -361,11 +433,17 @@ public class GoogleAuthPlugin extends Plugin {
 
     @PluginMethod
     public void searchCalendarEvents(PluginCall call) {
-        String accessTokenString = call.getString("accessToken");
+        // String accessTokenString = call.getString("accessToken"); // KALDIRILDI
         String appId = call.getString("appId");
 
+        /* KALDIRILDI
         if (accessTokenString == null || accessTokenString.isEmpty()) {
             call.reject("Access token is required.");
+            return;
+        }
+        */
+        if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
+            call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
             return;
         }
         if (appId == null || appId.isEmpty()) {
@@ -376,16 +454,20 @@ public class GoogleAuthPlugin extends Plugin {
         executorService.execute(() -> {
             try {
                 // Yeni Google Auth Library kullanarak Credentials oluştur
+                /* KALDIRILDI
                 AccessToken accessToken = new AccessToken(accessTokenString, null); // Expiration time bilinmiyorsa null
                 GoogleCredentials credentials = GoogleCredentials.create(accessToken);
                 HttpCredentialsAdapter adapter = new HttpCredentialsAdapter(credentials);
-
+                */
+                Calendar service = buildCalendarServiceWithAccount(); // YENİ YARDIMCI METOT
+                /* ESKİ YAPI
                 Calendar service = new Calendar.Builder(
                         new NetHttpTransport(), // AndroidHttp.newCompatibleTransport() yerine
                         GsonFactory.getDefaultInstance(),
                         adapter) // GoogleCredential yerine adapter kullan
                         .setApplicationName(getContext().getPackageName())
                         .build();
+                */
 
                 // AppID'den tarihi çıkar (YYYY-MM-DD kısmını bul)
                 // Bu mantık JS tarafındaydı, burada da benzerini yapalım
@@ -465,6 +547,7 @@ public class GoogleAuthPlugin extends Plugin {
         firebaseAuth.signOut();
         // Sonra Google'dan çıkış yap
         googleSignInClient.signOut().addOnCompleteListener(task -> {
+            this.currentGoogleAccount = null; // Saklanan hesabı temizle
             if (task.isSuccessful()) {
                 Log.d(TAG, "Google Sign Out successful");
                 call.resolve();
@@ -480,14 +563,20 @@ public class GoogleAuthPlugin extends Plugin {
 
     @PluginMethod
     public void searchGmailMessages(PluginCall call) {
-        String accessTokenString = call.getString("accessToken");
+        // String accessTokenString = call.getString("accessToken"); // KALDIRILDI
         String query = call.getString("query");
         // Opsiyonel: Sayfalama için nextPageToken ve maxResults eklenebilir
         // String pageToken = call.getString("pageToken");
         // Integer maxResults = call.getInteger("maxResults", 100); // Default 100?
 
+        /* KALDIRILDI
         if (accessTokenString == null || accessTokenString.isEmpty()) {
             call.reject("Access token is required.");
+            return;
+        }
+        */
+        if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
+            call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
             return;
         }
         if (query == null || query.isEmpty()) {
@@ -497,7 +586,8 @@ public class GoogleAuthPlugin extends Plugin {
 
         executorService.execute(() -> {
             try {
-                Gmail service = buildGmailService(accessTokenString);
+                // Gmail service = buildGmailService(accessTokenString); // ESKİ YAPI
+                Gmail service = buildGmailServiceWithAccount(); // YENİ YARDIMCI METOT
 
                 ListMessagesResponse response = service.users().messages().list("me")
                         .setQ(query)
@@ -540,11 +630,17 @@ public class GoogleAuthPlugin extends Plugin {
 
     @PluginMethod
     public void getGmailMessageDetails(PluginCall call) {
-        String accessTokenString = call.getString("accessToken");
+        // String accessTokenString = call.getString("accessToken"); // KALDIRILDI
         String messageId = call.getString("messageId");
 
+        /* KALDIRILDI
         if (accessTokenString == null || accessTokenString.isEmpty()) {
             call.reject("Access token is required.");
+            return;
+        }
+        */
+        if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
+            call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
             return;
         }
         if (messageId == null || messageId.isEmpty()) {
@@ -554,7 +650,8 @@ public class GoogleAuthPlugin extends Plugin {
 
         executorService.execute(() -> {
             try {
-                Gmail service = buildGmailService(accessTokenString);
+                // Gmail service = buildGmailService(accessTokenString); // ESKİ YAPI
+                Gmail service = buildGmailServiceWithAccount(); // YENİ YARDIMCI METOT
 
                 // format=FULL ile tüm detayları al (payload, headers etc.)
                 Message message = service.users().messages().get("me", messageId).setFormat("FULL").execute();
@@ -576,12 +673,18 @@ public class GoogleAuthPlugin extends Plugin {
 
     @PluginMethod
     public void getGmailAttachment(PluginCall call) {
-        String accessTokenString = call.getString("accessToken");
+        // String accessTokenString = call.getString("accessToken"); // KALDIRILDI
         String messageId = call.getString("messageId");
         String attachmentId = call.getString("attachmentId");
 
+        /* KALDIRILDI
         if (accessTokenString == null || accessTokenString.isEmpty()) {
             call.reject("Access token is required.");
+            return;
+        }
+        */
+        if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
+            call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
             return;
         }
         if (messageId == null || messageId.isEmpty()) {
@@ -595,7 +698,8 @@ public class GoogleAuthPlugin extends Plugin {
 
         executorService.execute(() -> {
             try {
-                Gmail service = buildGmailService(accessTokenString);
+                // Gmail service = buildGmailService(accessTokenString); // ESKİ YAPI
+                Gmail service = buildGmailServiceWithAccount(); // YENİ YARDIMCI METOT
 
                 MessagePartBody attachmentBody = service.users().messages().attachments()
                                                     .get("me", messageId, attachmentId).execute();
@@ -620,15 +724,50 @@ public class GoogleAuthPlugin extends Plugin {
     }
 
     // Yardımcı metod: Gmail servisini oluşturur
+    /* KALDIRILDI
     private Gmail buildGmailService(String accessTokenString) throws IOException {
-        AccessToken accessToken = new AccessToken(accessTokenString, null);
-        GoogleCredentials credentials = GoogleCredentials.create(accessToken);
+        AccessToken accessTokenObj = new AccessToken(accessTokenString, null);
+        GoogleCredentials credentials = GoogleCredentials.create(accessTokenObj);
         HttpCredentialsAdapter adapter = new HttpCredentialsAdapter(credentials);
 
         return new Gmail.Builder(
                 new NetHttpTransport(),
                 GsonFactory.getDefaultInstance(),
                 adapter)
+                .setApplicationName(getContext().getPackageName())
+                .build();
+    }
+    */
+
+    // YENİ YARDIMCI METODLAR (GoogleAccountCredential ile)
+    private Gmail buildGmailServiceWithAccount() throws IOException {
+        if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
+            throw new IOException("User not signed in or account not available for Gmail service.");
+        }
+        GoogleAccountCredential credential = GoogleAccountCredential.usingOAuth2(
+                getContext(), Collections.singletonList(GMAIL_READONLY_SCOPE));
+        credential.setSelectedAccount(this.currentGoogleAccount.getAccount()); // Hesabı set et
+
+        return new Gmail.Builder(
+                new NetHttpTransport(),
+                GsonFactory.getDefaultInstance(),
+                credential) // GoogleAccountCredential kullan
+                .setApplicationName(getContext().getPackageName())
+                .build();
+    }
+
+    private Calendar buildCalendarServiceWithAccount() throws IOException {
+        if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
+            throw new IOException("User not signed in or account not available for Calendar service.");
+        }
+        GoogleAccountCredential credential = GoogleAccountCredential.usingOAuth2(
+                getContext(), Collections.singletonList(CALENDAR_EVENTS_SCOPE));
+        credential.setSelectedAccount(this.currentGoogleAccount.getAccount()); // Hesabı set et
+
+        return new Calendar.Builder(
+                new NetHttpTransport(),
+                GsonFactory.getDefaultInstance(),
+                credential) // GoogleAccountCredential kullan
                 .setApplicationName(getContext().getPackageName())
                 .build();
     }

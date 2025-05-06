@@ -74,7 +74,7 @@ describe('Ziraat Email Parser', () => {
                  return; // Veya expect(true).toBe(false) ile testi fail ettir.
              }
 
-            const result = await ziraatEmailParser.parse(mockEmailDetails, 'mockAccessToken');
+            const result = await ziraatEmailParser.parse(mockEmailDetails);
 
             // Sonucun null olmadığını kontrol et
             expect(result).not.toBeNull();

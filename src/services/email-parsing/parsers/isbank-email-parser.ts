@@ -102,7 +102,7 @@ class IsbankEmailParser implements BankEmailParser {
     }
 
     // parse (async yaptık)
-    async parse(emailDetails: EmailDetails, accessToken: string): Promise<ParsedStatement | null> {
+    async parse(emailDetails: EmailDetails): Promise<ParsedStatement | null> {
         const emailId = emailDetails.id;
 
         const parts = emailDetails.originalResponse?.payload?.parts;
@@ -121,7 +121,7 @@ class IsbankEmailParser implements BankEmailParser {
         const attachmentId = pdfPart.body.attachmentId;
 
         try {
-            const attachmentResponse = await gmailService.getAttachment(accessToken, emailId, attachmentId);
+            const attachmentResponse = await gmailService.getAttachment(emailId, attachmentId);
 
             let base64PdfDataUrl: string | null = null;
             if (attachmentResponse?.size !== undefined && attachmentResponse?.data && typeof attachmentResponse.data === 'string') {

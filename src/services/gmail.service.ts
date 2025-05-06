@@ -27,6 +27,69 @@ import type {
     GmailAttachmentResponse
 } from '../plugins/google-auth/definitions'; // Düzeltilmiş import yolu
 
+// Redux store ve actionları için importlar
+import { getStore } from '../store'; // `store` yerine `getStore` kullanılıyor
+import { setAuthCredentials, clearAuth } from '../store/slices/authSlice'; // `logout` yerine `clearAuth` kullanılıyor
+
+// --- Native API Çağrıları için Hata Yönetimi ve Yeniden Deneme Sarmalayıcısı ---
+interface NativePluginError extends Error {
+  code?: string;
+  message: string;
+}
+
+async function callNativeGoogleApi<T>(
+  nativeApiFunction: () => Promise<T>,
+  isRetry: boolean = false
+): Promise<T> {
+  try {
+    return await nativeApiFunction();
+  } catch (e) {
+    const error = e as NativePluginError;
+    // Native plugin tarafından SIGN_IN_REQUIRED veya INVALID_GRANT kodu ile reject edilen hataları kontrol et
+    if (error && (error.code === "SIGN_IN_REQUIRED" || error.code === "INVALID_GRANT")) {
+      if (isRetry) {
+        console.error(
+          'callNativeGoogleApi: Silent sign-in was already attempted and failed, or the API call failed again after retry. Logging out.'
+        );
+        getStore().dispatch(clearAuth());
+        throw new Error('Authentication failed after retry and silent sign-in attempt.');
+      }
+
+      console.warn(
+        `callNativeGoogleApi: Native API call failed with code: ${error.code}. Attempting silent sign-in.`
+      );
+      try {
+        const silentSignInResult = await GoogleAuth.trySilentSignIn();
+        // silentSignInResult, GoogleUser tipinde olmalı (idToken içerir, accessToken içermez)
+        if (silentSignInResult && silentSignInResult.idToken) {
+          getStore().dispatch(setAuthCredentials(silentSignInResult));
+          console.log(
+            'callNativeGoogleApi: Silent sign-in successful. Retrying original native API call.'
+          );
+          return await callNativeGoogleApi(nativeApiFunction, true);
+        } else {
+          console.error(
+            'callNativeGoogleApi: Silent sign-in did not return the necessary credentials (e.g., idToken). Logging out.'
+          );
+          getStore().dispatch(clearAuth());
+          throw new Error('Silent sign-in failed to provide necessary credentials.');
+        }
+      } catch (silentError) {
+        const sError = silentError as NativePluginError;
+        console.error('callNativeGoogleApi: Silent sign-in attempt also failed:', sError.message);
+        getStore().dispatch(clearAuth());
+        throw new Error(`Silent sign-in attempt failed: ${sError.message || 'Unknown error'}`);
+      }
+    }
+    // Yetkilendirme hatası değilse veya farklı bir hata ise tekrar fırlat
+    console.error(
+      `callNativeGoogleApi: Native API call failed with an unhandled error or a non-auth error: ${error.message}, Code: ${error.code}`
+    );
+    throw error;
+  }
+}
+// --- Sarmalayıcı Sonu ---
+
 /**
  * Gmail API ile etkileşim kurmak için servis.
  */
@@ -35,79 +98,42 @@ export class GmailService {
 
     /**
      * Belirtilen sorguyla eşleşen e-postaları arar (Native Plugin aracılığıyla).
-     * @param accessToken - Google API erişim token'ı.
      * @param query - Gmail arama sorgusu.
      * @param maxResults - Döndürülecek maksimum sonuç sayısı (Native tarafta henüz implemente edilmedi, opsiyonel).
      * @returns E-posta listesi (ID ve threadId içerir) veya API yanıtı.
      */
-    async searchEmails(accessToken: string, query: string, maxResults: number = 100): Promise<GmailSearchResponse> {
+    async searchEmails(query: string, maxResults: number = 100): Promise<GmailSearchResponse> {
         if (!GoogleAuth) {
             console.error('GmailService: GoogleAuth plugin is not available.');
             throw new Error('GoogleAuth plugin not available');
         }
-         if (!accessToken) {
-            console.error('GmailService: Access token is required for searchEmails.');
-            throw new Error('Access token is required');
-        }
 
-        const options: GmailSearchOptions = {
-            accessToken,
+        const options: Omit<GmailSearchOptions, 'accessToken'> = {
             query,
             // maxResults, // Native tarafta desteklenince eklenebilir
         };
 
-        console.log(`GmailService: Calling native searchGmailMessages with query: ${query}`);
+        console.log(`GmailService: Preparing to call native searchGmailMessages with query: ${query}`);
 
-        try {
-            // Native metodu çağır
-            const result: GmailSearchResponse = await GoogleAuth.searchGmailMessages(options);
-            console.log(`GmailService: Native email search successful. Found approx ${result.resultSizeEstimate} messages.`);
-            // Native plugin doğrudan Gmail API yanıtını (ListMessagesResponse) döndürüyor
-            return result;
-        } catch (error: any) {
-            console.error('GmailService: Error calling native searchGmailMessages:', error);
-            const errorMessage = error?.message || 'E-postalar aranırken hata oluştu (native).';
-            const errorCode = error?.code;
-            const newError = new Error(errorMessage);
-            (newError as any).code = errorCode;
-            throw newError;
-        }
+        return callNativeGoogleApi(() => GoogleAuth.searchGmailMessages(options as GmailSearchOptions));
     }
 
     /**
      * Belirli bir e-postanın detaylarını alır (Native Plugin aracılığıyla).
-     * @param accessToken - Google API erişim token'ı.
      * @param messageId - Alınacak e-postanın ID'si.
      * @returns E-posta detayları (Gmail API Message formatında).
      */
-    async getEmailDetails(accessToken: string, messageId: string): Promise<GmailMessage> {
+    async getEmailDetails(messageId: string): Promise<GmailMessage> {
         if (!GoogleAuth) {
             console.error('GmailService: GoogleAuth plugin is not available.');
             throw new Error('GoogleAuth plugin not available');
         }
-        if (!accessToken) {
-            console.error('GmailService: Access token is required for getEmailDetails.');
-            throw new Error('Access token is required');
-        }
 
-        const options: GmailDetailsOptions = { accessToken, messageId };
+        const options: Omit<GmailDetailsOptions, 'accessToken'> = { messageId };
 
-        console.log(`GmailService: Calling native getGmailMessageDetails for ID: ${messageId}`);
+        console.log(`GmailService: Preparing to call native getGmailMessageDetails for ID: ${messageId}`);
 
-        try {
-            // Native metodu çağır
-            const result: GmailMessage = await GoogleAuth.getGmailMessageDetails(options);
-             console.log(`GmailService: Native get details successful for ID: ${messageId}`);
-            // Native plugin doğrudan Gmail API yanıtını (Message) döndürüyor
-            return result;
-        } catch (error: any) {
-            console.error(`GmailService: Error calling native getGmailMessageDetails for ${messageId}:`, error);
-            const errorMessage = error?.message || 'E-posta detayları alınırken hata oluştu (native).';
-            const errorCode = error?.code;
-            const newError = new Error(errorMessage);
-            (newError as any).code = errorCode;
-            throw newError;
-        }
+        return callNativeGoogleApi(() => GoogleAuth.getGmailMessageDetails(options as GmailDetailsOptions));
     }
 
     /**
@@ -214,42 +240,20 @@ export class GmailService {
 
     /**
      * Belirli bir e-postadaki bir eki alır (Native Plugin aracılığıyla).
-     * @param accessToken - Google API erişim token'ı.
      * @param messageId - Ekin bulunduğu e-postanın ID'si.
      * @param attachmentId - Alınacak ekin ID'si.
      * @returns Ek detayları (Gmail API MessagePartBody formatında, 'data' base64url kodludur).
      */
-    async getAttachment(accessToken: string, messageId: string, attachmentId: string): Promise<GmailAttachmentResponse> {
+    async getAttachment(messageId: string, attachmentId: string): Promise<GmailAttachmentResponse> {
         if (!GoogleAuth) {
             console.error('GmailService: GoogleAuth plugin is not available.');
             throw new Error('GoogleAuth plugin not available');
         }
-         if (!accessToken) {
-            console.error('GmailService: Access token is required for getAttachment.');
-            throw new Error('Access token is required');
-        }
 
-        const options: GmailAttachmentOptions = { accessToken, messageId, attachmentId };
+        const options: Omit<GmailAttachmentOptions, 'accessToken'> = { messageId, attachmentId };
 
-        console.log(`GmailService: Calling native getGmailAttachment for msg ${messageId}, att ${attachmentId}`);
-        try {
-            // Native metodu çağır
-            const result: GmailAttachmentResponse = await GoogleAuth.getGmailAttachment(options);
-            
-            // Native'den dönen yanıtı logla (data kısmı base64url olmalı)
-            console.log(`GmailService: Native getAttachment successful. Size: ${result.size}, Data start: ${result.data?.substring(0, 50)}...`);
-            
-            // Native plugin doğrudan Gmail API yanıtını (MessagePartBody) döndürüyor
-            return result; 
-
-        } catch (error: any) {
-            console.error('GmailService: Error calling native getGmailAttachment:', error);
-            const errorMessage = error?.message || 'E-posta eki alınırken hata oluştu (native).';
-            const errorCode = error?.code;
-            const newError = new Error(errorMessage);
-            (newError as any).code = errorCode;
-            throw newError;
-        }
+        console.log(`GmailService: Preparing to call native getGmailAttachment for msg ${messageId}, att ${attachmentId}`);
+        return callNativeGoogleApi(() => GoogleAuth.getGmailAttachment(options as GmailAttachmentOptions));
     }
 }
 

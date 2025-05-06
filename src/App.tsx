@@ -58,7 +58,7 @@ setupIonicReact();
 const App: React.FC = () => {
   // Global state'leri al
   const { isActive: isGlobalLoading, message: loadingMessage } = useSelector((state: RootState) => state.loading);
-  const isAuthenticated = useSelector((state: RootState) => !!state.auth.accessToken);
+  const isAuthenticated = useSelector((state: RootState) => !!state.auth.idToken);
 
   return (
   <IonApp>
