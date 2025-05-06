@@ -2,7 +2,6 @@
 package com.codeyzer.ekstre;
 
 import android.content.Intent;
-import android.os.AsyncTask;
 import android.util.Log;
 
 import androidx.activity.result.ActivityResult;
@@ -21,23 +20,14 @@ import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.common.api.Scope;
 
-// Access Token almak için gerekli importlar (GoogleAuthUtil eski ama deneyelim)
-// DEPRECATED WARNING: GoogleAuthUtil is deprecated and may be removed in future SDKs.
-// Consider using server-side auth code exchange or Google Identity Services (Credential Manager).
-// import com.google.android.gms.auth.GoogleAuthUtil; // KALDIRILDI
-// import com.google.android.gms.auth.GoogleAuthException; // KALDIRILDI
 import java.io.IOException;
-// import android.accounts.Account; // KALDIRILDI - GoogleSignInAccount.getAccount() kullanılacak
 
-// Firebase importları
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 
-// Google API Client Library ve Calendar API için importlar
-// import com.google.api.client.extensions.android.http.AndroidHttp; // KULLANIMDAN KALDIRILDI
-import com.google.api.client.http.javanet.NetHttpTransport; // YENİ IMPORT
+import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.model.Event;
@@ -45,17 +35,11 @@ import com.google.api.services.calendar.model.EventDateTime;
 import com.google.api.services.calendar.model.EventReminder;
 import com.google.api.services.calendar.model.Events;
 
-// GMAIL API için importlar
 import com.google.api.services.gmail.Gmail;
-// import com.google.api.services.gmail.GmailScopes; // Gerekirse scope sabitleri için (Zaten string olarak tanımlı)
 import com.google.api.services.gmail.model.ListMessagesResponse;
 import com.google.api.services.gmail.model.Message;
 import com.google.api.services.gmail.model.MessagePartBody;
 
-// Yeni Google Auth Library importları (GoogleAccountCredential için)
-// import com.google.auth.http.HttpCredentialsAdapter; // KALDIRILDI
-// import com.google.auth.oauth2.AccessToken; // KALDIRILDI
-// import com.google.auth.oauth2.GoogleCredentials; // KALDIRILDI
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
 
 import java.util.Arrays;
@@ -71,29 +55,23 @@ public class GoogleAuthPlugin extends Plugin {
     private static final String TAG = "GoogleAuthPlugin";
     private GoogleSignInClient googleSignInClient;
     private FirebaseAuth firebaseAuth;
-    private GoogleSignInAccount currentGoogleAccount; // YENİ: Mevcut Google hesabını saklamak için
-    // Scope sabitlerini tanımla
+    private GoogleSignInAccount currentGoogleAccount; // Stored Google account
+
     private static final String GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
     private static final String CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events";
-    // Access token için kullanılacak birleşik scope string'i (oauth2: prefixi ile ve boşlukla ayrılmış)
-    // private static final String REQUIRED_SCOPES_FOR_TOKEN = "oauth2:" + GMAIL_READONLY_SCOPE + " " + CALENDAR_EVENTS_SCOPE; // GoogleAuthUtil için kullanılıyordu, KALDIRILDI veya yorumlandı
-
-    // Sağlanan Web İstemci Kimliği (Firebase ile ilişkili GCP projesindeki Web ID olmalı)
     private static final String WEB_CLIENT_ID = "1008857567754-2s7hevrbudal3m8qju85g31souc8v4g5.apps.googleusercontent.com";
+
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     @Override
     public void load() {
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken(WEB_CLIENT_ID) // ID Token istemek için Web Client ID gerekli
+                .requestIdToken(WEB_CLIENT_ID)
                 .requestEmail()
-                // İstenen scope'ları ekle (Gmail ve Calendar)
                 .requestScopes(new Scope(GMAIL_READONLY_SCOPE), new Scope(CALENDAR_EVENTS_SCOPE))
-                // İsteğe bağlı: Server Auth Code istemek için (backend ile kullanılacaksa)
-                // .requestServerAuthCode(WEB_CLIENT_ID)
                 .build();
         googleSignInClient = GoogleSignIn.getClient(getContext(), gso);
-        firebaseAuth = FirebaseAuth.getInstance(); // Firebase Auth örneğini al
+        firebaseAuth = FirebaseAuth.getInstance();
     }
 
     @PluginMethod
@@ -106,214 +84,73 @@ public class GoogleAuthPlugin extends Plugin {
     @ActivityCallback
     private void handleSignInResult(PluginCall call, ActivityResult result) {
         if (call == null) {
-            Log.e(TAG, "PluginCall missing");
+            Log.e(TAG, "PluginCall missing in handleSignInResult");
             return;
         }
-        // Google Sign In sonucunu işle
+
         Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(result.getData());
         try {
-            // Google Sign In başarılı
             GoogleSignInAccount account = task.getResult(ApiException.class);
             Log.d(TAG, "Google Sign In successful.");
-
-            // --- Access Token Alma Denemesi (AsyncTask ile arka planda) ---
-            // Bu, UI thread'ini bloke etmemek için önemlidir.
-            // new GetAccessTokenTask(call, account).execute(); // KALDIRILDI
-
-            // Firebase ile giriş kısmı AsyncTask içinde yapılacak // ARTIK BURADA YAPILACAK
-            this.currentGoogleAccount = account; // Hesabı sakla
-
-            if (account.getIdToken() == null) {
-                call.reject("Google ID Token is null, cannot proceed with Firebase sign in.");
-                return;
-            }
-            AuthCredential credential = GoogleAuthProvider.getCredential(account.getIdToken(), null);
-            firebaseAuth.signInWithCredential(credential)
-                .addOnCompleteListener(getActivity(), authTask -> {
-                    if (authTask.isSuccessful()) {
-                        FirebaseUser user = firebaseAuth.getCurrentUser();
-                        Log.d(TAG, "Firebase Sign In successful: " + (user != null ? user.getEmail() : "null user"));
-                        JSObject userResult = new JSObject();
-                        userResult.put("id", account.getId());
-                        userResult.put("name", account.getDisplayName());
-                        userResult.put("email", account.getEmail());
-                        userResult.put("imageUrl", account.getPhotoUrl() != null ? account.getPhotoUrl().toString() : null);
-                        userResult.put("idToken", account.getIdToken()); // Google ID Token
-                        // userResult.put("accessToken", accessToken); // KALDIRILDI
-                        call.resolve(userResult);
-                    } else {
-                        Log.w(TAG, "Firebase Sign In failed", authTask.getException());
-                        call.reject("Firebase Sign In failed: " + (authTask.getException() != null ? authTask.getException().getMessage() : "Unknown error"));
-                    }
-                });
+            this.currentGoogleAccount = account;
+            signInToFirebaseAndResolve(call, account);
 
         } catch (ApiException e) {
             Log.w(TAG, "Google Sign In failed code=" + e.getStatusCode());
-            if (e.getStatusCode() == 12501) {
-                // Kullanıcı iptal etti (SIGN_IN_CANCELLED)
+            if (e.getStatusCode() == 12501) { // SIGN_IN_CANCELLED
                 call.reject("Sign-in cancelled by user.");
-            } else if (e.getStatusCode() == 7) {
-                 // Ağ hatası (NETWORK_ERROR)
+            } else if (e.getStatusCode() == 7) { // NETWORK_ERROR
                 call.reject("Network error during sign-in.");
             } else {
                  call.reject("Google Sign-in failed: " + e.getStatusCode());
             }
         } catch (Exception e) {
-             // Diğer beklenmedik hatalar
             Log.e(TAG, "Unexpected error during sign-in process", e);
             call.reject("Unexpected error: " + e.getMessage());
         }
     }
 
-    // --- YENİ METOT: trySilentSignIn ---
     @PluginMethod
     public void trySilentSignIn(PluginCall call) {
         Log.d(TAG, "Attempting silent sign in...");
-        // saveCall(call); // Sessiz giriş için sonucu ActivityCallback beklemiyoruz, doğrudan Task kullanacağız
-
-        // Önce mevcut giriş yapmış kullanıcıyı kontrol et (hızlandırma için)
-        // GoogleSignInAccount lastAccount = GoogleSignIn.getLastSignedInAccount(getContext());
-        // if (lastAccount != null && GoogleSignIn.hasPermissions(lastAccount, new Scope(GMAIL_READONLY_SCOPE), new Scope(CALENDAR_EVENTS_SCOPE))) {
-        //     Log.d(TAG, "Found last signed in account with required permissions.");
-        //     // İzinler varsa doğrudan token almayı dene
-        //     new GetAccessTokenTask(call, lastAccount).execute();
-        //     return;
-        // }
-        // Not: getLastSignedInAccount bazen güncel token vermeyebilir, silentSignIn daha güvenilir.
 
         Task<GoogleSignInAccount> task = googleSignInClient.silentSignIn();
 
         if (task.isSuccessful()) {
-            // Eğer görev hemen başarılıysa (cachelenmiş geçerli oturum varsa)
-            Log.d(TAG, "Silent sign in successful (immediately)");
+            Log.d(TAG, "Silent sign in successful (cached).");
             GoogleSignInAccount account = task.getResult();
-            // Access token al ve sonucu döndür
-            // new GetAccessTokenTask(call, account).execute(); // KALDIRILDI
-            this.currentGoogleAccount = account; // Hesabı sakla
-            signInToFirebaseAndResolve(call, account); // Firebase ile giriş yap ve sonucu döndür
+            this.currentGoogleAccount = account;
+            signInToFirebaseAndResolve(call, account);
         } else {
-            // Görev hemen başarılı değilse, tamamlanmasını bekle
             task.addOnCompleteListener(getActivity(), completedTask -> {
                 try {
                     if (completedTask.isSuccessful()) {
-                        Log.d(TAG, "Silent sign in successful (on complete)");
+                        Log.d(TAG, "Silent sign in successful (network).");
                         GoogleSignInAccount account = completedTask.getResult();
-                        // Access token al ve sonucu döndür
-                        // new GetAccessTokenTask(call, account).execute(); // KALDIRILDI
-                        this.currentGoogleAccount = account; // Hesabı sakla
-                        signInToFirebaseAndResolve(call, account); // Firebase ile giriş yap ve sonucu döndür
+                        this.currentGoogleAccount = account;
+                        signInToFirebaseAndResolve(call, account);
                     } else {
-                        // Sessiz giriş başarısız
                         Log.w(TAG, "Silent sign in failed.", completedTask.getException());
-                        // Hata sebebini kontrol et
                         Exception exception = completedTask.getException();
                         if (exception instanceof ApiException) {
                             ApiException apiException = (ApiException) exception;
                             if (apiException.getStatusCode() == com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes.SIGN_IN_REQUIRED) {
-                                // Kullanıcının manuel giriş yapması gerekiyor
                                 call.reject("Silent sign-in failed. User needs to sign in manually.", "SIGN_IN_REQUIRED");
                             } else {
-                                // Diğer API hataları
                                 call.reject("Silent sign-in failed with API error: " + apiException.getStatusCode());
                             }
                         } else {
-                            // Diğer beklenmedik hatalar
                             call.reject("Silent sign-in failed: " + (exception != null ? exception.getMessage() : "Unknown error"));
                         }
                     }
                 } catch (Exception e) {
-                    // Beklenmedik bir hata oluştu
                     Log.e(TAG, "Unexpected error during silent sign-in completion", e);
                     call.reject("Unexpected error during silent sign-in: " + e.getMessage());
                 }
             });
         }
     }
-    // --- trySilentSignIn SONU ---
 
-    // AsyncTask Access Token almak için (güncellenmiş scope ile)
-    // DEPRECATED WARNING: AsyncTask is deprecated in API level 30 (Android 11).
-    // Consider using standard Java concurrent utilities (e.g., ExecutorService) or Kotlin Coroutines.
-    /* KALDIRILDI
-    private class GetAccessTokenTask extends AsyncTask<Void, Void, String> {
-        private PluginCall call;
-        private GoogleSignInAccount googleAccount;
-        private Exception exception = null;
-
-        GetAccessTokenTask(PluginCall call, GoogleSignInAccount account) {
-            this.call = call;
-            this.googleAccount = account;
-        }
-
-        @Override
-        protected String doInBackground(Void... params) {
-            try {
-                Account androidAccount = googleAccount.getAccount();
-                if (androidAccount == null) {
-                   throw new IOException("Google Account not found on device.");
-                }
-                 // Güncellenmiş birleşik scope'u kullan
-                 Log.d(TAG, "Attempting to get Access Token for scopes: " + REQUIRED_SCOPES_FOR_TOKEN);
-                // DEPRECATED WARNING: GoogleAuthUtil.getToken is deprecated.
-                // This client-side token retrieval is less secure and may stop working.
-                // The recommended approach is server-side auth code exchange.
-                String accessToken = GoogleAuthUtil.getToken(getContext(), androidAccount, REQUIRED_SCOPES_FOR_TOKEN);
-                Log.d(TAG, "Access Token obtained successfully.");
-                return accessToken;
-            } catch (IOException | GoogleAuthException e) {
-                Log.e(TAG, "Error getting Access Token", e);
-                this.exception = e;
-                return null;
-            }
-        }
-
-        @Override
-        protected void onPostExecute(String accessToken) {
-            // Ana thread'e geri döndük. Firebase ile devam et ve sonucu döndür.
-
-            if (accessToken == null || exception != null) {
-                 String errorMsg = "Failed to get Access Token";
-                 if (exception != null) {
-                     errorMsg += ": " + exception.getMessage();
-                 }
-                 // Erişim token'ı alınamasa bile Firebase ile devam etmeyi deneyebiliriz (sadece kimlik doğrulama için)
-                 // Veya burada doğrudan reject edebiliriz. Şimdilik devam edelim.
-                 Log.w(TAG, errorMsg);
-                 // call.reject(errorMsg);
-                 // return;
-            }
-
-            // ID Token ile Firebase Credential oluştur (googleAccount hala geçerli)
-             if (googleAccount.getIdToken() == null) {
-                 call.reject("Google ID Token is null, cannot proceed with Firebase sign in.");
-                 return;
-             }
-            AuthCredential credential = GoogleAuthProvider.getCredential(googleAccount.getIdToken(), null);
-
-            // Firebase'e giriş yap
-            firebaseAuth.signInWithCredential(credential)
-                .addOnCompleteListener(getActivity(), authTask -> {
-                    if (authTask.isSuccessful()) {
-                        FirebaseUser user = firebaseAuth.getCurrentUser();
-                        Log.d(TAG, "Firebase Sign In successful: " + user.getEmail());
-                        JSObject userResult = new JSObject();
-                        userResult.put("id", googleAccount.getId());
-                        userResult.put("name", googleAccount.getDisplayName());
-                        userResult.put("email", googleAccount.getEmail());
-                        userResult.put("imageUrl", googleAccount.getPhotoUrl() != null ? googleAccount.getPhotoUrl().toString() : null);
-                        userResult.put("idToken", googleAccount.getIdToken()); // Google ID Token
-                        userResult.put("accessToken", accessToken); // <<< Alınan Access Token eklendi (null olabilir)
-                        call.resolve(userResult);
-                    } else {
-                        Log.w(TAG, "Firebase Sign In failed", authTask.getException());
-                        call.reject("Firebase Sign In failed: " + authTask.getException().getMessage());
-                    }
-                });
-        }
-    }
-    */ // GetAccessTokenTask SONU
-
-    // Yeni yardımcı metod: Firebase'e giriş yap ve sonucu JS'e döndür
     private void signInToFirebaseAndResolve(PluginCall call, GoogleSignInAccount googleAccount) {
         if (googleAccount.getIdToken() == null) {
             call.reject("Google ID Token is null, cannot proceed with Firebase sign in.");
@@ -323,15 +160,14 @@ public class GoogleAuthPlugin extends Plugin {
         firebaseAuth.signInWithCredential(credential)
             .addOnCompleteListener(getActivity(), authTask -> {
                 if (authTask.isSuccessful()) {
-                    FirebaseUser user = firebaseAuth.getCurrentUser(); // Kullanılabilirliği kontrol et
-                    Log.d(TAG, "Firebase Sign In successful: " + (user != null ? user.getEmail() : "null user"));
+                    // FirebaseUser user = firebaseAuth.getCurrentUser(); // Can be used if needed
+                    Log.d(TAG, "Firebase Sign In successful.");
                     JSObject userResult = new JSObject();
                     userResult.put("id", googleAccount.getId());
                     userResult.put("name", googleAccount.getDisplayName());
                     userResult.put("email", googleAccount.getEmail());
                     userResult.put("imageUrl", googleAccount.getPhotoUrl() != null ? googleAccount.getPhotoUrl().toString() : null);
                     userResult.put("idToken", googleAccount.getIdToken());
-                    // accessToken GÖNDERİLMEZ
                     call.resolve(userResult);
                 } else {
                     Log.w(TAG, "Firebase Sign In failed", authTask.getException());
@@ -340,21 +176,15 @@ public class GoogleAuthPlugin extends Plugin {
             });
     }
 
+
     @PluginMethod
     public void createCalendarEvent(PluginCall call) {
-        // String accessTokenString = call.getString("accessToken"); // KALDIRILDI
         String summary = call.getString("summary");
         String description = call.getString("description");
         String startTimeIso = call.getString("startTimeIso");
         String endTimeIso = call.getString("endTimeIso");
         String timeZone = call.getString("timeZone", "Europe/Istanbul");
 
-        /* KALDIRILDI
-        if (accessTokenString == null || accessTokenString.isEmpty()) {
-            call.reject("Access token is required.");
-            return;
-        }
-        */
         if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
             call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
             return;
@@ -366,22 +196,7 @@ public class GoogleAuthPlugin extends Plugin {
 
         executorService.execute(() -> {
             try {
-                // Yeni Google Auth Library kullanarak Credentials oluştur
-                /* KALDIRILDI
-                AccessToken accessToken = new AccessToken(accessTokenString, null); // Expiration time bilinmiyorsa null
-                GoogleCredentials credentials = GoogleCredentials.create(accessToken);
-                HttpCredentialsAdapter adapter = new HttpCredentialsAdapter(credentials);
-                */
-
-                Calendar service = buildCalendarServiceWithAccount(); // YENİ YARDIMCI METOT KULLANILDI
-                /* ESKİ YAPI
-                Calendar service = new Calendar.Builder(
-                        new NetHttpTransport(), // AndroidHttp.newCompatibleTransport() yerine
-                        GsonFactory.getDefaultInstance(),
-                        adapter) // GoogleCredential yerine adapter kullan
-                        .setApplicationName(getContext().getPackageName())
-                        .build();
-                */
+                Calendar service = buildCalendarServiceWithAccount();
 
                 Event event = new Event()
                         .setSummary(summary)
@@ -417,31 +232,17 @@ public class GoogleAuthPlugin extends Plugin {
                 call.resolve(result);
 
             } catch (IOException e) {
-                Log.e(TAG, "IOException in createCalendarEvent: " + e.getMessage(), e);
-                // Check if the error is due to invalid_grant (token expired/revoked)
-                if (e.getMessage() != null && e.getMessage().toLowerCase().contains("invalid_grant")) {
-                     call.reject("Access token is invalid or expired. Please sign in again.", "INVALID_GRANT", e);
-                } else {
-                     call.reject("Error creating calendar event: " + e.getMessage(), e);
-                }
+                handleIOException(call, e, "Error creating calendar event");
             } catch (Exception e) {
-                Log.e(TAG, "Exception in createCalendarEvent: " + e.getMessage(), e);
-                call.reject("Unexpected error creating calendar event: " + e.getMessage(), e);
+                handleGenericException(call, e, "Unexpected error creating calendar event");
             }
         });
     }
 
     @PluginMethod
     public void searchCalendarEvents(PluginCall call) {
-        // String accessTokenString = call.getString("accessToken"); // KALDIRILDI
         String appId = call.getString("appId");
 
-        /* KALDIRILDI
-        if (accessTokenString == null || accessTokenString.isEmpty()) {
-            call.reject("Access token is required.");
-            return;
-        }
-        */
         if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
             call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
             return;
@@ -453,25 +254,8 @@ public class GoogleAuthPlugin extends Plugin {
 
         executorService.execute(() -> {
             try {
-                // Yeni Google Auth Library kullanarak Credentials oluştur
-                /* KALDIRILDI
-                AccessToken accessToken = new AccessToken(accessTokenString, null); // Expiration time bilinmiyorsa null
-                GoogleCredentials credentials = GoogleCredentials.create(accessToken);
-                HttpCredentialsAdapter adapter = new HttpCredentialsAdapter(credentials);
-                */
-                Calendar service = buildCalendarServiceWithAccount(); // YENİ YARDIMCI METOT
-                /* ESKİ YAPI
-                Calendar service = new Calendar.Builder(
-                        new NetHttpTransport(), // AndroidHttp.newCompatibleTransport() yerine
-                        GsonFactory.getDefaultInstance(),
-                        adapter) // GoogleCredential yerine adapter kullan
-                        .setApplicationName(getContext().getPackageName())
-                        .build();
-                */
+                Calendar service = buildCalendarServiceWithAccount();
 
-                // AppID'den tarihi çıkar (YYYY-MM-DD kısmını bul)
-                // Bu mantık JS tarafındaydı, burada da benzerini yapalım
-                // Örnek AppID: "[AppID: ekstre_yapikredi_2024-07-15]"
                 String targetDate = null;
                 java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(\\d{4}-\\d{2}-\\d{2})").matcher(appId);
                 if (matcher.find()) {
@@ -479,21 +263,12 @@ public class GoogleAuthPlugin extends Plugin {
                 }
 
                 if (targetDate == null) {
-                    Log.w(TAG, "Could not extract date from AppID for search: " + appId);
-                    // Tarih yoksa, tüm takvimde AppID ile arama yapmayı deneyebiliriz,
-                    // ama bu çok geniş olabilir. Şimdilik daraltılmış arama olmadan devam edelim.
-                    // Veya belirli bir zaman aralığı zorunlu kılınabilir.
-                    // JS'deki gibi timeMin ve timeMax belirlemek daha iyi.
-                    // Şimdilik son 1 yılı arayalım eğer tarih yoksa, ya da hata verelim.
-                    // JS tarafı spesifik bir gün aradığı için, burada da benzer bir mantık olmalı.
-                    // Eğer tarih çıkarılamazsa, JS tarafı hata veriyordu, burada da benzerini yapalım.
+                    Log.w(TAG, "Could not extract date from AppID for calendar search: " + appId);
                     call.reject("Could not extract date from AppID: " + appId);
                     return;
                 }
 
-                // timeMin ve timeMax için RFC3339 formatını kullan
                 String startOfDayUtc = targetDate + "T00:00:00Z";
-
                 java.util.Calendar calendar = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
                 java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
                 sdf.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
@@ -504,77 +279,55 @@ public class GoogleAuthPlugin extends Plugin {
 
 
                 Events events = service.events().list("primary")
-                        .setQ(appId) // AppID'yi doğrudan q parametresi olarak kullan
+                        .setQ(appId)
                         .setTimeMin(new com.google.api.client.util.DateTime(startOfDayUtc))
                         .setTimeMax(new com.google.api.client.util.DateTime(endOfDayUtc))
                         .setSingleEvents(true)
-                        .setMaxResults(5) // En fazla 5 sonuç (genelde 1 tane bekliyoruz)
+                        .setMaxResults(5)
                         .execute();
 
                 boolean eventFound = false;
                 if (events.getItems() != null) {
                     for (Event event : events.getItems()) {
-                        // Google q araması geniş olabileceğinden, açıklama içinde tam eşleşme arayalım.
                         if (event.getDescription() != null && event.getDescription().contains(appId)) {
-                             Log.d(TAG, "Exact match found for AppID in event description: " + appId + ", Event ID: " + event.getId());
                             eventFound = true;
                             break;
                         }
                     }
                 }
-                 Log.d(TAG, "Search for AppID '" + appId + "' completed. Found: " + eventFound);
                 JSObject result = new JSObject();
                 result.put("eventFound", eventFound);
                 call.resolve(result);
 
             } catch (IOException e) {
-                Log.e(TAG, "IOException in searchCalendarEvents: " + e.getMessage(), e);
-                 if (e.getMessage() != null && e.getMessage().toLowerCase().contains("invalid_grant")) {
-                     call.reject("Access token is invalid or expired. Please sign in again.", "INVALID_GRANT", e);
-                } else {
-                    call.reject("Error searching calendar events: " + e.getMessage(), e);
-                }
+                handleIOException(call, e, "Error searching calendar events");
             } catch (Exception e) {
-                Log.e(TAG, "Exception in searchCalendarEvents: " + e.getMessage(), e);
-                call.reject("Unexpected error searching calendar events: " + e.getMessage(), e);
+                handleGenericException(call, e, "Unexpected error searching calendar events");
             }
         });
     }
 
     @PluginMethod
     public void signOut(PluginCall call) {
-        // Önce Firebase'den çıkış yap
         firebaseAuth.signOut();
-        // Sonra Google'dan çıkış yap
         googleSignInClient.signOut().addOnCompleteListener(task -> {
-            this.currentGoogleAccount = null; // Saklanan hesabı temizle
+            this.currentGoogleAccount = null;
             if (task.isSuccessful()) {
                 Log.d(TAG, "Google Sign Out successful");
                 call.resolve();
             } else {
-                // Google çıkışı başarısız olsa bile devam edebiliriz, Firebase çıkışı önemli.
-                Log.w(TAG, "Google Sign Out failed", task.getException());
-                call.resolve(); // Yine de resolve edebiliriz
+                Log.w(TAG, "Google Sign Out failed but proceeding anyway.", task.getException());
+                call.resolve();
             }
         });
     }
 
-    // --- GMAIL API METODLARI ---
+    // --- GMAIL API METHODS ---
 
     @PluginMethod
     public void searchGmailMessages(PluginCall call) {
-        // String accessTokenString = call.getString("accessToken"); // KALDIRILDI
         String query = call.getString("query");
-        // Opsiyonel: Sayfalama için nextPageToken ve maxResults eklenebilir
-        // String pageToken = call.getString("pageToken");
-        // Integer maxResults = call.getInteger("maxResults", 100); // Default 100?
 
-        /* KALDIRILDI
-        if (accessTokenString == null || accessTokenString.isEmpty()) {
-            call.reject("Access token is required.");
-            return;
-        }
-        */
         if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
             call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
             return;
@@ -586,38 +339,14 @@ public class GoogleAuthPlugin extends Plugin {
 
         executorService.execute(() -> {
             try {
-                // Gmail service = buildGmailService(accessTokenString); // ESKİ YAPI
-                Gmail service = buildGmailServiceWithAccount(); // YENİ YARDIMCI METOT
+                Gmail service = buildGmailServiceWithAccount();
 
                 ListMessagesResponse response = service.users().messages().list("me")
                         .setQ(query)
-                        // .setPageToken(pageToken) 
-                        // .setMaxResults(maxResults.longValue())
                         .execute();
 
-                JSObject result = new JSObject();
-                // Gmail API'den dönen mesaj listesini (sadece ID'ler) JSObject'e çevir
-                // com.google.api.client.json.gson.GsonFactory kullanarak doğrudan JSON'a çevirme
                 String jsonResponse = GsonFactory.getDefaultInstance().toString(response);
-                result = new JSObject(jsonResponse); // JSObject'i JSON string'inden oluştur
-
-                // Alternatif: Manuel olarak JSObject oluşturma
-                /*
-                JSArray messagesArray = new JSArray();
-                if (response.getMessages() != null) {
-                    for (Message message : response.getMessages()) {
-                        JSObject msgObj = new JSObject();
-                        msgObj.put("id", message.getId());
-                        msgObj.put("threadId", message.getThreadId());
-                        messagesArray.put(msgObj);
-                    }
-                }
-                result.put("messages", messagesArray);
-                if (response.getNextPageToken() != null) {
-                    result.put("nextPageToken", response.getNextPageToken());
-                }
-                result.put("resultSizeEstimate", response.getResultSizeEstimate());
-                 */
+                JSObject result = new JSObject(jsonResponse);
                 call.resolve(result);
 
             } catch (IOException e) {
@@ -630,15 +359,8 @@ public class GoogleAuthPlugin extends Plugin {
 
     @PluginMethod
     public void getGmailMessageDetails(PluginCall call) {
-        // String accessTokenString = call.getString("accessToken"); // KALDIRILDI
         String messageId = call.getString("messageId");
 
-        /* KALDIRILDI
-        if (accessTokenString == null || accessTokenString.isEmpty()) {
-            call.reject("Access token is required.");
-            return;
-        }
-        */
         if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
             call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
             return;
@@ -650,17 +372,12 @@ public class GoogleAuthPlugin extends Plugin {
 
         executorService.execute(() -> {
             try {
-                // Gmail service = buildGmailService(accessTokenString); // ESKİ YAPI
-                Gmail service = buildGmailServiceWithAccount(); // YENİ YARDIMCI METOT
+                Gmail service = buildGmailServiceWithAccount();
 
-                // format=FULL ile tüm detayları al (payload, headers etc.)
                 Message message = service.users().messages().get("me", messageId).setFormat("FULL").execute();
 
-                JSObject result = new JSObject();
-                // Dönen Message objesini JSObject'e çevir (Gson kullanarak)
-                 String jsonResponse = GsonFactory.getDefaultInstance().toString(message);
-                 result = new JSObject(jsonResponse);
-
+                String jsonResponse = GsonFactory.getDefaultInstance().toString(message);
+                JSObject result = new JSObject(jsonResponse);
                 call.resolve(result);
 
             } catch (IOException e) {
@@ -673,16 +390,9 @@ public class GoogleAuthPlugin extends Plugin {
 
     @PluginMethod
     public void getGmailAttachment(PluginCall call) {
-        // String accessTokenString = call.getString("accessToken"); // KALDIRILDI
         String messageId = call.getString("messageId");
         String attachmentId = call.getString("attachmentId");
 
-        /* KALDIRILDI
-        if (accessTokenString == null || accessTokenString.isEmpty()) {
-            call.reject("Access token is required.");
-            return;
-        }
-        */
         if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
             call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
             return;
@@ -698,21 +408,13 @@ public class GoogleAuthPlugin extends Plugin {
 
         executorService.execute(() -> {
             try {
-                // Gmail service = buildGmailService(accessTokenString); // ESKİ YAPI
-                Gmail service = buildGmailServiceWithAccount(); // YENİ YARDIMCI METOT
+                Gmail service = buildGmailServiceWithAccount();
 
                 MessagePartBody attachmentBody = service.users().messages().attachments()
                                                     .get("me", messageId, attachmentId).execute();
 
-                JSObject result = new JSObject();
-                // Dönen MessagePartBody objesini JSObject'e çevir (Gson kullanarak)
                 String jsonResponse = GsonFactory.getDefaultInstance().toString(attachmentBody);
-                result = new JSObject(jsonResponse);
-                
-                // Alternatif: Sadece data alanını koymak
-                // result.put("data", attachmentBody.getData()); // Base64 encoded data
-                // result.put("size", attachmentBody.getSize()); 
-
+                JSObject result = new JSObject(jsonResponse);
                 call.resolve(result);
 
             } catch (IOException e) {
@@ -723,35 +425,20 @@ public class GoogleAuthPlugin extends Plugin {
         });
     }
 
-    // Yardımcı metod: Gmail servisini oluşturur
-    /* KALDIRILDI
-    private Gmail buildGmailService(String accessTokenString) throws IOException {
-        AccessToken accessTokenObj = new AccessToken(accessTokenString, null);
-        GoogleCredentials credentials = GoogleCredentials.create(accessTokenObj);
-        HttpCredentialsAdapter adapter = new HttpCredentialsAdapter(credentials);
+    // --- Helper Methods ---
 
-        return new Gmail.Builder(
-                new NetHttpTransport(),
-                GsonFactory.getDefaultInstance(),
-                adapter)
-                .setApplicationName(getContext().getPackageName())
-                .build();
-    }
-    */
-
-    // YENİ YARDIMCI METODLAR (GoogleAccountCredential ile)
     private Gmail buildGmailServiceWithAccount() throws IOException {
         if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
             throw new IOException("User not signed in or account not available for Gmail service.");
         }
         GoogleAccountCredential credential = GoogleAccountCredential.usingOAuth2(
                 getContext(), Collections.singletonList(GMAIL_READONLY_SCOPE));
-        credential.setSelectedAccount(this.currentGoogleAccount.getAccount()); // Hesabı set et
+        credential.setSelectedAccount(this.currentGoogleAccount.getAccount());
 
         return new Gmail.Builder(
                 new NetHttpTransport(),
                 GsonFactory.getDefaultInstance(),
-                credential) // GoogleAccountCredential kullan
+                credential)
                 .setApplicationName(getContext().getPackageName())
                 .build();
     }
@@ -762,49 +449,44 @@ public class GoogleAuthPlugin extends Plugin {
         }
         GoogleAccountCredential credential = GoogleAccountCredential.usingOAuth2(
                 getContext(), Collections.singletonList(CALENDAR_EVENTS_SCOPE));
-        credential.setSelectedAccount(this.currentGoogleAccount.getAccount()); // Hesabı set et
+        credential.setSelectedAccount(this.currentGoogleAccount.getAccount());
 
         return new Calendar.Builder(
                 new NetHttpTransport(),
                 GsonFactory.getDefaultInstance(),
-                credential) // GoogleAccountCredential kullan
+                credential)
                 .setApplicationName(getContext().getPackageName())
                 .build();
     }
     
-    // Yardımcı metod: IOException yönetimi
     private void handleIOException(PluginCall call, IOException e, String logPrefix) {
         Log.e(TAG, logPrefix + ": " + e.getMessage(), e);
-        String errorCode = null;
+        String errorCode = "IO_ERROR";
         String errorMessage = logPrefix + ": " + e.getMessage();
+
         if (e instanceof com.google.api.client.http.HttpResponseException) {
             com.google.api.client.http.HttpResponseException httpError = (com.google.api.client.http.HttpResponseException) e;
-            // GoogleJsonResponseException yerine HttpResponseException kullanıldığı için hata detayını manuel parse etmek gerekebilir
-             // String content = httpError.getContent(); // Hata içeriği (JSON olabilir)
-             // Örneğin: { "error": { "code": 401, "message": "Invalid Credentials", "errors": [...] } }
-            if (httpError.getStatusCode() == 401 || httpError.getStatusCode() == 403) {
+            int statusCode = httpError.getStatusCode();
+
+            if (statusCode == 401 || statusCode == 403) {
                  if (e.getMessage() != null && e.getMessage().toLowerCase().contains("invalid_grant")) {
                     errorCode = "INVALID_GRANT";
                     errorMessage = "Access token is invalid or expired. Please sign in again.";
                  } else {
                      errorCode = "AUTH_ERROR";
-                     errorMessage = "Authentication error accessing Gmail: " + httpError.getStatusMessage();
+                     errorMessage = "Authentication error accessing API (Code: " + statusCode + ")";
                  }
             } else {
                  errorCode = "NETWORK_ERROR";
-                 errorMessage = "Network error accessing Gmail: " + httpError.getStatusMessage();
+                 errorMessage = "API request failed (Code: " + statusCode + "): " + httpError.getStatusMessage();
             }
-        } else {
-            errorCode = "IO_ERROR";
         }
+
         call.reject(errorMessage, errorCode, e);
     }
 
-    // Yardımcı metod: Genel Exception yönetimi
     private void handleGenericException(PluginCall call, Exception e, String logPrefix) {
          Log.e(TAG, logPrefix + ": " + e.getMessage(), e);
          call.reject(logPrefix + ": " + e.getMessage(), e);
     }
-
-    // --- GMAIL API METODLARI SONU ---
 } 
