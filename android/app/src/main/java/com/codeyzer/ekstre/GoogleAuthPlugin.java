@@ -56,6 +56,8 @@ public class GoogleAuthPlugin extends Plugin {
     private GoogleSignInClient googleSignInClient;
     private FirebaseAuth firebaseAuth;
     private GoogleSignInAccount currentGoogleAccount; // Stored Google account
+    private GoogleCalendarHandler googleCalendarHandler; // Handler for Calendar operations
+    private GoogleGmailHandler googleGmailHandler; // Handler for Gmail operations
 
     private static final String GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
     private static final String CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events";
@@ -72,6 +74,8 @@ public class GoogleAuthPlugin extends Plugin {
                 .build();
         googleSignInClient = GoogleSignIn.getClient(getContext(), gso);
         firebaseAuth = FirebaseAuth.getInstance();
+        this.googleCalendarHandler = new GoogleCalendarHandler(getContext(), this.executorService);
+        this.googleGmailHandler = new GoogleGmailHandler(getContext(), this.executorService); // Initialize GmailHandler
     }
 
     @PluginMethod
@@ -96,17 +100,11 @@ public class GoogleAuthPlugin extends Plugin {
             signInToFirebaseAndResolve(call, account);
 
         } catch (ApiException e) {
-            Log.w(TAG, "Google Sign In failed code=" + e.getStatusCode());
-            if (e.getStatusCode() == 12501) { // SIGN_IN_CANCELLED
-                call.reject("Sign-in cancelled by user.");
-            } else if (e.getStatusCode() == 7) { // NETWORK_ERROR
-                call.reject("Network error during sign-in.");
-            } else {
-                 call.reject("Google Sign-in failed: " + e.getStatusCode());
-            }
+            // Use ErrorUtils for Google Sign-In API exceptions
+            ErrorUtils.handleGoogleSignInApiException(call, e, "Google Sign In failed", TAG);
         } catch (Exception e) {
-            Log.e(TAG, "Unexpected error during sign-in process", e);
-            call.reject("Unexpected error: " + e.getMessage());
+            // Use ErrorUtils for generic exceptions
+            ErrorUtils.handleGenericException(call, e, "Unexpected error during sign-in process", TAG);
         }
     }
 
@@ -133,19 +131,16 @@ public class GoogleAuthPlugin extends Plugin {
                         Log.w(TAG, "Silent sign in failed.", completedTask.getException());
                         Exception exception = completedTask.getException();
                         if (exception instanceof ApiException) {
-                            ApiException apiException = (ApiException) exception;
-                            if (apiException.getStatusCode() == com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes.SIGN_IN_REQUIRED) {
-                                call.reject("Silent sign-in failed. User needs to sign in manually.", "SIGN_IN_REQUIRED");
-                            } else {
-                                call.reject("Silent sign-in failed with API error: " + apiException.getStatusCode());
-                            }
+                            // Use ErrorUtils for Google Sign-In API exceptions
+                            ErrorUtils.handleGoogleSignInApiException(call, (ApiException) exception, "Silent sign in failed", TAG);
                         } else {
-                            call.reject("Silent sign-in failed: " + (exception != null ? exception.getMessage() : "Unknown error"));
+                            // Use ErrorUtils for other exceptions during silent sign-in
+                            ErrorUtils.handleGenericException(call, exception, "Silent sign-in failed", TAG);
                         }
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "Unexpected error during silent sign-in completion", e);
-                    call.reject("Unexpected error during silent sign-in: " + e.getMessage());
+                    // Use ErrorUtils for unexpected errors during silent sign-in completion
+                    ErrorUtils.handleGenericException(call, e, "Unexpected error during silent sign-in completion", TAG);
                 }
             });
         }
@@ -170,8 +165,8 @@ public class GoogleAuthPlugin extends Plugin {
                     userResult.put("idToken", googleAccount.getIdToken());
                     call.resolve(userResult);
                 } else {
-                    Log.w(TAG, "Firebase Sign In failed", authTask.getException());
-                    call.reject("Firebase Sign In failed: " + (authTask.getException() != null ? authTask.getException().getMessage() : "Unknown error"));
+                    // Use ErrorUtils for Firebase Auth exceptions
+                    ErrorUtils.handleFirebaseAuthException(call, authTask.getException(), "Firebase Sign In failed", TAG);
                 }
             });
     }
@@ -179,132 +174,24 @@ public class GoogleAuthPlugin extends Plugin {
 
     @PluginMethod
     public void createCalendarEvent(PluginCall call) {
-        String summary = call.getString("summary");
-        String description = call.getString("description");
-        String startTimeIso = call.getString("startTimeIso");
-        String endTimeIso = call.getString("endTimeIso");
-        String timeZone = call.getString("timeZone", "Europe/Istanbul");
-
-        if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
-            call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
+        if (this.currentGoogleAccount == null) {
+            // ErrorUtils.handleGenericException(call, new IllegalStateException("User not signed in or account not available."), "User not signed in for createCalendarEvent", TAG);
+            call.reject("User not signed in or account not available for createCalendarEvent.", "SIGN_IN_REQUIRED");
             return;
         }
-        if (summary == null || startTimeIso == null || endTimeIso == null) {
-            call.reject("Missing required parameters: summary, startTimeIso, or endTimeIso.");
-            return;
-        }
-
-        executorService.execute(() -> {
-            try {
-                Calendar service = buildCalendarServiceWithAccount();
-
-                Event event = new Event()
-                        .setSummary(summary)
-                        .setDescription(description);
-
-                com.google.api.client.util.DateTime startDateTime = new com.google.api.client.util.DateTime(startTimeIso);
-                EventDateTime start = new EventDateTime()
-                        .setDateTime(startDateTime)
-                        .setTimeZone(timeZone);
-                event.setStart(start);
-
-                com.google.api.client.util.DateTime endDateTime = new com.google.api.client.util.DateTime(endTimeIso);
-                EventDateTime end = new EventDateTime()
-                        .setDateTime(endDateTime)
-                        .setTimeZone(timeZone);
-                event.setEnd(end);
-
-                EventReminder[] reminderOverrides = new EventReminder[]{
-                        new EventReminder().setMethod("popup").setMinutes(0)
-                };
-                Event.Reminders reminders = new Event.Reminders()
-                        .setUseDefault(false)
-                        .setOverrides(Arrays.asList(reminderOverrides));
-                event.setReminders(reminders);
-
-                String calendarId = "primary";
-                Event createdEvent = service.events().insert(calendarId, event).execute();
-
-                JSObject result = new JSObject();
-                result.put("id", createdEvent.getId());
-                result.put("htmlLink", createdEvent.getHtmlLink());
-                result.put("summary", createdEvent.getSummary());
-                call.resolve(result);
-
-            } catch (IOException e) {
-                handleIOException(call, e, "Error creating calendar event");
-            } catch (Exception e) {
-                handleGenericException(call, e, "Unexpected error creating calendar event");
-            }
-        });
+        // Delegate to GoogleCalendarHandler
+        this.googleCalendarHandler.createCalendarEvent(call, this.currentGoogleAccount);
     }
 
     @PluginMethod
     public void searchCalendarEvents(PluginCall call) {
-        String appId = call.getString("appId");
-
-        if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
-            call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
+         if (this.currentGoogleAccount == null) {
+            // ErrorUtils.handleGenericException(call, new IllegalStateException("User not signed in or account not available."), "User not signed in for searchCalendarEvents", TAG);
+            call.reject("User not signed in or account not available for searchCalendarEvents.", "SIGN_IN_REQUIRED");
             return;
         }
-        if (appId == null || appId.isEmpty()) {
-            call.reject("appId is required for searching events.");
-            return;
-        }
-
-        executorService.execute(() -> {
-            try {
-                Calendar service = buildCalendarServiceWithAccount();
-
-                String targetDate = null;
-                java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(\\d{4}-\\d{2}-\\d{2})").matcher(appId);
-                if (matcher.find()) {
-                    targetDate = matcher.group(1);
-                }
-
-                if (targetDate == null) {
-                    Log.w(TAG, "Could not extract date from AppID for calendar search: " + appId);
-                    call.reject("Could not extract date from AppID: " + appId);
-                    return;
-                }
-
-                String startOfDayUtc = targetDate + "T00:00:00Z";
-                java.util.Calendar calendar = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
-                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
-                sdf.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
-                java.util.Date dateObj = sdf.parse(targetDate);
-                calendar.setTime(dateObj);
-                calendar.add(java.util.Calendar.DATE, 1);
-                String endOfDayUtc = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(calendar.getTime());
-
-
-                Events events = service.events().list("primary")
-                        .setQ(appId)
-                        .setTimeMin(new com.google.api.client.util.DateTime(startOfDayUtc))
-                        .setTimeMax(new com.google.api.client.util.DateTime(endOfDayUtc))
-                        .setSingleEvents(true)
-                        .setMaxResults(5)
-                        .execute();
-
-                boolean eventFound = false;
-                if (events.getItems() != null) {
-                    for (Event event : events.getItems()) {
-                        if (event.getDescription() != null && event.getDescription().contains(appId)) {
-                            eventFound = true;
-                            break;
-                        }
-                    }
-                }
-                JSObject result = new JSObject();
-                result.put("eventFound", eventFound);
-                call.resolve(result);
-
-            } catch (IOException e) {
-                handleIOException(call, e, "Error searching calendar events");
-            } catch (Exception e) {
-                handleGenericException(call, e, "Unexpected error searching calendar events");
-            }
-        });
+        // Delegate to GoogleCalendarHandler
+        this.googleCalendarHandler.searchCalendarEvents(call, this.currentGoogleAccount);
     }
 
     @PluginMethod
@@ -326,167 +213,31 @@ public class GoogleAuthPlugin extends Plugin {
 
     @PluginMethod
     public void searchGmailMessages(PluginCall call) {
-        String query = call.getString("query");
-
-        if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
-            call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
+        if (this.currentGoogleAccount == null) {
+            // ErrorUtils.handleGenericException(call, new IllegalStateException("User not signed in or account not available."), "User not signed in for searchGmailMessages", TAG);
+            call.reject("User not signed in or account not available for searchGmailMessages.", "SIGN_IN_REQUIRED");
             return;
         }
-        if (query == null || query.isEmpty()) {
-            call.reject("Search query is required.");
-            return;
-        }
-
-        executorService.execute(() -> {
-            try {
-                Gmail service = buildGmailServiceWithAccount();
-
-                ListMessagesResponse response = service.users().messages().list("me")
-                        .setQ(query)
-                        .execute();
-
-                String jsonResponse = GsonFactory.getDefaultInstance().toString(response);
-                JSObject result = new JSObject(jsonResponse);
-                call.resolve(result);
-
-            } catch (IOException e) {
-                handleIOException(call, e, "Error searching Gmail messages");
-            } catch (Exception e) {
-                handleGenericException(call, e, "Unexpected error searching Gmail messages");
-            }
-        });
+        this.googleGmailHandler.searchGmailMessages(call, this.currentGoogleAccount);
     }
 
     @PluginMethod
     public void getGmailMessageDetails(PluginCall call) {
-        String messageId = call.getString("messageId");
-
-        if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
-            call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
+        if (this.currentGoogleAccount == null) {
+            // ErrorUtils.handleGenericException(call, new IllegalStateException("User not signed in or account not available."), "User not signed in for getGmailMessageDetails", TAG);
+            call.reject("User not signed in or account not available for getGmailMessageDetails.", "SIGN_IN_REQUIRED");
             return;
         }
-        if (messageId == null || messageId.isEmpty()) {
-            call.reject("Message ID is required.");
-            return;
-        }
-
-        executorService.execute(() -> {
-            try {
-                Gmail service = buildGmailServiceWithAccount();
-
-                Message message = service.users().messages().get("me", messageId).setFormat("FULL").execute();
-
-                String jsonResponse = GsonFactory.getDefaultInstance().toString(message);
-                JSObject result = new JSObject(jsonResponse);
-                call.resolve(result);
-
-            } catch (IOException e) {
-                handleIOException(call, e, "Error getting Gmail message details");
-            } catch (Exception e) {
-                handleGenericException(call, e, "Unexpected error getting Gmail message details");
-            }
-        });
+        this.googleGmailHandler.getGmailMessageDetails(call, this.currentGoogleAccount);
     }
 
     @PluginMethod
     public void getGmailAttachment(PluginCall call) {
-        String messageId = call.getString("messageId");
-        String attachmentId = call.getString("attachmentId");
-
-        if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
-            call.reject("User not signed in or account not available.", "SIGN_IN_REQUIRED");
+        if (this.currentGoogleAccount == null) {
+            // ErrorUtils.handleGenericException(call, new IllegalStateException("User not signed in or account not available."), "User not signed in for getGmailAttachment", TAG);
+            call.reject("User not signed in or account not available for getGmailAttachment.", "SIGN_IN_REQUIRED");
             return;
         }
-        if (messageId == null || messageId.isEmpty()) {
-            call.reject("Message ID is required.");
-            return;
-        }
-         if (attachmentId == null || attachmentId.isEmpty()) {
-            call.reject("Attachment ID is required.");
-            return;
-        }
-
-        executorService.execute(() -> {
-            try {
-                Gmail service = buildGmailServiceWithAccount();
-
-                MessagePartBody attachmentBody = service.users().messages().attachments()
-                                                    .get("me", messageId, attachmentId).execute();
-
-                String jsonResponse = GsonFactory.getDefaultInstance().toString(attachmentBody);
-                JSObject result = new JSObject(jsonResponse);
-                call.resolve(result);
-
-            } catch (IOException e) {
-                handleIOException(call, e, "Error getting Gmail attachment");
-            } catch (Exception e) {
-                handleGenericException(call, e, "Unexpected error getting Gmail attachment");
-            }
-        });
-    }
-
-    // --- Helper Methods ---
-
-    private Gmail buildGmailServiceWithAccount() throws IOException {
-        if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
-            throw new IOException("User not signed in or account not available for Gmail service.");
-        }
-        GoogleAccountCredential credential = GoogleAccountCredential.usingOAuth2(
-                getContext(), Collections.singletonList(GMAIL_READONLY_SCOPE));
-        credential.setSelectedAccount(this.currentGoogleAccount.getAccount());
-
-        return new Gmail.Builder(
-                new NetHttpTransport(),
-                GsonFactory.getDefaultInstance(),
-                credential)
-                .setApplicationName(getContext().getPackageName())
-                .build();
-    }
-
-    private Calendar buildCalendarServiceWithAccount() throws IOException {
-        if (this.currentGoogleAccount == null || this.currentGoogleAccount.getAccount() == null) {
-            throw new IOException("User not signed in or account not available for Calendar service.");
-        }
-        GoogleAccountCredential credential = GoogleAccountCredential.usingOAuth2(
-                getContext(), Collections.singletonList(CALENDAR_EVENTS_SCOPE));
-        credential.setSelectedAccount(this.currentGoogleAccount.getAccount());
-
-        return new Calendar.Builder(
-                new NetHttpTransport(),
-                GsonFactory.getDefaultInstance(),
-                credential)
-                .setApplicationName(getContext().getPackageName())
-                .build();
-    }
-    
-    private void handleIOException(PluginCall call, IOException e, String logPrefix) {
-        Log.e(TAG, logPrefix + ": " + e.getMessage(), e);
-        String errorCode = "IO_ERROR";
-        String errorMessage = logPrefix + ": " + e.getMessage();
-
-        if (e instanceof com.google.api.client.http.HttpResponseException) {
-            com.google.api.client.http.HttpResponseException httpError = (com.google.api.client.http.HttpResponseException) e;
-            int statusCode = httpError.getStatusCode();
-
-            if (statusCode == 401 || statusCode == 403) {
-                 if (e.getMessage() != null && e.getMessage().toLowerCase().contains("invalid_grant")) {
-                    errorCode = "INVALID_GRANT";
-                    errorMessage = "Access token is invalid or expired. Please sign in again.";
-                 } else {
-                     errorCode = "AUTH_ERROR";
-                     errorMessage = "Authentication error accessing API (Code: " + statusCode + ")";
-                 }
-            } else {
-                 errorCode = "NETWORK_ERROR";
-                 errorMessage = "API request failed (Code: " + statusCode + "): " + httpError.getStatusMessage();
-            }
-        }
-
-        call.reject(errorMessage, errorCode, e);
-    }
-
-    private void handleGenericException(PluginCall call, Exception e, String logPrefix) {
-         Log.e(TAG, logPrefix + ": " + e.getMessage(), e);
-         call.reject(logPrefix + ": " + e.getMessage(), e);
+        this.googleGmailHandler.getGmailAttachment(call, this.currentGoogleAccount);
     }
 } 
