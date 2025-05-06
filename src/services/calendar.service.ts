@@ -1,12 +1,11 @@
 // src/services/calendar.service.ts
-import { registerPlugin } from '@capacitor/core';
 import type { GoogleAuthPlugin, CalendarEventOptions, CalendarSearchOptions, CalendarEventResponse, CalendarSearchResponse } from '../plugins/google-auth/definitions'; // Düzeltilmiş import yolu
+import { GoogleAuth } from '@plugins/google-auth';
 
 // fetchWithAuth importu artık gerekmeyebilir, yerine accessToken doğrudan alınacak.
 // import { fetchWithAuth } from './apiClient';
 
 // Plugin'i doğru şekilde import et
-const GoogleAuth = registerPlugin<GoogleAuthPlugin>('GoogleAuth');
 
 /**
  * Google Calendar API ile etkileşim kurmak için servis.
