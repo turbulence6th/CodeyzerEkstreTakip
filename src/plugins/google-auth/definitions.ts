@@ -39,8 +39,46 @@ export interface GoogleAuthPlugin {
   signOut(): Promise<void>;
 
   /**
+   * Creates a new event in the user's primary Google Calendar.
+   * Requires CALENDAR_EVENTS_SCOPE.
+   */
+  createCalendarEvent(options: CalendarEventOptions): Promise<CalendarEventResponse>;
+
+  /**
+   * Searches for events in the user's primary Google Calendar matching the provided AppID.
+   * Requires CALENDAR_EVENTS_SCOPE.
+   */
+  searchCalendarEvents(options: CalendarSearchOptions): Promise<CalendarSearchResponse>;
+
+  /**
    * Attempt to sign in silently without user interaction.
    * Returns the user if already signed in, otherwise null.
    */
   // trySilentSignIn(): Promise<GoogleUser | null>; // Gerekirse eklenebilir
+}
+
+export interface CalendarEventOptions {
+  accessToken: string;
+  summary: string;
+  description: string;
+  startTimeIso: string;
+  endTimeIso: string;
+  timeZone: string;
+}
+
+export interface CalendarSearchOptions {
+  accessToken: string;
+  appId: string;
+}
+
+export interface CalendarEventResponse {
+  id: string;
+  htmlLink?: string;
+  summary?: string;
+  // Native plugin'den dönebilecek diğer alanlar...
+}
+
+export interface CalendarSearchResponse {
+  eventFound: boolean;
+  // Native plugin'den dönebilecek diğer alanlar...
 } 

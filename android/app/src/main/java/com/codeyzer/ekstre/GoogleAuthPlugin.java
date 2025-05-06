@@ -35,6 +35,28 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 
+// Google API Client Library ve Calendar API için importlar
+// import com.google.api.client.extensions.android.http.AndroidHttp; // KULLANIMDAN KALDIRILDI
+import com.google.api.client.http.javanet.NetHttpTransport; // YENİ IMPORT
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.services.calendar.Calendar;
+import com.google.api.services.calendar.model.Event;
+import com.google.api.services.calendar.model.EventDateTime;
+import com.google.api.services.calendar.model.EventReminder;
+import com.google.api.services.calendar.model.Events;
+
+// Yeni Google Auth Library importları
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.GoogleCredentials;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.TimeZone;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 @CapacitorPlugin(name = "GoogleAuth")
 public class GoogleAuthPlugin extends Plugin {
 
@@ -49,6 +71,7 @@ public class GoogleAuthPlugin extends Plugin {
 
     // Sağlanan Web İstemci Kimliği (Firebase ile ilişkili GCP projesindeki Web ID olmalı)
     private static final String WEB_CLIENT_ID = "1008857567754-2s7hevrbudal3m8qju85g31souc8v4g5.apps.googleusercontent.com";
+    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     @Override
     public void load() {
@@ -248,6 +271,186 @@ public class GoogleAuthPlugin extends Plugin {
                     }
                 });
         }
+    }
+
+    @PluginMethod
+    public void createCalendarEvent(PluginCall call) {
+        String accessTokenString = call.getString("accessToken");
+        String summary = call.getString("summary");
+        String description = call.getString("description");
+        String startTimeIso = call.getString("startTimeIso");
+        String endTimeIso = call.getString("endTimeIso");
+        String timeZone = call.getString("timeZone", "Europe/Istanbul");
+
+        if (accessTokenString == null || accessTokenString.isEmpty()) {
+            call.reject("Access token is required.");
+            return;
+        }
+        if (summary == null || startTimeIso == null || endTimeIso == null) {
+            call.reject("Missing required parameters: summary, startTimeIso, or endTimeIso.");
+            return;
+        }
+
+        executorService.execute(() -> {
+            try {
+                // Yeni Google Auth Library kullanarak Credentials oluştur
+                AccessToken accessToken = new AccessToken(accessTokenString, null); // Expiration time bilinmiyorsa null
+                GoogleCredentials credentials = GoogleCredentials.create(accessToken);
+                HttpCredentialsAdapter adapter = new HttpCredentialsAdapter(credentials);
+
+                Calendar service = new Calendar.Builder(
+                        new NetHttpTransport(), // AndroidHttp.newCompatibleTransport() yerine
+                        GsonFactory.getDefaultInstance(),
+                        adapter) // GoogleCredential yerine adapter kullan
+                        .setApplicationName(getContext().getPackageName())
+                        .build();
+
+                Event event = new Event()
+                        .setSummary(summary)
+                        .setDescription(description);
+
+                com.google.api.client.util.DateTime startDateTime = new com.google.api.client.util.DateTime(startTimeIso);
+                EventDateTime start = new EventDateTime()
+                        .setDateTime(startDateTime)
+                        .setTimeZone(timeZone);
+                event.setStart(start);
+
+                com.google.api.client.util.DateTime endDateTime = new com.google.api.client.util.DateTime(endTimeIso);
+                EventDateTime end = new EventDateTime()
+                        .setDateTime(endDateTime)
+                        .setTimeZone(timeZone);
+                event.setEnd(end);
+
+                EventReminder[] reminderOverrides = new EventReminder[]{
+                        new EventReminder().setMethod("popup").setMinutes(0)
+                };
+                Event.Reminders reminders = new Event.Reminders()
+                        .setUseDefault(false)
+                        .setOverrides(Arrays.asList(reminderOverrides));
+                event.setReminders(reminders);
+
+                String calendarId = "primary";
+                Event createdEvent = service.events().insert(calendarId, event).execute();
+
+                JSObject result = new JSObject();
+                result.put("id", createdEvent.getId());
+                result.put("htmlLink", createdEvent.getHtmlLink());
+                result.put("summary", createdEvent.getSummary());
+                call.resolve(result);
+
+            } catch (IOException e) {
+                Log.e(TAG, "IOException in createCalendarEvent: " + e.getMessage(), e);
+                // Check if the error is due to invalid_grant (token expired/revoked)
+                if (e.getMessage() != null && e.getMessage().toLowerCase().contains("invalid_grant")) {
+                     call.reject("Access token is invalid or expired. Please sign in again.", "INVALID_GRANT", e);
+                } else {
+                     call.reject("Error creating calendar event: " + e.getMessage(), e);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Exception in createCalendarEvent: " + e.getMessage(), e);
+                call.reject("Unexpected error creating calendar event: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void searchCalendarEvents(PluginCall call) {
+        String accessTokenString = call.getString("accessToken");
+        String appId = call.getString("appId");
+
+        if (accessTokenString == null || accessTokenString.isEmpty()) {
+            call.reject("Access token is required.");
+            return;
+        }
+        if (appId == null || appId.isEmpty()) {
+            call.reject("appId is required for searching events.");
+            return;
+        }
+
+        executorService.execute(() -> {
+            try {
+                // Yeni Google Auth Library kullanarak Credentials oluştur
+                AccessToken accessToken = new AccessToken(accessTokenString, null); // Expiration time bilinmiyorsa null
+                GoogleCredentials credentials = GoogleCredentials.create(accessToken);
+                HttpCredentialsAdapter adapter = new HttpCredentialsAdapter(credentials);
+
+                Calendar service = new Calendar.Builder(
+                        new NetHttpTransport(), // AndroidHttp.newCompatibleTransport() yerine
+                        GsonFactory.getDefaultInstance(),
+                        adapter) // GoogleCredential yerine adapter kullan
+                        .setApplicationName(getContext().getPackageName())
+                        .build();
+
+                // AppID'den tarihi çıkar (YYYY-MM-DD kısmını bul)
+                // Bu mantık JS tarafındaydı, burada da benzerini yapalım
+                // Örnek AppID: "[AppID: ekstre_yapikredi_2024-07-15]"
+                String targetDate = null;
+                java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(\\d{4}-\\d{2}-\\d{2})").matcher(appId);
+                if (matcher.find()) {
+                    targetDate = matcher.group(1);
+                }
+
+                if (targetDate == null) {
+                    Log.w(TAG, "Could not extract date from AppID for search: " + appId);
+                    // Tarih yoksa, tüm takvimde AppID ile arama yapmayı deneyebiliriz,
+                    // ama bu çok geniş olabilir. Şimdilik daraltılmış arama olmadan devam edelim.
+                    // Veya belirli bir zaman aralığı zorunlu kılınabilir.
+                    // JS'deki gibi timeMin ve timeMax belirlemek daha iyi.
+                    // Şimdilik son 1 yılı arayalım eğer tarih yoksa, ya da hata verelim.
+                    // JS tarafı spesifik bir gün aradığı için, burada da benzer bir mantık olmalı.
+                    // Eğer tarih çıkarılamazsa, JS tarafı hata veriyordu, burada da benzerini yapalım.
+                    call.reject("Could not extract date from AppID: " + appId);
+                    return;
+                }
+
+                // timeMin ve timeMax için RFC3339 formatını kullan
+                String startOfDayUtc = targetDate + "T00:00:00Z";
+
+                java.util.Calendar calendar = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
+                sdf.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+                java.util.Date dateObj = sdf.parse(targetDate);
+                calendar.setTime(dateObj);
+                calendar.add(java.util.Calendar.DATE, 1);
+                String endOfDayUtc = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(calendar.getTime());
+
+
+                Events events = service.events().list("primary")
+                        .setQ(appId) // AppID'yi doğrudan q parametresi olarak kullan
+                        .setTimeMin(new com.google.api.client.util.DateTime(startOfDayUtc))
+                        .setTimeMax(new com.google.api.client.util.DateTime(endOfDayUtc))
+                        .setSingleEvents(true)
+                        .setMaxResults(5) // En fazla 5 sonuç (genelde 1 tane bekliyoruz)
+                        .execute();
+
+                boolean eventFound = false;
+                if (events.getItems() != null) {
+                    for (Event event : events.getItems()) {
+                        // Google q araması geniş olabileceğinden, açıklama içinde tam eşleşme arayalım.
+                        if (event.getDescription() != null && event.getDescription().contains(appId)) {
+                             Log.d(TAG, "Exact match found for AppID in event description: " + appId + ", Event ID: " + event.getId());
+                            eventFound = true;
+                            break;
+                        }
+                    }
+                }
+                 Log.d(TAG, "Search for AppID '" + appId + "' completed. Found: " + eventFound);
+                JSObject result = new JSObject();
+                result.put("eventFound", eventFound);
+                call.resolve(result);
+
+            } catch (IOException e) {
+                Log.e(TAG, "IOException in searchCalendarEvents: " + e.getMessage(), e);
+                 if (e.getMessage() != null && e.getMessage().toLowerCase().contains("invalid_grant")) {
+                     call.reject("Access token is invalid or expired. Please sign in again.", "INVALID_GRANT", e);
+                } else {
+                    call.reject("Error searching calendar events: " + e.getMessage(), e);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Exception in searchCalendarEvents: " + e.getMessage(), e);
+                call.reject("Unexpected error searching calendar events: " + e.getMessage(), e);
+            }
+        });
     }
 
     @PluginMethod

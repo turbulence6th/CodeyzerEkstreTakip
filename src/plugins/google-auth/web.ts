@@ -53,4 +53,25 @@ export class GoogleAuthWeb extends WebPlugin implements GoogleAuthPlugin {
     this.user = null; // Mock kullanıcıyı temizle
     return Promise.resolve();
   }
+
+  // --- Web Platformu için Takvim Metodları (Mock Implementasyon) ---
+
+  async createCalendarEvent(options: import("./definitions").CalendarEventOptions): Promise<import("./definitions").CalendarEventResponse> {
+    console.warn('GoogleAuthWeb.createCalendarEvent() called on web. Mock response returned.', options);
+    // Web'de gerçek takvim işlemi yapılamaz.
+    // Başarılı olduğunu varsayan basit bir mock yanıt döndür.
+    return Promise.resolve({ 
+      id: 'mock_event_id_' + Date.now(),
+      summary: options.summary,
+      htmlLink: '#mock-link'
+    }); 
+  }
+
+  async searchCalendarEvents(options: import("./definitions").CalendarSearchOptions): Promise<import("./definitions").CalendarSearchResponse> {
+    console.warn('GoogleAuthWeb.searchCalendarEvents() called on web. Mock response returned.', options);
+    // Web'de gerçek takvim araması yapılamaz.
+    // Etkinlik bulunamadığını varsayan basit bir mock yanıt döndür.
+    return Promise.resolve({ eventFound: false }); 
+  }
+
 } 

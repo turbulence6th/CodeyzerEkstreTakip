@@ -122,7 +122,7 @@ const AccountTab: React.FC = () => {
             continue;
           }
           try {
-            const status = await calendarService.searchEvents(appIdToCheck);
+            const status = await calendarService.searchEvents(accessToken!, appIdToCheck);
             newStatus[appIdToCheck] = status;
           } catch (error: any) {
             console.error(`Error checking calendar status for AppID: ${appIdToCheck}`, item, error);
@@ -216,7 +216,7 @@ Tutar: ${formatCurrency(item.amount)}`;
         return;
       }
 
-      const exists = await calendarService.searchEvents(itemKey);
+      const exists = await calendarService.searchEvents(accessToken!, itemKey);
       if (exists) {
          console.log(`Event ${itemKey} already exists in calendar (checked via API).`);
          setCalendarEventStatus(prevStatus => ({ ...prevStatus, [itemKey]: true }));
@@ -226,7 +226,7 @@ Tutar: ${formatCurrency(item.amount)}`;
       }
 
       console.log(`Adding to calendar: ${summary} for ${itemKey}`);
-      await calendarService.createEvent(summary, description, startTimeIsoForApi, endTimeIsoForApi);
+      await calendarService.createEvent(accessToken!, summary, description, startTimeIsoForApi, endTimeIsoForApi);
       setCalendarEventStatus(prevStatus => ({ ...prevStatus, [itemKey]: true }));
       dispatch(addToast({ message: 'Etkinlik başarıyla takvime eklendi.', duration: 2000, color: 'success', }));
     } catch (error: any) {
@@ -292,7 +292,7 @@ Kaynak: ${loan.source.toUpperCase()}`;
                   continue;
               }
 
-              const exists = await calendarService.searchEvents(installmentKey);
+              const exists = await calendarService.searchEvents(accessToken!, installmentKey);
               if (exists) {
                   console.log(`Installment ${installmentKey} already exists in calendar (checked via API).`);
                   setCalendarEventStatus(prevStatus => ({ ...prevStatus, [installmentKey]: true }));
@@ -301,7 +301,7 @@ Kaynak: ${loan.source.toUpperCase()}`;
               }
 
               console.log(`Adding installment to calendar: ${summary} for ${installmentKey}`);
-              await calendarService.createEvent(summary, finalDescription, startTimeIsoForApi, endTimeIsoForApi);
+              await calendarService.createEvent(accessToken!, summary, finalDescription, startTimeIsoForApi, endTimeIsoForApi);
               setCalendarEventStatus(prevStatus => ({ ...prevStatus, [installmentKey]: true }));
               addedCount++;
 

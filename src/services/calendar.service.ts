@@ -1,146 +1,138 @@
 // src/services/calendar.service.ts
-// Yeni API istemcisini import et
-import { fetchWithAuth } from './apiClient'; 
+import { registerPlugin } from '@capacitor/core';
+import type { GoogleAuthPlugin, CalendarEventOptions, CalendarSearchOptions, CalendarEventResponse, CalendarSearchResponse } from '../plugins/google-auth/definitions'; // Düzeltilmiş import yolu
+
+// fetchWithAuth importu artık gerekmeyebilir, yerine accessToken doğrudan alınacak.
+// import { fetchWithAuth } from './apiClient';
+
+// Plugin'i doğru şekilde import et
+const GoogleAuth = registerPlugin<GoogleAuthPlugin>('GoogleAuth');
 
 /**
  * Google Calendar API ile etkileşim kurmak için servis.
  */
 class CalendarService {
-    private readonly calendarApiBaseUrl = 'https://www.googleapis.com/calendar/v3';
+    // private readonly calendarApiBaseUrl = 'https://www.googleapis.com/calendar/v3'; // Artık kullanılmayacak
 
     /**
-     * Google Takvim'de yeni bir etkinlik oluşturur.
+     * Google Takvim'de yeni bir etkinlik oluşturur (Native Plugin aracılığıyla).
+     * @param accessToken - Google API erişim token'ı.
      * @param summary - Etkinliğin başlığı.
      * @param description - Etkinliğin açıklaması.
-     * @param startTimeIso - Başlangıç zamanı (ISO 8601 formatında, örn: "2024-08-15T09:30:00+03:00").
-     * @param endTimeIso - Bitiş zamanı (ISO 8601 formatında, örn: "2024-08-15T10:00:00+03:00").
-     * @param timeZone - Etkinliğin zaman dilimi (örn: "Europe/Istanbul").
+     * @param startTimeIso - Başlangıç zamanı (ISO 8601 formatında).
+     * @param endTimeIso - Bitiş zamanı (ISO 8601 formatında).
+     * @param timeZone - Etkinliğin zaman dilimi.
      */
     async createEvent(
+        accessToken: string, // EKLENDİ
         summary: string,
         description: string,
         startTimeIso: string,
         endTimeIso: string,
-        timeZone: string = 'Europe/Istanbul' // Varsayılan zaman dilimi
-    ): Promise<any> { // Dönen event objesinin tipi daha detaylı belirtilebilir (gapi.client.calendar.Event gibi)
-        const event = {
-            summary: summary,
-            description: description,
-            start: {
-                dateTime: startTimeIso,
-                timeZone: timeZone,
-            },
-            end: {
-                dateTime: endTimeIso,
-                timeZone: timeZone,
-            },
-            reminders: {
-                useDefault: false,
-                overrides: [
-                  { method: 'popup', minutes: 0 }, // Etkinlik zamanında popup bildirimi
-                ],
-              },
+        timeZone: string = 'Europe/Istanbul'
+    ): Promise<CalendarEventResponse> { // Dönen tip native plugin'den gelene göre güncellendi
+        if (!GoogleAuth) {
+            console.error('CalendarService: GoogleAuth plugin is not available.');
+            throw new Error('GoogleAuth plugin not available');
+        }
+        if (!accessToken) {
+            console.error('CalendarService: Access token is required for createEvent.');
+            throw new Error('Access token is required');
+        }
+
+        const options: CalendarEventOptions = {
+            accessToken,
+            summary,
+            description,
+            startTimeIso,
+            endTimeIso,
+            timeZone,
         };
 
-        const url = `${this.calendarApiBaseUrl}/calendars/primary/events`;
-        console.log('CalendarService: Creating event with payload:', event);
+        console.log('CalendarService: Calling native createEvent with options:', options);
 
         try {
-            // fetch yerine fetchWithAuth kullan
-            const response = await fetchWithAuth(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }, // Auth header'ı fetchWithAuth ekler
-                body: JSON.stringify(event),
-            });
-            const responseData = await response.json();
-
-            if (!response.ok) {
-                console.error('CalendarService: Error creating event:', responseData);
-                // API'den gelen hata mesajını fırlat
-                throw new Error(`Takvim etkinliği oluşturulamadı: ${responseData.error?.message || response.statusText}`);
-            }
-
-            console.log('CalendarService: Event created successfully:', responseData);
-            return responseData; // Başarılı durumda oluşturulan etkinliği döndür
-
-        } catch (error) {
-            console.error('CalendarService: Error creating event:', error);
-            // Hata mesajı fetchWithAuth veya API'den gelir
-            throw error;
+            const result = await GoogleAuth.createCalendarEvent(options);
+            console.log('CalendarService: Native event creation successful:', result);
+            return result;
+        } catch (error: any) {
+            console.error('CalendarService: Error calling native createEvent:', error);
+            // Native'den gelen hata mesajını veya standart bir mesajı fırlat
+            const errorMessage = error?.message || 'Takvim etkinliği oluşturulamadı (native).';
+            const errorCode = error?.code; // Opsiyonel: Hata kodunu da ekleyebiliriz
+            const newError = new Error(errorMessage);
+            (newError as any).code = errorCode;
+            throw newError;
         }
     }
 
     /**
-     * Belirli bir AppID'ye sahip etkinliği Google Takvim'de arar.
-     * AppID'nin formatı: "[AppID: type_name_YYYY-MM-DD...]"
-     * @param appId - Aranacak etkinliğin AppID'si (örn: "[AppID: ekstre_yapikredi_2024-07-15]").
-     * @returns Eşleşen etkinlik bulunursa true, bulunmazsa false döner.
+     * Belirli bir AppID'ye sahip etkinliği Google Takvim'de arar (Native Plugin aracılığıyla).
+     * @param accessToken - Google API erişim token'ı.
+     * @param appId - Aranacak etkinliğin AppID'si.
+     * @returns Eşleşen etkinlik bulunursa true, bulunmazsa false döner (Native plugin response'una göre).
      */
-    async searchEvents(appId: string): Promise<boolean> {
-        // AppID'den tarihi çıkar (YYYY-MM-DD kısmını bul)
-        const dateMatch = appId.match(/(\d{4}-\d{2}-\d{2})/);
-        if (!dateMatch) {
-            console.error('CalendarService: Could not extract date from AppID:', appId);
-            // Tarih çıkarılamazsa geniş bir aralıkta arama yapmayı deneyebiliriz
-            // ancak bu daha yavaş olabilir. Şimdilik hata verelim veya false dönelim.
-            // return false; // Veya hata fırlat?
-            throw new Error(`AppID'den tarih çıkarılamadı: ${appId}`);
+    async searchEvents(accessToken: string, appId: string): Promise<boolean> { // Dönen tip native plugin'den gelene göre güncellendi
+        if (!GoogleAuth) {
+            console.error('CalendarService: GoogleAuth plugin is not available.');
+            throw new Error('GoogleAuth plugin not available');
         }
-        const targetDate = dateMatch[1]; // YYYY-MM-DD
+        if (!accessToken) {
+            console.error('CalendarService: Access token is required for searchEvents.');
+            throw new Error('Access token is required');
+        }
+        if (!appId) {
+            console.error('CalendarService: AppID is required for searchEvents.');
+            throw new Error('AppID is required');
+        }
 
-        // timeMin ve timeMax için UTC RFC3339 formatını kullan
-        const startOfDayUtc = `${targetDate}T00:00:00Z`;
-        const dateObj = new Date(targetDate + 'T00:00:00Z');
-        dateObj.setUTCDate(dateObj.getUTCDate() + 1);
-        const endOfDayUtc = dateObj.toISOString();
+        const options: CalendarSearchOptions = { accessToken, appId };
 
-        const timeMin = startOfDayUtc;
-        const timeMax = endOfDayUtc;
-
-        // q parametresi olarak AppID'nin tamamını kullan
-        // AppID köşeli parantez içerdiği için encodeURIComponent kullanalım
-        const searchQuery = encodeURIComponent(appId);
-
-        // API URL'si
-        // q araması açıklama dahil tüm alanlarda yapılır.
-        const url = `${this.calendarApiBaseUrl}/calendars/primary/events?q=${searchQuery}&timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&maxResults=1`;
-
-        console.log(`CalendarService: Searching event with AppID: "${appId}" within date: ${targetDate}`);
+        console.log(`CalendarService: Calling native searchEvents with AppID: "${appId}"`);
 
         try {
-            const response = await fetchWithAuth(url, {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' },
-            });
-            const responseData = await response.json();
-
-            if (!response.ok) {
-                console.error('CalendarService: Error searching events:', responseData);
-                throw new Error(`Takvim etkinliği aranamadı: ${responseData.error?.message || response.statusText}`);
-            }
-
-            console.log('CalendarService: Search response:', responseData);
-
-            // Eğer 'items' dizisi varsa ve içinde en az bir etkinlik varsa, eşleşme bulunmuştur.
-            // Google q parametresi bazen alakasız sonuçlar dönebileceği için,
-            // dönen sonucun açıklamasında gerçekten aradığımız AppID'nin olup olmadığını kontrol etmek daha güvenli olabilir.
-            if (responseData.items && responseData.items.length > 0) {
-                const foundEvent = responseData.items[0];
-                if (foundEvent.description && foundEvent.description.includes(appId)) {
-                    console.log(`CalendarService: Exact match found for AppID: ${appId}`);
-                    return true;
-                }
-                 console.log(`CalendarService: Found event(s) with query, but none contain the exact AppID in description. AppID: ${appId}`);
-            }
-            
-            return false; // Tam eşleşme bulunamadı
-
-        } catch (error) {
-            console.error('CalendarService: Error searching events:', error);
-            throw error;
+            const result: CalendarSearchResponse = await GoogleAuth.searchCalendarEvents(options);
+            console.log('CalendarService: Native event search successful:', result);
+            return result.eventFound; // Native plugin'den dönen eventFound alanını kullan
+        } catch (error: any) {
+            console.error('CalendarService: Error calling native searchEvents:', error);
+            const errorMessage = error?.message || 'Takvim etkinliği aranamadı (native).';
+            const errorCode = error?.code; 
+            const newError = new Error(errorMessage);
+            (newError as any).code = errorCode;
+            throw newError;
         }
     }
 }
 
 // Servisin tek bir örneğini dışa aktar
-export const calendarService = new CalendarService(); 
+export const calendarService = new CalendarService();
+
+// Plugin arayüzleri artık ../plugins/google-auth/definitions.ts içinde tanımlı, buradakiler kaldırılabilir.
+/*
+export interface CalendarEventOptions {
+    accessToken: string;
+    summary: string;
+    description: string;
+    startTimeIso: string;
+    endTimeIso: string;
+    timeZone: string;
+}
+
+export interface CalendarSearchOptions {
+    accessToken: string;
+    appId: string;
+}
+
+export interface CalendarEventResponse {
+    id: string;
+    htmlLink?: string;
+    summary?: string;
+    // Native plugin'den dönebilecek diğer alanlar...
+}
+
+export interface CalendarSearchResponse {
+    eventFound: boolean;
+    // Native plugin'den dönebilecek diğer alanlar...
+}
+*/ 

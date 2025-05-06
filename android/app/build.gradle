@@ -30,6 +30,7 @@ android {
     packaging {
         resources {
             excludes += '/META-INF/DEPENDENCIES'
+            excludes += '/META-INF/INDEX.LIST'
         }
     }
 }
@@ -45,6 +46,16 @@ dependencies {
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation 'com.google.android.gms:play-services-auth:21.2.0'
     implementation 'com.google.firebase:firebase-auth:23.0.0'
+
+    // Google API Client Libraries for Android
+    // google-api-client-android, AndroidHttp ve GoogleAccountCredential gibi sınıfları içerir.
+    // Ayrıca google-api-client (core), google-oauth-client ve google-http-client-android gibi bağımlılıkları transitif olarak getirir.
+    implementation 'com.google.api-client:google-api-client-android:2.0.0'
+    // Modern Google Auth Library (OAuth2 ve HTTP entegrasyonu için)
+    implementation 'com.google.auth:google-auth-library-oauth2-http:1.30.1'
+    // Spesifik Google servisleri (gmail, calendar)
+    implementation 'com.google.apis:google-api-services-gmail:v1-rev20250331-2.0.0'
+    implementation 'com.google.apis:google-api-services-calendar:v3-rev20250404-2.0.0'
 
      // --- YENİ PDF PARSER İÇİN GEREKLİ BAĞIMLILIKLAR ---
     implementation 'com.tom-roush:pdfbox-android:2.0.27.0' // <-- PDFBox Android versiyonunu ekleyin
