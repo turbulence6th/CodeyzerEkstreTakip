@@ -1,11 +1,21 @@
 import { SmsReader } from '@plugins/sms-reader'; // Plugin import
 import type { SmsFilterOptions, SmsPermissionStatus } from '@plugins/sms-reader'; // Tipler
 
+// Plugin Definitions Tiplerini Doğrudan Import Et
+import type {
+    GmailSearchResponse, // EKLENDİ
+    // Diğer gerekebilecek tipler (şimdilik sadece bu)
+} from '../../plugins/google-auth/definitions';
+
 // Tipleri import edelim
-import type { BankProcessor, BankSmsParser, BankEmailParser, ParsedStatement, SmsDetails, EmailDetails, ParsedLoan } from './types';
+import type { BankProcessor, BankSmsParser, BankEmailParser, ParsedStatement, SmsDetails, EmailDetails, ParsedLoan, DecodedEmailBody } from './types'; // DecodedEmailBody eklendi (canParse için)
 
 // Gmail Servisi
-import { gmailService } from '../index'; // <-- DOĞRU IMPORT: index.ts üzerinden
+// import { gmailService } from '../index'; // <-- İndex üzerinden import kaldırıldı
+import { GmailService } from '../gmail.service'; // <-- Doğrudan import edildi
+
+// Servisi yerel olarak başlatalım
+const localGmailService = new GmailService();
 
 // SMS Parser'ları
 import { QnbSmsParser } from './parsers/qnb-parser';
@@ -107,7 +117,7 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
   }
 
   // Belirtilen filtreye göre SMS ve E-postaları getir ve ekstreleri ayrıştır
-  async fetchAndParseStatements(options: SmsFilterOptions = { maxCount: 100 }): Promise<ParsedStatement[]> {
+  async fetchAndParseStatements(accessToken: string, options: SmsFilterOptions = { maxCount: 100 }): Promise<ParsedStatement[]> {
     let parsedStatements: ParsedStatement[] = [];
     const smsPermission = await this.checkSmsPermission();
 
@@ -159,7 +169,13 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
     try {
         for (const processor of availableBankProcessors) {
             if (processor.emailParser && processor.gmailQuery) {
-                for (const emailInfo of await gmailService.searchEmails(processor.gmailQuery, 10)) {
+                // accessToken eklendi ve maxResults düzeltildi
+                // Dönüş tipi açıkça belirtilMİYOR, TS çıkarsın
+                // gmailService yerine localGmailService kullanıldı
+                const emailSearchResult = await localGmailService.searchEmails(accessToken, processor.gmailQuery, 10);
+                // emailSearchResult.messages üzerinde iterate et
+                // messages alanı opsiyonel olduğu için kontrol ekleyelim
+                for (const emailInfo of emailSearchResult?.messages || []) {
                     // Linter Hatası Düzeltmesi: emailInfo.id null/undefined olabilir, kontrol et
                     const messageId = emailInfo?.id;
                     if (!messageId) {
@@ -175,7 +191,9 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
                     let emailDetailsResponse: any = null;
                     try {
                         // getEmailDetails Promise döndürdüğü için await kullan
-                        emailDetailsResponse = await gmailService.getEmailDetails(messageId);
+                        // accessToken eklendi
+                        // gmailService yerine localGmailService kullanıldı
+                        emailDetailsResponse = await localGmailService.getEmailDetails(accessToken, messageId);
                         // Detay alındıktan sonra payload var mı kontrol et (optional chaining ile)
                         if (!emailDetailsResponse?.payload) {
                             console.warn(`SmsProcessor: Received empty or payload-less response for ID: ${messageId}`);
@@ -190,41 +208,50 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
                     // emailDetailsResponse ve payload kontrolü (try..catch sonrası)
                     if (emailDetailsResponse?.payload) {
                         // decodeEmailBody artık { plainBody, htmlBody } döndürüyor
-                        const decodedBody = gmailService.decodeEmailBody(emailDetailsResponse.payload); // Payload'ı kullan
-                        const headers = emailDetailsResponse.payload?.headers || []; // Optional chaining
-                        const senderHeader = headers.find((h: any) => h.name === 'From');
-                        const subjectHeader = headers.find((h: any) => h.name === 'Subject');
-                        const dateHeader = headers.find((h: any) => h.name === 'Date');
+                        // gmailService yerine localGmailService kullanıldı
+                        const decodedBody = localGmailService.decodeEmailBody(emailDetailsResponse); // Message objesini kullan
+                        
+                        // decodedBody null kontrolü eklendi
+                        if (decodedBody) {
+                            const headers = emailDetailsResponse.payload?.headers || []; // Optional chaining
+                            const senderHeader = headers.find((h: any) => h.name === 'From');
+                            const subjectHeader = headers.find((h: any) => h.name === 'Subject');
+                            const dateHeader = headers.find((h: any) => h.name === 'Date');
 
-                        const sender = senderHeader?.value || 'Unknown'; // Optional chaining
-                        const subject = subjectHeader?.value || 'No Subject'; // Optional chaining
-                        let emailDate = new Date();
-                        try { if (dateHeader?.value) { emailDate = new Date(dateHeader.value); } } catch {}
+                            const sender = senderHeader?.value || 'Unknown'; // Optional chaining
+                            const subject = subjectHeader?.value || 'No Subject'; // Optional chaining
+                            let emailDate = new Date();
+                            try { if (dateHeader?.value) { emailDate = new Date(dateHeader.value); } } catch {}
 
-                        const emailData: EmailDetails = {
-                            id: messageId, // messageId (string) ata
-                            sender: sender,
-                            subject: subject,
-                            date: emailDate,
-                            plainBody: decodedBody.plainBody,
-                            htmlBody: decodedBody.htmlBody,
-                            originalResponse: emailDetailsResponse // <- Ekin alınması için bu önemli
-                        };
+                            const emailData: EmailDetails = {
+                                id: messageId, // messageId (string) ata
+                                sender: sender,
+                                subject: subject,
+                                date: emailDate,
+                                plainBody: decodedBody.plainBody, // Null değilse eriş
+                                htmlBody: decodedBody.htmlBody,   // Null değilse eriş
+                                originalResponse: emailDetailsResponse // <- Ekin alınması için bu önemli
+                            };
 
-                        // PDF kontrolü IsbankEmailParser.parse içine taşındı.
-                        const canParseResult = await processor.emailParser.canParse(sender, subject, decodedBody);
-                        if (canParseResult) {
-                            // console.log(`Attempting to parse newest email (${messageId}) for ${processor.bankName}...`); // Log kaldırıldı
-                            const statement = await processor.emailParser.parse(emailData);
-                            processedEmailBanks.add(processor.bankName); // En yeni işlendi olarak işaretle
-                            if (statement) {
-                                // console.log(`Successfully parsed EMAIL statement for ${statement.bankName}`); // Log kaldırıldı
-                                // source'u kontrol et, parser kendi içinde belirlemeli (örn. 'email-pdf')
-                                parsedStatements.push({ ...statement, source: statement.source || 'email' });
-                            } else {
-                                 console.warn(`Email Parser for ${processor.bankName} identified email but failed to parse content (ID: ${messageId}).`); // Uyarı kalsın
+                            // PDF kontrolü IsbankEmailParser.parse içine taşındı.
+                            // decodedBody null kontrolü burada da geçerli
+                            const canParseResult = await processor.emailParser.canParse(sender, subject, decodedBody as DecodedEmailBody, emailData);
+                            if (canParseResult) {
+                                // console.log(`Attempting to parse newest email (${messageId}) for ${processor.bankName}...`); // Log kaldırıldı
+                                // accessToken eklendi
+                                const statement = await processor.emailParser.parse(emailData, accessToken);
+                                processedEmailBanks.add(processor.bankName); // En yeni işlendi olarak işaretle
+                                if (statement) {
+                                    // console.log(`Successfully parsed EMAIL statement for ${statement.bankName}`); // Log kaldırıldı
+                                    // source'u kontrol et, parser kendi içinde belirlemeli (örn. 'email-pdf')
+                                    parsedStatements.push({ ...statement, source: statement.source || 'email' });
+                                } else {
+                                     console.warn(`Email Parser for ${processor.bankName} identified email but failed to parse content (ID: ${messageId}).`); // Uyarı kalsın
+                                }
+                                 // break; // Eski yorum kalsın
                             }
-                             // break; // Eski yorum kalsın
+                        } else {
+                             console.warn(`SmsProcessor: Could not decode body for email ID: ${messageId}`);
                         }
                     }
                 }
@@ -274,7 +301,7 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
   }
 
   // --- Kredileri Getir ve Ayrıştır --- //
-  async fetchAndParseLoans(options: SmsFilterOptions = { maxCount: 50 }): Promise<ParsedLoan[]> {
+  async fetchAndParseLoans(accessToken: string, options: SmsFilterOptions = { maxCount: 50 }): Promise<ParsedLoan[]> {
     let parsedLoans: ParsedLoan[] = [];
     const smsPermission = await this.checkSmsPermission();
 

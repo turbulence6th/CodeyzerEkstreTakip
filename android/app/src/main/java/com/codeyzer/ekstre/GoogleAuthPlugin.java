@@ -45,6 +45,12 @@ import com.google.api.services.calendar.model.EventDateTime;
 import com.google.api.services.calendar.model.EventReminder;
 import com.google.api.services.calendar.model.Events;
 
+// GMAIL API için importlar
+import com.google.api.services.gmail.Gmail;
+import com.google.api.services.gmail.model.ListMessagesResponse;
+import com.google.api.services.gmail.model.Message;
+import com.google.api.services.gmail.model.MessagePartBody;
+
 // Yeni Google Auth Library importları
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.AccessToken;
@@ -469,4 +475,197 @@ public class GoogleAuthPlugin extends Plugin {
             }
         });
     }
+
+    // --- GMAIL API METODLARI ---
+
+    @PluginMethod
+    public void searchGmailMessages(PluginCall call) {
+        String accessTokenString = call.getString("accessToken");
+        String query = call.getString("query");
+        // Opsiyonel: Sayfalama için nextPageToken ve maxResults eklenebilir
+        // String pageToken = call.getString("pageToken");
+        // Integer maxResults = call.getInteger("maxResults", 100); // Default 100?
+
+        if (accessTokenString == null || accessTokenString.isEmpty()) {
+            call.reject("Access token is required.");
+            return;
+        }
+        if (query == null || query.isEmpty()) {
+            call.reject("Search query is required.");
+            return;
+        }
+
+        executorService.execute(() -> {
+            try {
+                Gmail service = buildGmailService(accessTokenString);
+
+                ListMessagesResponse response = service.users().messages().list("me")
+                        .setQ(query)
+                        // .setPageToken(pageToken) 
+                        // .setMaxResults(maxResults.longValue())
+                        .execute();
+
+                JSObject result = new JSObject();
+                // Gmail API'den dönen mesaj listesini (sadece ID'ler) JSObject'e çevir
+                // com.google.api.client.json.gson.GsonFactory kullanarak doğrudan JSON'a çevirme
+                String jsonResponse = GsonFactory.getDefaultInstance().toString(response);
+                result = new JSObject(jsonResponse); // JSObject'i JSON string'inden oluştur
+
+                // Alternatif: Manuel olarak JSObject oluşturma
+                /*
+                JSArray messagesArray = new JSArray();
+                if (response.getMessages() != null) {
+                    for (Message message : response.getMessages()) {
+                        JSObject msgObj = new JSObject();
+                        msgObj.put("id", message.getId());
+                        msgObj.put("threadId", message.getThreadId());
+                        messagesArray.put(msgObj);
+                    }
+                }
+                result.put("messages", messagesArray);
+                if (response.getNextPageToken() != null) {
+                    result.put("nextPageToken", response.getNextPageToken());
+                }
+                result.put("resultSizeEstimate", response.getResultSizeEstimate());
+                 */
+                call.resolve(result);
+
+            } catch (IOException e) {
+                handleIOException(call, e, "Error searching Gmail messages");
+            } catch (Exception e) {
+                handleGenericException(call, e, "Unexpected error searching Gmail messages");
+            }
+        });
+    }
+
+    @PluginMethod
+    public void getGmailMessageDetails(PluginCall call) {
+        String accessTokenString = call.getString("accessToken");
+        String messageId = call.getString("messageId");
+
+        if (accessTokenString == null || accessTokenString.isEmpty()) {
+            call.reject("Access token is required.");
+            return;
+        }
+        if (messageId == null || messageId.isEmpty()) {
+            call.reject("Message ID is required.");
+            return;
+        }
+
+        executorService.execute(() -> {
+            try {
+                Gmail service = buildGmailService(accessTokenString);
+
+                // format=FULL ile tüm detayları al (payload, headers etc.)
+                Message message = service.users().messages().get("me", messageId).setFormat("FULL").execute();
+
+                JSObject result = new JSObject();
+                // Dönen Message objesini JSObject'e çevir (Gson kullanarak)
+                 String jsonResponse = GsonFactory.getDefaultInstance().toString(message);
+                 result = new JSObject(jsonResponse);
+
+                call.resolve(result);
+
+            } catch (IOException e) {
+                handleIOException(call, e, "Error getting Gmail message details");
+            } catch (Exception e) {
+                handleGenericException(call, e, "Unexpected error getting Gmail message details");
+            }
+        });
+    }
+
+    @PluginMethod
+    public void getGmailAttachment(PluginCall call) {
+        String accessTokenString = call.getString("accessToken");
+        String messageId = call.getString("messageId");
+        String attachmentId = call.getString("attachmentId");
+
+        if (accessTokenString == null || accessTokenString.isEmpty()) {
+            call.reject("Access token is required.");
+            return;
+        }
+        if (messageId == null || messageId.isEmpty()) {
+            call.reject("Message ID is required.");
+            return;
+        }
+         if (attachmentId == null || attachmentId.isEmpty()) {
+            call.reject("Attachment ID is required.");
+            return;
+        }
+
+        executorService.execute(() -> {
+            try {
+                Gmail service = buildGmailService(accessTokenString);
+
+                MessagePartBody attachmentBody = service.users().messages().attachments()
+                                                    .get("me", messageId, attachmentId).execute();
+
+                JSObject result = new JSObject();
+                // Dönen MessagePartBody objesini JSObject'e çevir (Gson kullanarak)
+                String jsonResponse = GsonFactory.getDefaultInstance().toString(attachmentBody);
+                result = new JSObject(jsonResponse);
+                
+                // Alternatif: Sadece data alanını koymak
+                // result.put("data", attachmentBody.getData()); // Base64 encoded data
+                // result.put("size", attachmentBody.getSize()); 
+
+                call.resolve(result);
+
+            } catch (IOException e) {
+                handleIOException(call, e, "Error getting Gmail attachment");
+            } catch (Exception e) {
+                handleGenericException(call, e, "Unexpected error getting Gmail attachment");
+            }
+        });
+    }
+
+    // Yardımcı metod: Gmail servisini oluşturur
+    private Gmail buildGmailService(String accessTokenString) throws IOException {
+        AccessToken accessToken = new AccessToken(accessTokenString, null);
+        GoogleCredentials credentials = GoogleCredentials.create(accessToken);
+        HttpCredentialsAdapter adapter = new HttpCredentialsAdapter(credentials);
+
+        return new Gmail.Builder(
+                new NetHttpTransport(),
+                GsonFactory.getDefaultInstance(),
+                adapter)
+                .setApplicationName(getContext().getPackageName())
+                .build();
+    }
+    
+    // Yardımcı metod: IOException yönetimi
+    private void handleIOException(PluginCall call, IOException e, String logPrefix) {
+        Log.e(TAG, logPrefix + ": " + e.getMessage(), e);
+        String errorCode = null;
+        String errorMessage = logPrefix + ": " + e.getMessage();
+        if (e instanceof com.google.api.client.http.HttpResponseException) {
+            com.google.api.client.http.HttpResponseException httpError = (com.google.api.client.http.HttpResponseException) e;
+            // GoogleJsonResponseException yerine HttpResponseException kullanıldığı için hata detayını manuel parse etmek gerekebilir
+             // String content = httpError.getContent(); // Hata içeriği (JSON olabilir)
+             // Örneğin: { "error": { "code": 401, "message": "Invalid Credentials", "errors": [...] } }
+            if (httpError.getStatusCode() == 401 || httpError.getStatusCode() == 403) {
+                 if (e.getMessage() != null && e.getMessage().toLowerCase().contains("invalid_grant")) {
+                    errorCode = "INVALID_GRANT";
+                    errorMessage = "Access token is invalid or expired. Please sign in again.";
+                 } else {
+                     errorCode = "AUTH_ERROR";
+                     errorMessage = "Authentication error accessing Gmail: " + httpError.getStatusMessage();
+                 }
+            } else {
+                 errorCode = "NETWORK_ERROR";
+                 errorMessage = "Network error accessing Gmail: " + httpError.getStatusMessage();
+            }
+        } else {
+            errorCode = "IO_ERROR";
+        }
+        call.reject(errorMessage, errorCode, e);
+    }
+
+    // Yardımcı metod: Genel Exception yönetimi
+    private void handleGenericException(PluginCall call, Exception e, String logPrefix) {
+         Log.e(TAG, logPrefix + ": " + e.getMessage(), e);
+         call.reject(logPrefix + ": " + e.getMessage(), e);
+    }
+
+    // --- GMAIL API METODLARI SONU ---
 } 

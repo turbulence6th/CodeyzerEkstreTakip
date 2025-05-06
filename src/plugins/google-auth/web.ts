@@ -74,4 +74,29 @@ export class GoogleAuthWeb extends WebPlugin implements GoogleAuthPlugin {
     return Promise.resolve({ eventFound: false }); 
   }
 
+  // --- Web Platformu için Gmail Metodları (Mock Implementasyon) ---
+
+  async searchGmailMessages(options: import("./definitions").GmailSearchOptions): Promise<import("./definitions").GmailSearchResponse> {
+    console.warn('GoogleAuthWeb.searchGmailMessages() called on web. Mock response returned.', options);
+    // Web'de gerçek arama yapılamaz. Boş sonuç döndür.
+    return Promise.resolve({ messages: [], resultSizeEstimate: 0 });
+  }
+
+  async getGmailMessageDetails(options: import("./definitions").GmailDetailsOptions): Promise<import("./definitions").GmailMessage> {
+    console.warn('GoogleAuthWeb.getGmailMessageDetails() called on web. Mock response returned.', options);
+    // Web'de gerçek detay alınamaz. Mock bir mesaj döndür.
+    return Promise.resolve({
+      id: options.messageId, 
+      threadId: 'mock_thread_id_' + options.messageId,
+      snippet: 'Mock email content for web.',
+      payload: { mimeType: 'text/plain', body: { size: 25, data: 'TW9jayBlbWFpbCBjb250ZW50IGZvciB3ZWIu' /* "Mock email content for web." base64url */ } }
+    });
+  }
+
+  async getGmailAttachment(options: import("./definitions").GmailAttachmentOptions): Promise<import("./definitions").GmailAttachmentResponse> {
+    console.warn('GoogleAuthWeb.getGmailAttachment() called on web. Mock response returned.', options);
+    // Web'de gerçek ek alınamaz. Boş data ile yanıt döndür.
+    return Promise.resolve({ size: 0, data: '' });
+  }
+
 } 

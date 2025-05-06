@@ -13,129 +13,195 @@
 // }
 
 // Yeni API istemcisini import et
-import { fetchWithAuth } from './apiClient'; 
-import { CapacitorHttp, HttpResponse } from '@capacitor/core';
+// import { fetchWithAuth } from './apiClient'; 
+// import { CapacitorHttp, HttpResponse } from '@capacitor/core';
+
+import { GoogleAuth } from '@plugins/google-auth';
+import type {
+    GoogleAuthPlugin,
+    GmailSearchOptions,
+    GmailSearchResponse,
+    GmailDetailsOptions,
+    GmailMessage,
+    GmailAttachmentOptions,
+    GmailAttachmentResponse
+} from '../plugins/google-auth/definitions'; // Düzeltilmiş import yolu
 
 /**
  * Gmail API ile etkileşim kurmak için servis.
  */
 export class GmailService {
-    private readonly gmailApiBaseUrl = 'https://www.googleapis.com/gmail/v1';
+    // private readonly gmailApiBaseUrl = 'https://www.googleapis.com/gmail/v1'; // Artık kullanılmayacak
 
     /**
-     * Belirtilen sorguyla eşleşen e-postaları arar.
-     * @param query - Gmail arama sorgusu (örn: "from:banka@example.com subject:ekstre").
-     * @param maxResults - Döndürülecek maksimum sonuç sayısı.
-     * @returns E-posta listesi (ID ve threadId içerir).
+     * Belirtilen sorguyla eşleşen e-postaları arar (Native Plugin aracılığıyla).
+     * @param accessToken - Google API erişim token'ı.
+     * @param query - Gmail arama sorgusu.
+     * @param maxResults - Döndürülecek maksimum sonuç sayısı (Native tarafta henüz implemente edilmedi, opsiyonel).
+     * @returns E-posta listesi (ID ve threadId içerir) veya API yanıtı.
      */
-    async searchEmails(query: string, maxResults: number = 10): Promise<{ id: string; threadId: string }[]> {
-        const url = `${this.gmailApiBaseUrl}/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`;
-        console.log(`GmailService: Searching emails with query: ${query}`);
+    async searchEmails(accessToken: string, query: string, maxResults: number = 100): Promise<GmailSearchResponse> {
+        if (!GoogleAuth) {
+            console.error('GmailService: GoogleAuth plugin is not available.');
+            throw new Error('GoogleAuth plugin not available');
+        }
+         if (!accessToken) {
+            console.error('GmailService: Access token is required for searchEmails.');
+            throw new Error('Access token is required');
+        }
+
+        const options: GmailSearchOptions = {
+            accessToken,
+            query,
+            // maxResults, // Native tarafta desteklenince eklenebilir
+        };
+
+        console.log(`GmailService: Calling native searchGmailMessages with query: ${query}`);
 
         try {
-            const response = await fetchWithAuth(url, { method: 'GET' });
-            const data = await response.json();
-
-            if (!data.messages) {
-                console.log('GmailService: No messages found for query.');
-                return [];
-            }
-            console.log(`GmailService: Found ${data.messages.length} messages.`);
-            return data.messages;
-        } catch (error) {
-            console.error('GmailService: Error searching emails:', error);
-            throw error;
+            // Native metodu çağır
+            const result: GmailSearchResponse = await GoogleAuth.searchGmailMessages(options);
+            console.log(`GmailService: Native email search successful. Found approx ${result.resultSizeEstimate} messages.`);
+            // Native plugin doğrudan Gmail API yanıtını (ListMessagesResponse) döndürüyor
+            return result;
+        } catch (error: any) {
+            console.error('GmailService: Error calling native searchGmailMessages:', error);
+            const errorMessage = error?.message || 'E-postalar aranırken hata oluştu (native).';
+            const errorCode = error?.code;
+            const newError = new Error(errorMessage);
+            (newError as any).code = errorCode;
+            throw newError;
         }
     }
 
     /**
-     * Belirli bir e-postanın detaylarını alır.
+     * Belirli bir e-postanın detaylarını alır (Native Plugin aracılığıyla).
+     * @param accessToken - Google API erişim token'ı.
      * @param messageId - Alınacak e-postanın ID'si.
-     * @returns E-posta detayları (payload içerir).
+     * @returns E-posta detayları (Gmail API Message formatında).
      */
-    async getEmailDetails(messageId: string): Promise<any> {
-        const url = `${this.gmailApiBaseUrl}/users/me/messages/${messageId}?format=full`;
-        console.log(`GmailService: Getting details for message ID: ${messageId}`);
+    async getEmailDetails(accessToken: string, messageId: string): Promise<GmailMessage> {
+        if (!GoogleAuth) {
+            console.error('GmailService: GoogleAuth plugin is not available.');
+            throw new Error('GoogleAuth plugin not available');
+        }
+        if (!accessToken) {
+            console.error('GmailService: Access token is required for getEmailDetails.');
+            throw new Error('Access token is required');
+        }
+
+        const options: GmailDetailsOptions = { accessToken, messageId };
+
+        console.log(`GmailService: Calling native getGmailMessageDetails for ID: ${messageId}`);
 
         try {
-            const response = await fetchWithAuth(url, { method: 'GET' });
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error(`GmailService: Error getting email details for ${messageId}:`, error);
-            throw error;
+            // Native metodu çağır
+            const result: GmailMessage = await GoogleAuth.getGmailMessageDetails(options);
+             console.log(`GmailService: Native get details successful for ID: ${messageId}`);
+            // Native plugin doğrudan Gmail API yanıtını (Message) döndürüyor
+            return result;
+        } catch (error: any) {
+            console.error(`GmailService: Error calling native getGmailMessageDetails for ${messageId}:`, error);
+            const errorMessage = error?.message || 'E-posta detayları alınırken hata oluştu (native).';
+            const errorCode = error?.code;
+            const newError = new Error(errorMessage);
+            (newError as any).code = errorCode;
+            throw newError;
         }
     }
 
-     /**
-     * E-posta gövdesini (body) base64'ten çözer ve metin olarak döndürür.
-     * Mime tipine göre doğru bölümü bulmaya çalışır.
-     * Content-Type başlığındaki charset'e göre decode eder.
-     * @param payload - E-postanın payload nesnesi.
-     * @returns Çözülmüş e-posta gövdesi (string) veya null.
-     */
-    decodeEmailBody(payload: any): { plainBody: string | null; htmlBody: string | null } {
+    /**
+    * E-posta gövdesini (body) base64'ten çözer ve metin olarak döndürür.
+    * Mime tipine göre doğru bölümü bulmaya çalışır.
+    * Content-Type başlığındaki charset'e göre decode eder.
+    * ÖNEMLİ: Bu metod artık doğrudan Gmail API Message objesi (native'den gelen) üzerinde çalışır.
+    * @param message - Native getEmailDetails'ten dönen GmailMessage objesi.
+    * @returns Çözülmüş e-posta gövdeleri ({ plainBody: string | null; htmlBody: string | null }) veya null.
+    */
+    decodeEmailBody(message: GmailMessage): { plainBody: string | null; htmlBody: string | null } | null {
+        if (!message || !message.payload) {
+            console.warn('GmailService.decodeEmailBody: Message or payload is missing.');
+            return null;
+        }
+        const payload = message.payload;
         let plainBodyData: string | null = null;
         let htmlBodyData: string | null = null;
         let charset = 'utf-8'; // Varsayılan
 
+        // Content-Type header'ını bul ve charset'i çıkar
         const contentTypeHeader = payload.headers?.find((h: any) => h.name.toLowerCase() === 'content-type');
         if (contentTypeHeader) {
-            const match = contentTypeHeader.value.match(/charset=[\"\']?([^;\"\']*)[\"\']?/i); // Updated regex for quotes
+            const match = contentTypeHeader.value.match(/charset=["']?([^;"']*)["']?/i);
             if (match && match[1]) {
                 charset = match[1].trim().toLowerCase();
-                console.log(`GmailService: Detected charset: ${charset}`);
+                console.log(`GmailService.decodeEmailBody: Detected charset: ${charset}`);
             }
         }
 
+        // Rekürsif olarak body part'larını arayan fonksiyon
         const findBodyParts = (part: any) => {
             if (!part) return;
 
             const mimeType = part.mimeType;
-            const bodyData = part.body?.data;
+            const bodyData = part.body?.data; // Body verisi base64url encoded
 
             if (bodyData) {
-                 if (mimeType === 'text/plain' && !plainBodyData) {
+                if (mimeType === 'text/plain' && !plainBodyData) {
                     plainBodyData = bodyData;
-                 } else if (mimeType === 'text/html' && !htmlBodyData) {
-                     htmlBodyData = bodyData;
-                 }
-             }
-
-            if (part.parts && part.parts.length > 0 && (!plainBodyData || !htmlBodyData)) {
-                for (const subPart of part.parts) {
-                    findBodyParts(subPart);
-                    if (plainBodyData && htmlBodyData) break;
+                } else if (mimeType === 'text/html' && !htmlBodyData) {
+                    htmlBodyData = bodyData;
                 }
+            }
+
+            // Eğer hem plain hem html bulunduysa veya alt part yoksa dur
+            if ((plainBodyData && htmlBodyData) || !part.parts || part.parts.length === 0) {
+                return;
+            }
+
+            // Alt part'ları gez
+            for (const subPart of part.parts) {
+                findBodyParts(subPart);
+                if (plainBodyData && htmlBodyData) break; // İkisi de bulunduysa daha fazla aramaya gerek yok
             }
         };
 
         findBodyParts(payload);
 
-        const decodePart = (base64Data: string | null): string | null => {
-            if (!base64Data) return null;
+        // Base64url veriyi çözen yardımcı fonksiyon
+        const decodePart = (base64urlData: string | null): string | null => {
+            if (!base64urlData) return null;
             try {
-                const binaryString = atob(base64Data.replace(/-/g, '+').replace(/_/g, '/'));
+                // Base64url -> Base64
+                let base64 = base64urlData.replace(/-/g, '+').replace(/_/g, '/');
+                // Padding ekle (gerekliyse)
+                while (base64.length % 4) {
+                    base64 += '=';
+                }
+                const binaryString = atob(base64);
                 const bytes = new Uint8Array(binaryString.length);
                 for (let i = 0; i < binaryString.length; i++) {
                     bytes[i] = binaryString.charCodeAt(i);
                 }
-                 const decoder = new TextDecoder(charset, { fatal: false });
-                 return decoder.decode(bytes);
+                // Belirlenen veya varsayılan charset ile decode et
+                const decoder = new TextDecoder(charset, { fatal: false });
+                return decoder.decode(bytes);
             } catch (e) {
-                console.error(`GmailService: Error decoding base64 body part with charset ${charset}:`, e);
-                 if (charset !== 'utf-8') {
-                     try {
-                         console.warn('GmailService: Retrying decoding with UTF-8');
-                         const binaryString = atob(base64Data.replace(/-/g, '+').replace(/_/g, '/'));
-                         const bytes = new Uint8Array(binaryString.length);
-                         for (let i = 0; i < binaryString.length; i++) { bytes[i] = binaryString.charCodeAt(i); }
-                         const decoder = new TextDecoder('utf-8', { fatal: false });
-                         return decoder.decode(bytes);
-                     } catch (utf8Error) {
-                          console.error('GmailService: Error decoding base64 body part with UTF-8 fallback:', utf8Error);
-                     }
-                 }
+                console.error(`GmailService.decodeEmailBody: Error decoding base64url body part with charset ${charset}:`, e);
+                // UTF-8 ile tekrar dene (fallback)
+                if (charset !== 'utf-8') {
+                    try {
+                        console.warn('GmailService.decodeEmailBody: Retrying decoding with UTF-8');
+                        let base64 = base64urlData.replace(/-/g, '+').replace(/_/g, '/');
+                        while (base64.length % 4) { base64 += '='; }
+                        const binaryString = atob(base64);
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) { bytes[i] = binaryString.charCodeAt(i); }
+                        const decoder = new TextDecoder('utf-8', { fatal: false });
+                        return decoder.decode(bytes);
+                    } catch (utf8Error) {
+                         console.error('GmailService.decodeEmailBody: Error decoding base64url body part with UTF-8 fallback:', utf8Error);
+                    }
+                }
                 return null;
             }
         };
@@ -146,65 +212,43 @@ export class GmailService {
         };
     }
 
-    // --- YENİ METOT: Eki Alma (fetchWithAuth ile) ---
-    async getAttachment(messageId: string, attachmentId: string): Promise<any> {
-        // Token kontrolü (store'dan alma fetchWithAuth içinde yapılmalı)
-        // Eğer fetchWithAuth token almıyorsa, burada alıp options'a eklemek gerekir.
+    /**
+     * Belirli bir e-postadaki bir eki alır (Native Plugin aracılığıyla).
+     * @param accessToken - Google API erişim token'ı.
+     * @param messageId - Ekin bulunduğu e-postanın ID'si.
+     * @param attachmentId - Alınacak ekin ID'si.
+     * @returns Ek detayları (Gmail API MessagePartBody formatında, 'data' base64url kodludur).
+     */
+    async getAttachment(accessToken: string, messageId: string, attachmentId: string): Promise<GmailAttachmentResponse> {
+        if (!GoogleAuth) {
+            console.error('GmailService: GoogleAuth plugin is not available.');
+            throw new Error('GoogleAuth plugin not available');
+        }
+         if (!accessToken) {
+            console.error('GmailService: Access token is required for getAttachment.');
+            throw new Error('Access token is required');
+        }
 
-        const url = `${this.gmailApiBaseUrl}/users/me/messages/${messageId}/attachments/${attachmentId}`;
+        const options: GmailAttachmentOptions = { accessToken, messageId, attachmentId };
 
-        console.log(`GmailService: Fetching attachment using fetchWithAuth: ${url}`);
+        console.log(`GmailService: Calling native getGmailAttachment for msg ${messageId}, att ${attachmentId}`);
         try {
-            // CapacitorHttp yerine fetchWithAuth kullan
-            const response = await fetchWithAuth(url, { 
-                method: 'GET',
-                // fetchWithAuth zaten header ekliyorsa buna gerek yok,
-                // eklemiyorsa manuel eklenmeli:
-                // headers: { 'Authorization': `Bearer ${token}` } 
-            });
+            // Native metodu çağır
+            const result: GmailAttachmentResponse = await GoogleAuth.getGmailAttachment(options);
             
-            console.log(`GmailService: Attachment response status: ${response.status}`);
-            // fetch ile response.headers'a doğrudan erişim olmayabilir, loglamayı kaldıralım veya fetchWithAuth'a ekleyelim.
-            // console.log(`GmailService: Attachment response headers:`, JSON.stringify(response.headers, null, 2));
+            // Native'den dönen yanıtı logla (data kısmı base64url olmalı)
+            console.log(`GmailService: Native getAttachment successful. Size: ${result.size}, Data start: ${result.data?.substring(0, 50)}...`);
+            
+            // Native plugin doğrudan Gmail API yanıtını (MessagePartBody) döndürüyor
+            return result; 
 
-            if (response.ok) { // fetch API'si response.ok kullanır (status 200-299)
-                const data = await response.json(); // Gmail attachment API JSON döner
-                
-                // Verinin tipini ve boyutunu logla
-                console.log(`GmailService: Attachment data type: ${typeof data}, Keys: ${Object.keys(data).join(', ')}`);
-
-                let base64DataToCheck: string | null = null;
-
-                 // Yanıt { size: number, data: string } şeklinde mi (Attachment resource tipi)?
-                 if (data?.size !== undefined && data?.data && typeof data.data === 'string') {
-                     console.log(`GmailService: Attachment response matches Attachment resource type (size: ${data.size}).`);
-                     base64DataToCheck = data.data; // API dokümanına göre bu base64url encoded
-                 } else {
-                     console.warn('GmailService: Could not find base64 data string in the expected format within response JSON. Response data:', data);
-                 }
-
-                // Kontrol edilecek base64 verisi bulunduysa başını/sonunu logla
-                if (base64DataToCheck) {
-                    console.log(`GmailService: Base64 data length: ${base64DataToCheck.length}`);
-                    console.log(`GmailService: Base64 data start: ${base64DataToCheck.substring(0, 100)}...`);
-                    console.log(`GmailService: Base64 data end: ...${base64DataToCheck.substring(base64DataToCheck.length - 100)}`);
-                }
-                
-                return data;
-            } else {
-                console.error('GmailService: Failed to get attachment', response.status, response.statusText);
-                // Hata detayını almaya çalış
-                let errorBody = null;
-                try {
-                    errorBody = await response.text(); // veya .json()
-                    console.error('Error response body:', errorBody);
-                } catch (e) { /* ignore */ }
-                throw new Error(`Failed to get attachment: Status ${response.status} ${response.statusText}`);
-            }
         } catch (error: any) {
-            console.error('GmailService: Error fetching attachment:', error);
-            // Network hatası veya response.json() hatası olabilir
-            throw error;
+            console.error('GmailService: Error calling native getGmailAttachment:', error);
+            const errorMessage = error?.message || 'E-posta eki alınırken hata oluştu (native).';
+            const errorCode = error?.code;
+            const newError = new Error(errorMessage);
+            (newError as any).code = errorCode;
+            throw newError;
         }
     }
 }

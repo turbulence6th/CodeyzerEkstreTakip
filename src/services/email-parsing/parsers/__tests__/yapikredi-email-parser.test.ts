@@ -74,7 +74,7 @@ describe('Yapı Kredi Email Parser', () => {
                  return;
              }
 
-            const result = await yapikrediEmailParser.parse(mockEmailDetails);
+            const result = await yapikrediEmailParser.parse(mockEmailDetails, 'mockAccessToken');
 
             // Sonucun null olmadığını kontrol et (Tarih parse edilebildiği için)
             expect(result).not.toBeNull();

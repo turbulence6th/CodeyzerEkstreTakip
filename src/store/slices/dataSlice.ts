@@ -58,8 +58,8 @@ export const fetchAndProcessDataThunk = createAsyncThunk<
     try {
       console.log("[Thunk] Fetching and parsing statements & loans...");
       const [parsedStatements, parsedLoans] = await Promise.all([
-        statementProcessor.fetchAndParseStatements({ maxCount: 100 }),
-        statementProcessor.fetchAndParseLoans({ maxCount: 100 })
+        statementProcessor.fetchAndParseStatements(accessToken, { maxCount: 100 }),
+        statementProcessor.fetchAndParseLoans(accessToken, { maxCount: 100 })
       ]);
       console.log("[Thunk] Promise.all for statement/loan fetching completed.");
 

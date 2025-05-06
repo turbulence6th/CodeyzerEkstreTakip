@@ -77,7 +77,7 @@ describe('Kuveyt Türk Email Parser', () => {
             // *** ÖNEMLİ: Bu testin geçmesi için kuveytturk-email-parser.ts içindeki parse fonksiyonunun
             // *** HTML'den verileri (tutar, tarih, kart no) çıkaracak şekilde implemente edilmesi gerekir.
             // *** Şu anki haliyle (sadece loglama yapıp null dönen haliyle) bu test BAŞARISIZ olacaktır.
-            const result = await kuveytturkEmailParser.parse(mockEmailDetails);
+            const result = await kuveytturkEmailParser.parse(mockEmailDetails, 'mockAccessToken');
 
             // Sonucun null olmadığını ve beklenen değerleri içerdiğini kontrol et
             expect(result).not.toBeNull();
@@ -103,7 +103,7 @@ describe('Kuveyt Türk Email Parser', () => {
 
         it('should return null if HTML content is missing', async () => {
              const emailWithoutHtml: EmailDetails = { ...mockEmailDetails, htmlBody: null };
-             const result = await kuveytturkEmailParser.parse(emailWithoutHtml);
+             const result = await kuveytturkEmailParser.parse(emailWithoutHtml, 'mockAccessToken');
              expect(result).toBeNull();
          });
 

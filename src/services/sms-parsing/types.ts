@@ -79,7 +79,8 @@ export interface BankEmailParser {
   bankName: string;
   // canParse imzası güncellendi
   canParse(sender: string, subject: string, body: DecodedEmailBody, emailDetails?: EmailDetails): Promise<boolean> | boolean;
-  parse(email: EmailDetails): Promise<ParsedStatement | null> | ParsedStatement | null;
+  // parse metoduna accessToken eklendi
+  parse(email: EmailDetails, accessToken: string): Promise<ParsedStatement | null> | ParsedStatement | null;
 }
 
 // --- Loan Parsing Types (Common for SMS/Email if applicable) --- //
