@@ -25,12 +25,14 @@ import { KuveytTurkSmsParser } from './parsers/kuveytturk-parser'; // Yeni parse
 // Kredi SMS Parser'ları
 import { qnbLoanParser } from './parsers/qnb-parser';
 import { garantiLoanParser, GarantiParser } from './parsers/garanti-parser'; // Yeni Garanti kredi parser'ını import et
+import { garantiEmailParser } from 'services/email-parsing/parsers/garanti-email-parser';
 
 // EMAIL Parser'ları
 import { yapikrediEmailParser } from '../email-parsing/parsers/yapikredi-email-parser';
 import { ziraatEmailParser } from '../email-parsing/parsers/ziraat-email-parser'; // Yeni parser import edildi
 import { isbankEmailParser } from '../email-parsing/parsers/isbank-email-parser'; // <-- YENİ İŞ BANKASI PARSER IMPORTU
 import { kuveytturkEmailParser } from 'services/email-parsing/parsers/kuveytturk-email-parser';
+import { akbankEmailParser } from 'services/email-parsing/parsers/akbank-email-parser';
 
 // --- Banka İşlemci Yapılandırması --- //
 // Her banka için SMS, Kredi ve E-posta parser'larını ve Gmail sorgusunu burada tanımlayalım
@@ -57,11 +59,13 @@ export const availableBankProcessors: BankProcessor[] = [
   },
   {
     bankName: 'Garanti BBVA',
-    smsSenderKeywords: ['GARANTIBBVA', 'GARANTiBBVA', 'BONUS'], // Kullanıcı tarafından güncellendi
-    smsStatementQueryKeyword: 'ekstresinin', // Ekstre için
-    smsLoanQueryKeyword: 'ihtiyac krediniz', // Sadece kredi için
+    smsSenderKeywords: ['GARANTIBBVA', 'GARANTiBBVA', 'BONUS'],
+    smsStatementQueryKeyword: 'ekstresinin',
+    smsLoanQueryKeyword: 'ihtiyac krediniz',
     smsParser: new GarantiParser(),
     loanSmsParser: garantiLoanParser,
+    emailParser: garantiEmailParser,
+    gmailQuery: 'from:(garantibbva@garantibbva.com.tr) subject:("Bonus Ekstresi")',
   },
   {
     bankName: 'Kuveyt Türk',
@@ -77,6 +81,11 @@ export const availableBankProcessors: BankProcessor[] = [
     emailParser: isbankEmailParser, // Yeni PDF işleyecek parser
     // Gmail sorgusu: gönderen ve konu başlangıcına göre (kart no/tarih kısmı değişken olabilir)
     gmailQuery: 'from:(bilgilendirme@ileti.isbank.com.tr) subject:("Maximum Kredi Kartı Hesap Özeti")',
+  },
+  {
+    bankName: 'Akbank',
+    emailParser: akbankEmailParser,
+    gmailQuery: 'from:(hizmet@bilgi.akbank.com) subject:("Kredi kartı ekstre bilgileri")',
   },
   // ... Diğer bankalar eklenebilir
 ];
