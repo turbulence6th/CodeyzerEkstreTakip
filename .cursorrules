@@ -51,6 +51,9 @@ key_files:
   - src/utils/parsing.ts
   - android/app/src/main/java/com/codeyzer/ekstre/PdfParserPlugin.java # Yeni eklenen native plugin
   - android/app/build.gradle # Native bağımlılıklar için önemli
+  - src/services/email-parsing/parsers/garanti-email-parser.ts # Garanti BBVA email parser
+  - src/services/email-parsing/parsers/__tests__/garanti-email-parser.test.ts # Garanti BBVA email parser test
+  - src/services/email-parsing/parsers/__tests__/mocks/garanti-ekstre-sample.html # Garanti BBVA ekstre örnek maili
 
 # Dil/Framework Bilgisi (AI'nın doğru araçları kullanmasına yardımcı olur)
 language: typescript
