@@ -9,11 +9,22 @@
 }
 
 .permission-warning-text {
-  /* color: var(--ion-color-dark-shade, #333); // Eski koyu renk */
-  color: var(--ion-color-orange, #ff9500); /* Turuncu uyarı rengi, fallback ile */
-  font-weight: bold; /* Metni kalın yap */
-  margin-top: 10px;
-  font-size: small;
+    font-size: 0.9em;
+    color: var(--ion-color-medium-shade);
+}
+
+.item-paid {
+    --background: var(--ion-color-light-tint);
+    opacity: 0.7;
+}
+  
+.item-paid ion-label h2,
+.item-paid ion-label p {
+    text-decoration: line-through;
+}
+
+.item-paid ion-icon {
+    opacity: 0.6;
 }
 
 .calendar-button-container {

@@ -18,6 +18,27 @@ export class SmsReaderWeb extends WebPlugin implements SmsReaderPlugin {
 
   async getMessages(options?: SmsFilterOptions): Promise<{ messages: SmsMessage[] }> {
     console.log('SmsReaderWeb: Mock Get Messages with options:', options);
+    
+    // --- Dinamik Tarih Hesaplama ---
+    // İkinci taksitin vadesinin bugünden 5 gün sonrası olacağı şekilde,
+    // ilk taksitin ödeme tarihini hesapla.
+    const secondInstallmentDate = new Date();
+    secondInstallmentDate.setDate(secondInstallmentDate.getDate() + 5);
+
+    const firstPaymentDate = new Date(secondInstallmentDate);
+    firstPaymentDate.setMonth(secondInstallmentDate.getMonth() - 1);
+
+    // Ay sonu taşmalarını yönet (örn: 2. taksit 31 Mart ise, 1. taksit Şubat sonu olmalı)
+    if (firstPaymentDate.getDate() !== secondInstallmentDate.getDate()) {
+      firstPaymentDate.setDate(0); // Bir önceki ayın son gününe ayarla
+    }
+
+    const day = String(firstPaymentDate.getDate()).padStart(2, '0');
+    const month = String(firstPaymentDate.getMonth() + 1).padStart(2, '0'); // Aylar 0'dan başlar
+    const year = firstPaymentDate.getFullYear();
+    const dynamicLoanDate = `${day}/${month}/${year}`;
+    // --- Dinamik Tarih Hesaplama Sonu ---
+
     // Return a list of mock SMS messages matching the SmsMessage interface
     const mockMessages: SmsMessage[] = [
       {
@@ -41,7 +62,7 @@ export class SmsReaderWeb extends WebPlugin implements SmsReaderPlugin {
       {
         id: 'mock_qnb_kredi_1',
         address: 'QNB',
-        body: "Basvurdugunuz 3 ay vade ve 5.179,22 TL taksitli 15.000,00 TL krediniz, 108266946 no'lu vadesiz hesabiniza yatirilmistir. Ilk taksitin odeme tarihi 16/01/2026'dir. dstk@qnb.com.tr B002",
+        body: `Basvurdugunuz 3 ay vade ve 5.179,22 TL taksitli 15.000,00 TL krediniz, 108266946 no'lu vadesiz hesabiniza yatirilmistir. Ilk taksitin odeme tarihi ${dynamicLoanDate}'dir. dstk@qnb.com.tr B002`,
         date: Date.now(),
       },
       {

@@ -24,7 +24,9 @@ describe('Garanti Parser Tests', () => {
         amount: 2120.76,
         dueDate: expectedDueDate,
         originalMessage: sms, // originalMessage'ı da doğrudan ekleyelim
-        source: 'sms'
+        source: 'sms',
+        isPaid: false, // Varsayılan olarak isPaid ekleyelim
+        entryType: 'debt', // entryType ekleyelim
       };
 
       const result = garantiBonusStatementParser.parse(sms);
@@ -66,6 +68,7 @@ describe('Garanti Parser Tests', () => {
               accountNumber: undefined,
               originalMessage: sms,
               source: 'sms',
+              entryType: 'debt',
           };
 
           const result = garantiLoanParser.parse(sms);

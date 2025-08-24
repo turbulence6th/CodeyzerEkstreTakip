@@ -61,7 +61,8 @@ async function parseExtractedPdfText(pdfText: string, emailDetails: EmailDetails
                 dueDate: dueDate,
                 source: 'email',
                 originalMessage: emailDetails,
-                last4Digits: last4Digits
+                last4Digits: last4Digits,
+                entryType: 'debt',
             };
             return parsedData;
 

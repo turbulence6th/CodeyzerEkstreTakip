@@ -50,14 +50,18 @@ export class QnbSmsParser implements BankSmsParser {
         return null;
       }
 
-      return {
-        bankName: this.bankName,
-        dueDate: dueDate,
-        amount: amount, // Borç null olabilir
-        last4Digits: last4Digits,
-        originalMessage: message,
-        source: 'sms'
-      };
+      if (dueDate && (amount !== null || last4Digits)) {
+        return {
+          bankName: this.bankName,
+          dueDate: dueDate,
+          amount: amount,
+          last4Digits: last4Digits,
+          originalMessage: message,
+          source: 'sms',
+          entryType: 'debt',
+        };
+      }
+      return null;
     } catch (error) {
       console.error(`[${this.bankName}] Error parsing message:`, message, error);
       return null;
@@ -119,7 +123,8 @@ export const qnbLoanParser = {
                     firstPaymentDate,
                     accountNumber,
                     originalMessage: message,
-                    source: 'sms'
+                    source: 'sms',
+                    entryType: 'debt',
                 };
             }
         } catch (error) {

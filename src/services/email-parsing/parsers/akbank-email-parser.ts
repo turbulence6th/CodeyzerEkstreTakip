@@ -49,11 +49,12 @@ export const akbankEmailParser: BankEmailParser = {
 
         return {
             bankName: this.bankName,
-            dueDate: dueDate,
-            amount: amount,
-            last4Digits: last4Digits,
+            dueDate,
+            amount,
+            last4Digits,
             source: 'email',
             originalMessage: email,
+            entryType: 'debt',
         };
     }
 }; 

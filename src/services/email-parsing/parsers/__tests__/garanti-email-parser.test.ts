@@ -70,7 +70,7 @@ describe('Garanti BBVA Email Parser', () => {
             const result = await garantiEmailParser.parse(mockEmailDetails);
             expect(result).not.toBeNull();
             if (result) {
-                expect(result.bankName).toBe('Garanti BBVA');
+                expect(result.bankName).toBe('Garanti BBVA Bonus');
                 expect(result.source).toBe('email');
                 expect(result.last4Digits).toBe('0000');
                 expect(result.dueDate).not.toBeNull();

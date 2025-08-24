@@ -21,7 +21,9 @@ import {
     chatbubbleEllipsesOutline,
     documentTextOutline,
     trashOutline,
-    addOutline
+    addOutline,
+    arrowUndoCircleOutline, // Yeni ikon
+    receiptOutline, // Yeni ikon
 } from 'ionicons/icons';
 
 // Tipler
@@ -30,14 +32,14 @@ import type { ManualEntry } from '../types/manual-entry.types';
 
 // Yeni utils'leri import et
 import { formatDate, formatCurrency } from '../utils/formatting';
-import { isStatement, isManualEntry, isLoan } from '../utils/typeGuards';
+import { isStatement, isManualEntry } from '../utils/typeGuards';
 import { generateAppId } from '../utils/identifiers';
 
 // Yeni importlar
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 
-type DisplayItem = ParsedStatement | ParsedLoan | ManualEntry;
+type DisplayItem = ParsedStatement | ManualEntry; // ParsedLoan kaldırıldı
 
 // --- Yardımcı Fonksiyonlar kaldırıldı ---
 
@@ -46,8 +48,9 @@ interface DisplayItemListProps {
     calendarEventStatus: Record<string, boolean>;
     onItemClick: (item: DisplayItem) => void;
     onAddToCalendar: (item: ParsedStatement | ManualEntry) => void;
-    onAddAllInstallments: (loan: ParsedLoan) => void;
+    // onAddAllInstallments prop'u kaldırıldı
     onDeleteManualEntry: (id: string) => void;
+    onTogglePaidStatus: (id: string) => void; 
 }
 
 const DisplayItemList: React.FC<DisplayItemListProps> = ({
@@ -55,37 +58,70 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
     calendarEventStatus,
     onItemClick,
     onAddToCalendar,
-    onAddAllInstallments,
-    onDeleteManualEntry
+    // onAddAllInstallments prop'u kaldırıldı
+    onDeleteManualEntry,
+    onTogglePaidStatus 
 }) => {
     // Global loading state'ini al
     const isLoading = useSelector((state: RootState) => state.loading.isActive);
     // Global loading mesajını al (spinner'ı hangi işlem için göstereceğimizi bilmek için)
     const loadingMessage = useSelector((state: RootState) => state.loading.message);
 
+    if (items.length === 0) {
+        return (
+            <IonItem lines="none">
+                <p className="empty-list-message">Görüntülenecek aktif ekstre veya kredi bilgisi bulunamadı. Verileri yenilemek için ekranı aşağı çekebilirsiniz.</p>
+            </IonItem>
+        );
+    }
+
     return (
         <>
             {items.length > 0 ? (
                 <IonList lines="none">
                     {items.map((item, index) => {
-                        const listKey = `${item.source}-${item.source === 'manual' ? item.id : (item as any).bankName || 'unknown'}-${index}`;
+                        // id'yi almak için type guard kullanalım
+                        let itemId: string | undefined;
+                        if (isManualEntry(item)) {
+                            itemId = item.id;
+                        } else if ((item as any).id) { // Geçici olarak any kullandık
+                            itemId = (item as any).id;
+                        }
+
+                        const listKey = `${item.source}-${itemId || index}`;
 
                         // Takvim durumu için AppID'yi oluştur
                         const appId = generateAppId(item);
-                        // Kredi taksitleri için ilk taksitin ID'sini oluştur (AddAll butonu için)
-                        const firstInstallmentAppId = isLoan(item) ? generateAppId(item, 1) : null;
-
+                        
                         // Prop'tan gelen status objesini kullanarak durumu belirle
                         const isAdded = appId ? !!calendarEventStatus[appId] : false;
-                        const isFirstInstallmentAdded = firstInstallmentAppId ? !!calendarEventStatus[firstInstallmentAppId] : false;
+
+                        // İkonu entryType'a göre belirle
+                        let itemIcon = addOutline;
+                        let itemColor = "primary";
+
+                        if (isManualEntry(item)) {
+                            itemIcon = item.entryType === 'debt' ? cashOutline : receiptOutline;
+                            itemColor = "tertiary";
+                        } else if (isStatement(item)) {
+                            // Kredi taksitlerini de burada yakala
+                            if(item.bankName.includes('Kredi Taksidi')) {
+                                itemIcon = cashOutline;
+                                itemColor = "success";
+                            } else {
+                                itemIcon = item.source === 'email' ? mailOutline : chatbubbleEllipsesOutline;
+                                itemColor = "primary";
+                            }
+                        }
+
 
                         return (
                             <IonItemSliding key={listKey}>
-                                <IonItem onClick={() => onItemClick(item)} button detail={false}>
+                                <IonItem onClick={() => onItemClick(item)} button detail={false} className={item.isPaid ? 'item-paid' : ''}>
                                     <IonIcon
                                         slot="start"
-                                        icon={isManualEntry(item) ? documentTextOutline : isStatement(item) && item.source === 'email' ? mailOutline : isStatement(item) && item.source === 'sms' ? chatbubbleEllipsesOutline : isLoan(item) ? cashOutline : addOutline}
-                                        color={isManualEntry(item) ? "tertiary" : isStatement(item) ? "primary" : "success"}
+                                        icon={itemIcon}
+                                        color={itemColor}
                                     />
                                     <IonLabel>
                                         <h2>{isManualEntry(item) ? item.description : item.bankName}</h2>
@@ -100,15 +136,9 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                                                 <p>Son Ödeme: <strong>{formatDate(item.dueDate)}</strong></p>
                                                 <p>Tutar: <strong>{formatCurrency(item.amount)}</strong></p>
                                             </>
-                                        ) : isLoan(item) ? (
-                                            <>
-                                                <p>İlk Ödeme: <strong>{formatDate(item.firstPaymentDate)}</strong></p>
-                                                <p>Taksit Tutarı: <strong>{formatCurrency(item.installmentAmount)}</strong></p>
-                                                <p>Vade: <strong>{item.termMonths ? `${item.termMonths} Ay` : '-'}</strong></p>
-                                            </>
                                         ) : null}
                                     </IonLabel>
-                                    {(isStatement(item) || isManualEntry(item)) && (
+                                    {(isStatement(item) || isManualEntry(item)) && !item.isPaid && (
                                         <IonButton
                                             slot="end"
                                             fill="clear"
@@ -126,27 +156,16 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                                             )}
                                         </IonButton>
                                     )}
-                                    {isLoan(item) && item.termMonths && item.firstPaymentDate && (
-                                        <IonButton
-                                            slot="end"
-                                            fill="clear"
-                                            size="small"
-                                            onClick={(e) => { e.stopPropagation(); onAddAllInstallments(item); }}
-                                            disabled={isLoading || isFirstInstallmentAdded || !item.firstPaymentDate || !item.termMonths}
-                                            className="calendar-button"
-                                        >
-                                            {isLoading && loadingMessage === 'Taksitler ekleniyor...' && firstInstallmentAppId && calendarEventStatus[firstInstallmentAppId] === undefined ? (
-                                                <IonSpinner name="crescent" style={{ width: '16px', height: '16px' }} />
-                                            ) : isLoading && loadingMessage === 'Takvim kontrol ediliyor...' && firstInstallmentAppId && calendarEventStatus[firstInstallmentAppId] === undefined ? (
-                                                <IonSpinner name="crescent" style={{ width: '16px', height: '16px' }} />
-                                            ) : (
-                                                <IonIcon slot="icon-only" icon={calendarOutline} color={isFirstInstallmentAdded ? 'medium' : 'success'} />
-                                            )}
-                                        </IonButton>
-                                    )}
                                 </IonItem>
 
                                 <IonItemOptions side="end">
+                                    <IonItemOption
+                                        color={item.isPaid ? "warning" : "success"}
+                                        onClick={() => itemId && onTogglePaidStatus(itemId)}
+                                        disabled={!itemId}
+                                    >
+                                        <IonIcon slot="icon-only" icon={item.isPaid ? arrowUndoCircleOutline : cashOutline}></IonIcon>
+                                    </IonItemOption>
                                     {isManualEntry(item) && (
                                         <IonItemOption
                                             color="danger"

@@ -70,6 +70,7 @@ export const ziraatEmailParser: BankEmailParser = {
             last4Digits: last4Digits, // undefined olabilir
             source: 'email',
             originalMessage: email, // Orijinal mesajı sakla
+            entryType: 'debt',
         };
     }
 }; 

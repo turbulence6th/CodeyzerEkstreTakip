@@ -81,6 +81,7 @@ describe('IsbankEmailParser', () => {
      amount: 2001.44,
      source: 'email', // Source should be 'email'
      last4Digits: '0000', // Extracted from mockPdfText "0000********0000"
+     entryType: 'debt',
    };
 
   // --- Happy Path Test --- //

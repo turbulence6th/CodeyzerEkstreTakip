@@ -1,9 +1,9 @@
-import type { ParsedStatement, ParsedLoan } from '../services/sms-parsing/types';
+import type { ParsedStatement } from '../services/sms-parsing/types';
 import type { ManualEntry } from '../types/manual-entry.types';
 import { formatTargetDate } from './formatting'; // Tarih formatlama fonksiyonunu import edelim
-import { isStatement, isManualEntry, isLoan } from './typeGuards';
+import { isStatement, isManualEntry } from './typeGuards';
 
-type InputItem = ParsedStatement | ParsedLoan | ManualEntry;
+type InputItem = ParsedStatement | ManualEntry;
 
 // Ortak Yardımcı Fonksiyon: Metni normalize eder ve temizler
 function normalizeAndSanitizeText(text: string, spaceReplacement: string = ''): string {
@@ -65,13 +65,9 @@ export function generateAppId(item: InputItem, installmentNumber?: number): stri
         namePart = sanitizeForAppId(item.description);
         date = item.dueDate instanceof Date ? item.dueDate : null;
     } else if (isStatement(item)) {
-        type = 'ekstre';
+        type = 'ekstre'; // Kredi taksitleri de bu yola girecek
         namePart = sanitizeBankName(item.bankName);
         date = item.dueDate instanceof Date ? item.dueDate : null;
-    } else if (isLoan(item)) {
-        type = 'kredi';
-        namePart = sanitizeBankName(item.bankName);
-        date = item.firstPaymentDate instanceof Date ? item.firstPaymentDate : null;
     } else {
         console.warn('generateAppId: Unknown item type after all guards', item);
         return null;
@@ -84,8 +80,6 @@ export function generateAppId(item: InputItem, installmentNumber?: number): stri
 
     const dateString = formatTargetDate(date); // YYYY-MM-DD formatı
 
-    // Kredi taksidi ise taksit numarasını ekleyelim
-    const suffix = installmentNumber !== undefined ? `_taksit_${installmentNumber}` : '';
-
-    return `[AppID: ${type}_${namePart}_${dateString}${suffix}]`;
+    // Krediler artık statement olduğu için, taksit numarası ayıklamaya gerek yok, bankName'de var.
+    return `[AppID: ${type}_${namePart}_${dateString}]`;
 } 

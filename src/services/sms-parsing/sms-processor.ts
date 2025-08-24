@@ -58,7 +58,7 @@ export const availableBankProcessors: BankProcessor[] = [
     gmailQuery: 'from:(ziraat@ileti.ziraatbank.com.tr) subject:("e-ekstre")',
   },
   {
-    bankName: 'Garanti BBVA',
+    bankName: 'Garanti BBVA Bonus',
     smsSenderKeywords: ['GARANTIBBVA', 'GARANTiBBVA', 'BONUS'],
     smsStatementQueryKeyword: 'ekstresinin',
     smsLoanQueryKeyword: 'ihtiyac krediniz',

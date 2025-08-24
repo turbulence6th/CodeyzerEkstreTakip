@@ -25,6 +25,14 @@ export interface ManualEntry {
    */
   source: 'manual';
   /**
+   * Girdinin türünü belirtir (Borç veya Harcama).
+   */
+  entryType: 'debt' | 'expense';
+  /**
+   * Ödendi durumunu belirtir.
+   */
+  isPaid?: boolean;
+  /**
    * Takvime eklenip eklenmediğini takip etmek için (opsiyonel).
    * Bu state `AccountTab` içinde yönetilebilir, tipte olması şart değil.
    */

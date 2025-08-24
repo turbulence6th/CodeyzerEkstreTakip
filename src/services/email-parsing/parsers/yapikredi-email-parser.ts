@@ -50,11 +50,12 @@ export const yapikrediEmailParser: BankEmailParser = {
         // Tarih bulunduğundan ve tutar zaten beklenmediğinden, bilgileri döndür.
         return {
             bankName: this.bankName,
-            dueDate: dueDate,
-            amount: amount, // Tutar bu formatta bulunmadığı için her zaman null olacak
-            last4Digits: last4Digits, // Bulunduysa eklenir, bulunmadıysa undefined olur
+            dueDate,
+            amount: null,
+            last4Digits,
             source: 'email',
             originalMessage: email,
+            entryType: 'debt',
         };
     }
 }; 

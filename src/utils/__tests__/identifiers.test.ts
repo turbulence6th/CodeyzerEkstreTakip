@@ -7,43 +7,31 @@ const mockSms: SmsDetails = { sender: 'test', body: 'test body', date: Date.now(
 
 describe('generateAppId Utility Function', () => {
 
-    it('should generate correct AppID for ParsedStatement', () => {
+    it('should generate a correct AppID for a statement', () => {
         const statement: ParsedStatement = {
-            bankName: 'Yapı Kredi', // Test Turkish chars and space
-            dueDate: new Date(2024, 6, 15), // July 15, 2024 (month is 0-indexed)
-            amount: 1234.56,
-            last4Digits: '9876',
-            originalMessage: mockSms,
-            source: 'sms'
+            bankName: 'Yapı Kredi',
+            dueDate: new Date('2024-07-15T12:00:00Z'),
+            amount: 1500.75,
+            last4Digits: '1234',
+            originalMessage: { sender: 'YAPIKREDI', body: 'Test', date: Date.now() },
+            source: 'sms',
+            entryType: 'debt',
         };
-        const expectedAppId = '[AppID: ekstre_yapi_kredi_2024-07-15]';
-        expect(generateAppId(statement)).toEqual(expectedAppId);
+        const appId = generateAppId(statement);
+        expect(appId).toBe('[AppID: ekstre_yapi_kredi_2024-07-15]');
     });
 
-    it('should generate correct AppID for ParsedLoan (without installment)', () => {
-        const loan: ParsedLoan = {
-            bankName: 'Garanti BBVA',
-            loanAmount: 15000,
-            installmentAmount: 1500.50,
-            termMonths: 12,
-            firstPaymentDate: new Date(2024, 7, 1), // August 1, 2024
-            originalMessage: mockSms,
-            source: 'sms'
-        };
-        const expectedAppId = '[AppID: kredi_garanti_bbva_2024-08-01]';
-        expect(generateAppId(loan)).toEqual(expectedAppId);
-    });
-
-    it('should generate correct AppID for ManualEntry', () => {
+    it('should generate a correct AppID for a manual entry', () => {
         const manualEntry: ManualEntry = {
             id: 'manual-123',
-            description: 'İş Bankası Ekstre Ödemesi!', // Test Turkish chars, space, punctuation
-            amount: 999.99,
-            dueDate: new Date(2024, 11, 25), // December 25, 2024
-            source: 'manual'
+            description: 'Kira Ödemesi',
+            amount: 2500,
+            dueDate: new Date('2024-07-20T12:00:00Z'),
+            source: 'manual',
+            entryType: 'expense',
         };
-        const expectedAppId = '[AppID: manuel_isbankasiekstreodemesi_2024-12-25]';
-        expect(generateAppId(manualEntry)).toEqual(expectedAppId);
+        const appId = generateAppId(manualEntry);
+        expect(appId).toBe('[AppID: manuel_kiraodemesi_2024-07-20]');
     });
 
 }); 

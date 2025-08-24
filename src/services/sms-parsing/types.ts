@@ -14,6 +14,8 @@ export interface ParsedStatement {
   last4Digits?: string; // Kartın son 4 hanesi (varsa)
   originalMessage: SmsDetails | EmailDetails; // Hem SMS hem E-posta detaylarını kabul etsin
   source: 'sms' | 'email'; // Kaynağı belirtmek için alan ekleyelim
+  isPaid?: boolean; // Ödendi durumu
+  entryType: 'debt'; // Otomatik kayıtlar her zaman borçtur
 }
 
 // Ayrıştırılmış kredi onay bilgilerini tutacak yapı
@@ -26,6 +28,8 @@ export interface ParsedLoan {
   accountNumber?: string; // Vadesiz hesap numarası (varsa)
   originalMessage: SmsDetails | EmailDetails; // Şimdilik kredi için de birleştirelim
   source: 'sms' | 'email'; // Kaynak
+  isPaid?: boolean; // Ödendi durumu
+  entryType: 'debt'; // Otomatik kayıtlar her zaman borçtur
 }
 
 // Tüm banka parser'larının uygulaması gereken interface

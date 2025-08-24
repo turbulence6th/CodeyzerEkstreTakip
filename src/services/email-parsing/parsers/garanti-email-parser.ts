@@ -2,7 +2,7 @@ import type { BankEmailParser, EmailDetails, ParsedStatement, DecodedEmailBody }
 import { parseDottedDate, parseTurkishNumber } from '../../../utils/parsing';
 
 export const garantiEmailParser: BankEmailParser = {
-    bankName: 'Garanti BBVA',
+    bankName: 'Garanti BBVA Bonus',
 
     canParse(sender: string, subject: string, body: DecodedEmailBody): boolean {
         return sender.toLowerCase().includes('garantibbva@garantibbva.com.tr') &&
@@ -51,11 +51,12 @@ export const garantiEmailParser: BankEmailParser = {
 
         return {
             bankName: this.bankName,
-            dueDate: dueDate,
-            amount: amount,
-            last4Digits: last4Digits,
+            dueDate,
+            amount,
+            last4Digits,
             source: 'email',
             originalMessage: email,
+            entryType: 'debt',
         };
     }
 }; 

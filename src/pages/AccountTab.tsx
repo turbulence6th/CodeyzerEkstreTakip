@@ -1,6 +1,6 @@
 import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonList, IonItem, IonLabel, IonSpinner, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonIcon, IonNote, useIonToast, IonModal, IonButtons, IonFooter, IonItemSliding, IonItemOptions, IonItemOption, IonRefresher, IonRefresherContent, RefresherEventDetail, IonAlert } from '@ionic/react';
 import './AccountTab.css';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { GoogleAuth } from '@plugins/google-auth';
 import type { GoogleUser } from '@plugins/google-auth'; 
 
@@ -23,6 +23,7 @@ import {
   fetchAndProcessDataThunk,
   deleteManualEntry,
   selectAllDataWithDates,
+  togglePaidStatus, // togglePaidStatus import edildi
 } from '../store/slices/dataSlice';
 import { startGlobalLoading, stopGlobalLoading } from '../store/slices/loadingSlice';
 import { checkSmsPermissionThunk } from '../store/slices/permissionSlice';
@@ -37,22 +38,12 @@ import DisplayItemList from '../components/DisplayItemList'; // Yeni liste bile�
 // Utils importları
 import { formatDate, formatCurrency, formatTargetDate } from '../utils/formatting';
 import { generateAppId } from '../utils/identifiers';
-import { isStatement, isManualEntry, isLoan } from '../utils/typeGuards';
+import { isStatement, isManualEntry } from '../utils/typeGuards';
 
-type DisplayItem = ParsedStatement | ParsedLoan | ManualEntry;
+type DisplayItem = ParsedStatement | ManualEntry;
 
-// Helper function to add months safely
-function addMonths(date: Date, months: number): Date {
-    const d = new Date(date);
-    const expectedMonth = (d.getMonth() + months) % 12;
-    d.setMonth(d.getMonth() + months);
-    // If the month didn't change as expected (e.g., adding 1 month to Jan 31 resulted in Mar 2/3),
-    // set the date to the last day of the *previous* month.
-    if (d.getMonth() !== expectedMonth) {
-        d.setDate(0); // Sets the date to the last day of the previous month
-    }
-    return d;
-}
+// Helper function to add months safely - BU FONKSİYON ARTIK formatting.ts İÇİNDE
+// function addMonths...
 
 const AccountTab: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -68,6 +59,31 @@ const AccountTab: React.FC = () => {
   const dataError = useSelector((state: RootState) => state.data.error);
   const lastUpdated = useSelector((state: RootState) => state.data.lastUpdated);
   const isLoading = useSelector((state: RootState) => state.loading.isActive);
+
+  // Filtreleme mantığı artık dataSlice'ta olduğu için bu useMemo kaldırıldı.
+  /*
+  const filteredItems = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Bugünün başlangıcı
+
+    const tenDaysFromNow = new Date();
+    tenDaysFromNow.setDate(tenDaysFromNow.getDate() + 10);
+    tenDaysFromNow.setHours(23, 59, 59, 999); // 10. günün sonu
+
+    return displayItems.filter(item => {
+        // Kredi taksidi olup olmadığını kontrol et
+        const isLoanInstallment = isStatement(item) && item.bankName.includes('Kredi Taksidi');
+        
+        if (isLoanInstallment) {
+            // Kredi taksitleri için, sadece bugünden itibaren 10 gün içinde vadesi gelenleri göster
+            return item.dueDate && item.dueDate >= today && item.dueDate <= tenDaysFromNow;
+        }
+        
+        // Diğer tüm kalemleri her zaman göster
+        return true;
+    });
+  }, [displayItems]);
+  */
 
   const combinedError = authError || permissionError || dataError;
 
@@ -106,7 +122,7 @@ const AccountTab: React.FC = () => {
 
   useEffect(() => {
     const checkCalendarEvents = async () => {
-      if (!userInfo || displayItems.length === 0) {
+      if (!userInfo || displayItems.length === 0) { // Artık doğrudan displayItems kullanılabilir
         setCalendarEventStatus({});
         return;
       }
@@ -114,9 +130,13 @@ const AccountTab: React.FC = () => {
       dispatch(startGlobalLoading('Takvim kontrol ediliyor...'));
       const newStatus: Record<string, boolean> = {};
 
-      // Orijinal for...of döngüsü
-      for (const item of displayItems) {
-          const appIdToCheck = isLoan(item) ? generateAppId(item, 1) : generateAppId(item);
+      // Orijinal for...of döngüsü (artık displayItems üzerinde)
+      for (const item of displayItems) { 
+          // Ödenmişse takvim kontrolü yapma
+          if (item.isPaid) {
+              continue;
+          }
+          const appIdToCheck = generateAppId(item);
           if (!appIdToCheck) {
             console.warn('Could not generate AppID for calendar check:', item);
             continue;
@@ -137,8 +157,7 @@ const AccountTab: React.FC = () => {
     };
 
     checkCalendarEvents();
-    // dispatch bağımlılığı tekrar kaldırıldı (önceki gibi)
-  }, [displayItems, userInfo, dispatch]);
+  }, [displayItems, userInfo, dispatch]); // Bağımlılık displayItems olarak geri değiştirildi
 
   // YENİ useEffect: İzin durumunu otomatik kontrol et
   useEffect(() => {
@@ -237,6 +256,8 @@ Tutar: ${formatCurrency(item.amount)}`;
     }
   };
 
+  // BU FONKSİYON ARTIK KULLANILMAYACAK
+  /*
   const handleAddAllInstallments = async (loan: ParsedLoan) => {
     if (!loan.firstPaymentDate || !loan.termMonths || !loan.installmentAmount) {
         dispatch(addToast({ message: 'Taksitleri eklemek için ilk ödeme tarihi, vade ve taksit tutarı bilgisi gerekli.', duration: 3000, color: 'warning', }));
@@ -328,6 +349,7 @@ Kaynak: ${loan.source.toUpperCase()}`;
         }));
     }
   };
+  */
 
   const handleItemClick = (item: DisplayItem) => {
       let title = "Detay";
@@ -345,15 +367,6 @@ Kaynak: ${loan.source.toUpperCase()}`;
               const email = item.originalMessage as EmailDetails;
               content = `Gönderen: ${email.sender}\nKonu: ${email.subject}\nZaman: ${new Date(email.date).toLocaleString('tr-TR')}\n\n--- İçerik ---\n${email.plainBody || 'Düz metin içerik yok.'}`;
           }
-      } else if (!isStatement(item) && !isManualEntry(item)) {
-           const loan = item as ParsedLoan;
-           title = `${loan.bankName || 'Kredi'} Detayı`;
-           if (loan.originalMessage && loan.source === 'sms') {
-                const sms = loan.originalMessage as SmsDetails;
-                content = `Gönderen: ${sms.sender}\nZaman: ${new Date(sms.date).toLocaleString('tr-TR')}\n\n${sms.body}`;
-           } else {
-               content = `Banka: ${loan.bankName || 'Bilinmiyor'}\nİlk Ödeme: ${formatDate(loan.firstPaymentDate)}\nTaksit Tutarı: ${formatCurrency(loan.installmentAmount)}\nVade: ${loan.termMonths || '-'} Ay\n\nOrijinal mesaj içeriği bulunamadı veya desteklenmiyor.`;
-           }
       } else {
           content = 'Detaylar görüntülenemiyor.';
       }
@@ -374,6 +387,10 @@ Kaynak: ${loan.source.toUpperCase()}`;
     } finally {
         dispatch(stopGlobalLoading());
     }
+  };
+
+  const handleTogglePaidStatus = (id: string) => {
+      dispatch(togglePaidStatus(id));
   };
 
   return (
@@ -426,8 +443,9 @@ Kaynak: ${loan.source.toUpperCase()}`;
                 calendarEventStatus={calendarEventStatus}
                 onItemClick={handleItemClick}
                 onAddToCalendar={handleAddToCalendar}
-                onAddAllInstallments={handleAddAllInstallments}
+                // onAddAllInstallments prop'u kaldırıldı
                 onDeleteManualEntry={handleDeleteManualEntry}
+                onTogglePaidStatus={handleTogglePaidStatus} 
              />
           </div>
         )}

@@ -52,7 +52,8 @@ export const garantiLoanParser = {
                     firstPaymentDate, // null olacak
                     accountNumber, // undefined olacak
                     originalMessage: message,
-                    source: 'sms'
+                    source: 'sms',
+                    entryType: 'debt',
                 };
             } else {
                  // Ayrıştırma başarısız logu
@@ -116,7 +117,8 @@ export class GarantiParser implements BankSmsParser {
                     amount,
                     dueDate,
                     originalMessage: message,
-                    source: 'sms'
+                    source: 'sms',
+                    entryType: 'debt',
                 };
             } else {
                 console.warn(`[${this.bankName}] Could not parse required fields (amount, dueDate, last4Digits) from SMS: ${message.body}`);

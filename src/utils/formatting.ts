@@ -66,4 +66,23 @@ export const formatTargetDate = (date: Date): string => {
         console.error("Error formatting target date:", date, e);
         return 'format-error';
     }
+};
+
+/**
+ * Verilen tarihe belirtilen ay kadar ekler ve tarih taşmalarını (örn. 31 Ocak + 1 Ay) doğru yönetir.
+ */
+export const addMonths = (date: Date, months: number): Date => {
+    const d = new Date(date);
+    // Beklenen ay, taşma durumunu kontrol etmek için. JavaScript'te aylar 0-11 arasıdır.
+    // Örneğin, 11 (Aralık) + 2 ay = 13. 13 % 12 = 1 (Şubat).
+    const expectedMonth = (d.getMonth() + months) % 12;
+    d.setMonth(d.getMonth() + months);
+    
+    // Eğer setMonth sonrası ay, beklenen aydan farklıysa, bu, ayın son gününden taşma olduğunu gösterir.
+    // Örn: 31 Ocak'a 1 ay eklenince 31 Şubat (yok) yerine 2 Mart'a atlar. Bu durumda ay 2, beklenen 1 olur.
+    // Bu durumda, tarihi bir önceki ayın son gününe (yani beklenen ayın son gününe) ayarlarız.
+    if (d.getMonth() !== expectedMonth) {
+        d.setDate(0); // setDate(0), bir önceki ayın son gününü verir.
+    }
+    return d;
 }; 

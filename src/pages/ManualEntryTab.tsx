@@ -13,7 +13,9 @@ import {
     IonCardContent,
     IonDatetimeButton, // Datetime butonu için
     IonModal, // Datetime modalı için
-    IonNote
+    IonNote,
+    IonSelect,
+    IonSelectOption
 } from '@ionic/react';
 import { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
@@ -34,6 +36,7 @@ const ManualEntryTab: React.FC = () => {
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState<string>(''); // String olarak alıp sonra sayıya çevireceğiz
     const [dueDate, setDueDate] = useState<string | undefined>(new Date().toISOString()); // ISO 8601 formatında string
+    const [entryType, setEntryType] = useState<'debt' | 'expense'>('debt'); // Yeni state
     const [formattedDueDate, setFormattedDueDate] = useState<string>(''); // Gösterilecek formatlanmış tarih
 
     // dueDate değiştiğinde formatlanmış tarihi güncelle
@@ -80,7 +83,8 @@ const ManualEntryTab: React.FC = () => {
             description: description,
             amount: parsedAmount,
             dueDate: dueDateObj,
-            source: 'manual'
+            source: 'manual',
+            entryType: entryType, // Seçilen türü ekle
         };
 
         // Mesaj eklendi
@@ -124,6 +128,18 @@ const ManualEntryTab: React.FC = () => {
                 </IonHeader>
 
                 <IonList>
+                    <IonItem>
+                        <IonLabel>Kayıt Türü</IonLabel>
+                        <IonSelect 
+                            value={entryType} 
+                            onIonChange={e => setEntryType(e.detail.value)}
+                            interface="popover"
+                        >
+                            <IonSelectOption value="debt">Borç</IonSelectOption>
+                            <IonSelectOption value="expense">Harcama</IonSelectOption>
+                        </IonSelect>
+                    </IonItem>
+
                     <IonItem>
                         <IonInput
                             label="Açıklama / Banka Adı"

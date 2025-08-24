@@ -63,11 +63,12 @@ export const kuveytturkEmailParser: BankEmailParser = {
 
         return {
             bankName: this.bankName,
-            dueDate: dueDate, // Artık null olamaz
-            amount: amount, // null olabilir
-            last4Digits: last4Digits, // undefined olabilir
+            dueDate,
+            amount,
+            last4Digits,
             source: 'email',
-            originalMessage: email, // Orijinal mesajı sakla
+            originalMessage: email,
+            entryType: 'debt',
         };
     }
 }; 
