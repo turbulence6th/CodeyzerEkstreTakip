@@ -60,31 +60,6 @@ const AccountTab: React.FC = () => {
   const lastUpdated = useSelector((state: RootState) => state.data.lastUpdated);
   const isLoading = useSelector((state: RootState) => state.loading.isActive);
 
-  // Filtreleme mantığı artık dataSlice'ta olduğu için bu useMemo kaldırıldı.
-  /*
-  const filteredItems = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Bugünün başlangıcı
-
-    const tenDaysFromNow = new Date();
-    tenDaysFromNow.setDate(tenDaysFromNow.getDate() + 10);
-    tenDaysFromNow.setHours(23, 59, 59, 999); // 10. günün sonu
-
-    return displayItems.filter(item => {
-        // Kredi taksidi olup olmadığını kontrol et
-        const isLoanInstallment = isStatement(item) && item.bankName.includes('Kredi Taksidi');
-        
-        if (isLoanInstallment) {
-            // Kredi taksitleri için, sadece bugünden itibaren 10 gün içinde vadesi gelenleri göster
-            return item.dueDate && item.dueDate >= today && item.dueDate <= tenDaysFromNow;
-        }
-        
-        // Diğer tüm kalemleri her zaman göster
-        return true;
-    });
-  }, [displayItems]);
-  */
-
   const combinedError = authError || permissionError || dataError;
 
   // fetchAndProcessData fonksiyonunu useCallback ile sarmala (useEffect bağımlılıkları için)
