@@ -287,6 +287,47 @@ export const selectAllDataWithDates = createSelector(
   }
 );
 
+// Toplam borcu hesaplayan yeni memoized selector
+export const selectTotalDebt = createSelector(
+  [selectAllData],
+  (items): number => {
+    // Yarının başlangıcını hesapla
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
+    return items.reduce((total, item) => {
+      let dueDate: Date | null = null;
+      try {
+        if (isSerializableStatement(item) || isSerializableManualEntry(item)) {
+          if (item.dueDate) dueDate = new Date(item.dueDate);
+        } else if (isSerializableLoan(item)) {
+          if (item.firstPaymentDate) dueDate = new Date(item.firstPaymentDate);
+        }
+      } catch (e) {
+        console.error("Geçersiz tarih formatı, borç hesaplamasında atlanıyor:", item, e);
+        dueDate = null;
+      }
+
+      // Eğer son ödeme tarihi yarından itibaren ise borcu toplama ekle
+      if (dueDate && dueDate >= tomorrow) {
+        let currentAmount = 0;
+        if (isSerializableStatement(item)) {
+          currentAmount = item.amount ?? 0;
+        } else if (isSerializableManualEntry(item)) {
+          currentAmount = item.amount;
+        } else if (isSerializableLoan(item)) {
+          currentAmount = item.loanAmount;
+        }
+        return total + currentAmount;
+      }
+
+      return total;
+    }, 0);
+  }
+);
+
+
 // Yeni action'ı export et
 export const { clearData, addManualEntry, deleteManualEntry } = dataSlice.actions;
 export default dataSlice.reducer;

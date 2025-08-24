@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Redirect, Route } from 'react-router-dom';
 import {
   IonApp,
@@ -18,6 +18,10 @@ import ManualEntryTab from './pages/ManualEntryTab';
 import SettingsTab from './pages/SettingsTab';
 import LoginPage from './pages/LoginPage';
 import ToastManager from './components/ToastManager';
+import { App as CapacitorApp, URLOpenListenerEvent } from '@capacitor/app';
+import type { PluginListenerHandle } from '@capacitor/core';
+import { AppLauncher } from '@capacitor/app-launcher';
+
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -50,8 +54,9 @@ import '@ionic/react/css/palettes/dark.system.css';
 import './theme/variables.css';
 
 // Redux
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from './store';
+import { selectTotalDebt } from './store/slices/dataSlice';
 
 setupIonicReact();
 
@@ -59,6 +64,51 @@ const App: React.FC = () => {
   // Global state'leri al
   const { isActive: isGlobalLoading, message: loadingMessage } = useSelector((state: RootState) => state.loading);
   const isAuthenticated = useSelector((state: RootState) => !!state.auth.idToken);
+  const totalDebt = useSelector(selectTotalDebt);
+  const totalDebtRef = useRef(totalDebt);
+  
+  useEffect(() => {
+    totalDebtRef.current = totalDebt;
+  }, [totalDebt]);
+
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    // Sadece kimlik doğrulanmışsa dinleyiciyi kur
+    if (!isAuthenticated) return;
+
+    let listenerHandle: PluginListenerHandle | null = null;
+
+    const registerListener = async () => {
+        listenerHandle = await CapacitorApp.addListener('appUrlOpen', (event: URLOpenListenerEvent) => {
+            const url = new URL(event.url);
+            if (url.hostname === 'borcu-getir' && url.protocol === 'codeyzer-ekstre-takip:') {
+                console.log('Borç getirme isteği alındı!', event.url);
+
+                // Her zaman en güncel borç bilgisini kullanmak için ref'i oku
+                const currentTotalDebt = totalDebtRef.current;
+                const responseUrl = `codeyzer-portfoy://borc-geldi?tutar=${currentTotalDebt}`;
+                
+                console.log(`Hesaplanan toplam borç: ${currentTotalDebt}. Portföy uygulamasına yönlendiriliyor: ${responseUrl}`);
+
+                // Başka bir uygulamayı URL şeması ile açmak için AppLauncher kullanılır.
+                AppLauncher.openUrl({ url: responseUrl }).catch((err: any) => {
+                    console.error('Portföy uygulaması açılamadı', err);
+                    // TODO: Kullanıcıya Portföy uygulamasının yüklü olmadığına dair bir bildirim gösterilebilir.
+                });
+            }
+        });
+    };
+
+    registerListener();
+
+    return () => {
+      if (listenerHandle) {
+        listenerHandle.remove();
+      }
+    };
+  }, [isAuthenticated]);
+
 
   return (
   <IonApp>
