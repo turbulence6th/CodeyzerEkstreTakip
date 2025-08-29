@@ -92,8 +92,14 @@ export class SmsReaderWeb extends WebPlugin implements SmsReaderPlugin {
       {
         id: 'mock_garanti_ekstre_1',
         address: 'BONUS',
-        body: 'Degerli musterimiz, 0000 ile biten kartinizin 2,120.76 TL ekstresinin minimum tutarini odeyip, kalan kismini aylik %3.50 faizle (vergiler haric) 1 ay ertelemek icin 01.05.2025 tarihine kadar ATLAT yazip kartinizin son 6 hanesini 3340\'a gonderin. SMS almamak icin IPT yazip 3342\'ye ucretsiz gonderin. Mersis:0879001756600379 B001',
+        body: 'Degerli musterimiz, 0000 ile biten kartinizin 2,120.77 TL ekstresinin minimum tutarini odeyip, kalan kismini aylik %3.50 faizle (vergiler haric) 1 ay ertelemek icin 01.05.2025 tarihine kadar ATLAT yazip kartinizin son 6 hanesini 3340\'a gonderin. SMS almamak icin IPT yazip 3342\'ye ucretsiz gonderin. Mersis:0879001756600379 B001',
         date: Date.now() - 8 * 24 * 60 * 60 * 1000,
+      },
+      {
+        id: 'mock_garanti_ekstre_2',
+        address: 'BONUS',
+        body: 'Degerli musterimiz, 0001 ile biten kartinizin 2,120.76 TL ekstresinin minimum tutarini odeyip, kalan kismini aylik %3.50 faizle (vergiler haric) 1 ay ertelemek icin 02.05.2025 tarihine kadar ATLAT yazip kartinizin son 6 hanesini 3340\'a gonderin. SMS almamak icin IPT yazip 3342\'ye ucretsiz gonderin. Mersis:0879001756600379 B001',
+        date: Date.now() - (8 * 24 * 60 * 60 * 1000) + 1000,
       },
     ];
 

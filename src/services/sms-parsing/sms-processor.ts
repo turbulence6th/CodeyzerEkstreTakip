@@ -158,7 +158,7 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
                             const statement = processor.smsParser.parse(message);
                             if (statement) {
                                 parsedStatements.push({ ...statement, source: 'sms' });
-                                break; // Bu banka için en yeniyi bulduk, sonraki mesajlara bakma
+                                // break; // Bu banka için en yeniyi bulduk, sonraki mesajlara bakma
                             }
                          } else {
                             // console.log(` -> Message from ${message.sender} did not pass canParse for ${processor.bankName}`);

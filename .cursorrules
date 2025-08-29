@@ -118,6 +118,7 @@ platform: capacitor
 #            - **API Veri Sorunları:** Gmail API\'den alınan Base64 verisinin **bazen bozuk veya eksik olabileceği** tespit edildi (örn. Base64 padding hatası, PDF trailer hatası). Bu durumlar `try-catch` ile yakalanır, hata loglanır ve ilgili e-posta atlanır (`null` döndürülür). Bozuk veriyi düzeltmek mümkün değildir.
 #    - `sms-processor.ts` içinde `statementProcessor` sınıfı ile tüm veriler merkezi olarak işlenir.
 #        - Aynı banka/kart için hem SMS hem de e-posta ile gelen ekstre bildirimleri arasında sadece en son gelen (mesaj tarihine göre) dikkate alınır, diğeri filtrelenir.
+#        - Kredi SMS/e-postaları `ParsedLoan` tipinde ham veri olarak ayrıştırılır ve daha sonra `dataSlice` içinde işlenmek üzere hazırlanır.
 #    - Banka bazlı yapılandırmalar (`availableBankProcessors`).
 
 # 5. State Yönetimi (Redux):
@@ -126,7 +127,13 @@ platform: capacitor
 #        - **Şifreleme:** `redux-persist-transform-encrypt` kullanılarak `auth`, `permissions` ve `data` slice'ları şifrelenir.
 #            - Anahtar yönetimi: JS'de üretilen anahtar, native `SecureStorage` (Android Keystore destekli) ile şifrelenip Capacitor Preferences'ta saklanır.
 #            - **Android Otomatik Yedekleme:** Veri tutarsızlığı ve ilk açılış sorunlarını önlemek için `AndroidManifest.xml` içinde `android:allowBackup="false"` olarak ayarlandı.
-#    - `dataSlice` manuel kayıtları da tutar (`ManualEntry` tipi, `addManualEntry`, `deleteManualEntry`)
+#    - **`dataSlice`'taki Veri Mantığı:**
+#        - **Kredilerin Taksitlere Bölünmesi:** `fetchAndProcessDataThunk` içinde, `sms-processor`'dan gelen `ParsedLoan` nesneleri işlenir. Her bir kredi, vadesi kadar takside bölünür ve her taksit, arayüzde gösterilmek üzere `ParsedStatement` yapısında bir nesneye dönüştürülür. Orijinal `ParsedLoan` nesnesi state'e kaydedilmez.
+#        - **Dinamik Taksit Filtreleme:** State'e sadece vadesi **bugün ile önümüzdeki 10 gün arasında** olan kredi taksitleri eklenir. Vadesi geçmiş veya daha ilerideki taksitler en baştan atlanır.
+#        - **"Ödendi" Durumu Yönetimi:** Tüm kalemler (`ParsedStatement`, `ManualEntry`) `isPaid?: boolean` alanı içerir. `togglePaidStatus` eylemi ile bir kalemin ödenme durumu değiştirilebilir. Bu durum, veri yenilemeleri arasında korunur. Ödenen kalemler toplam borçtan düşülür ve takvime eklenemez.
+#        - **"Borç" ve "Harcama" Ayrımı:** Tüm kalemler, `entryType: 'debt' | 'expense'` alanı içerir. Otomatik ayrıştırılan tüm kalemler `'debt'` (Borç) olarak işaretlenir. Manuel girişlerde kullanıcı bu türü "Harcama" (`expense`) olarak değiştirebilir.
+#        - **Toplam Borç Hesaplaması:** `selectTotalDebt` seçicisi, sadece `isPaid` durumu `false` olan ve `entryType`'ı `'debt'` olan kalemlerin tutarlarını toplayarak toplam borcu hesaplar.
+#        - `dataSlice` manuel kayıtları da tutar (`ManualEntry` tipi, `addManualEntry`, `deleteManualEntry`)
 
 # --- Yapılacaklar (To-Do) ---
 
