@@ -30,19 +30,30 @@ export const garantiEmailParser: BankEmailParser = {
         }
 
         // --- Son Ödeme Tarihi ---
-        // <strong>Son Ödeme Tarihi:</strong><br>02.06.2025
-        const dateMatch = content.match(/Son Ödeme Tarihi:<\/strong><br>(\d{2}\.\d{2}\.\d{4})/i);
+        // New format: <td>Son Ödeme Tarihi:</td><td align="right">21.10.2025</td>
+        let dateMatch = content.match(/>Son Ödeme Tarihi:<\/td>\s*<td[^>]*>\s*(\d{2}\.\d{2}\.\d{4})/is);
+        // Old format: <strong>Son Ödeme Tarihi:</strong><br>02.06.2025
+        if (!dateMatch) {
+            dateMatch = content.match(/Son Ödeme Tarihi:<strong><br>(\d{2}\.\d{2}\.\d{4})/i);
+        }
+        
         if (dateMatch && dateMatch[1]) {
             dueDate = parseDottedDate(dateMatch[1]);
         }
+
         if (!dueDate) {
             console.error('Garanti Email Parser: Could not parse a valid due date. Returning null.');
             return null;
         }
 
         // --- Toplam Borç Tutarı ---
-        // <strong>Toplam Borç Tutarı:</strong><br>+2.505,24 TL
-        const amountMatch = content.match(/Toplam Borç Tutarı:<\/strong><br>[+]?([\d.,]+) TL/i);
+        // New format: <td>Toplam Borç Tutarı:</td><td align="right">+616,80 TL</td>
+        let amountMatch = content.match(/>Toplam Borç Tutarı:<\/td>\s*<td[^>]*>\s*[+]?([\d.,]+)\s*TL/is);
+        // Old format: <strong>Toplam Borç Tutarı:</strong><br>+2.505,24 TL
+        if (!amountMatch) {
+            amountMatch = content.match(/Toplam Borç Tutarı:<strong><br>[+]?([\d.,]+) TL/i);
+        }
+
         if (amountMatch && amountMatch[1]) {
             amount = parseTurkishNumber(amountMatch[1]);
         } else {

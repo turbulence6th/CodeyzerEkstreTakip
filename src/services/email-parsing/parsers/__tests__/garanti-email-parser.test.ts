@@ -27,8 +27,8 @@ describe('Garanti BBVA Email Parser', () => {
         mockEmailDetails = {
             id: 'test-garanti-email-id',
             sender: 'garantibbva@garantibbva.com.tr',
-            subject: 'Bonus Ekstresi (TL) - Mayıs',
-            date: new Date(2025, 4, 24),
+            subject: 'Bonus Ekstresi (TL) - Ekim',
+            date: new Date(2025, 9, 12),
             plainBody: null,
             htmlBody: mockHtmlContent,
             originalResponse: {},
@@ -76,10 +76,10 @@ describe('Garanti BBVA Email Parser', () => {
                 expect(result.dueDate).not.toBeNull();
                 if (result.dueDate) {
                     expect(result.dueDate.getFullYear()).toBe(2025);
-                    expect(result.dueDate.getMonth()).toBe(5); // Haziran (0-index)
-                    expect(result.dueDate.getDate()).toBe(2);
+                    expect(result.dueDate.getMonth()).toBe(9); // Ekim (0-index)
+                    expect(result.dueDate.getDate()).toBe(21);
                 }
-                expect(result.amount).toBe(3704.24);
+                expect(result.amount).toBe(616.80);
             }
         });
 
