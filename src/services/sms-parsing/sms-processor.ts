@@ -174,7 +174,6 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
     }
 
     // --- E-posta İşleme ---
-    const processedEmailBanks = new Set<string>();
     try {
         for (const processor of availableBankProcessors) {
             if (processor.emailParser && processor.gmailQuery) {
@@ -189,10 +188,6 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
                     const messageId = emailInfo?.id;
                     if (!messageId) {
                         console.warn(`SmsProcessor: Found emailInfo without an ID for ${processor.bankName}, skipping.`);
-                        continue;
-                    }
-
-                    if (processedEmailBanks.has(processor.bankName)) {
                         continue;
                     }
 
@@ -249,7 +244,6 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
                                 // console.log(`Attempting to parse newest email (${messageId}) for ${processor.bankName}...`); // Log kaldırıldı
                                 // accessToken eklendi
                                 const statement = await processor.emailParser.parse(emailData /*, accessToken */); // accessToken kaldırıldı
-                                processedEmailBanks.add(processor.bankName); // En yeni işlendi olarak işaretle
                                 if (statement) {
                                     // console.log(`Successfully parsed EMAIL statement for ${statement.bankName}`); // Log kaldırıldı
                                     // source'u kontrol et, parser kendi içinde belirlemeli (örn. 'email-pdf')
