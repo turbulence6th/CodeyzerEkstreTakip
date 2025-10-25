@@ -49,6 +49,7 @@ const AccountTab: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const [presentToast] = useIonToast();
   const [calendarEventStatus, setCalendarEventStatus] = useState<Record<string, boolean>>({});
+  const [loadingItems, setLoadingItems] = useState<Record<string, boolean>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalContent, setModalContent] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState<string>("Detay");
@@ -97,42 +98,68 @@ const AccountTab: React.FC = () => {
 
   useEffect(() => {
     const checkCalendarEvents = async () => {
-      if (!userInfo || displayItems.length === 0) { // Artık doğrudan displayItems kullanılabilir
+      if (!userInfo || displayItems.length === 0) {
         setCalendarEventStatus({});
+        setLoadingItems({});
         return;
       }
 
-      dispatch(startGlobalLoading('Takvim kontrol ediliyor...'));
-      const newStatus: Record<string, boolean> = {};
+      // Sadece henüz kontrol edilmemiş itemleri filtrele
+      const allUnpaidItems = displayItems.filter(item => !item.isPaid);
+      const itemsToCheck = allUnpaidItems.filter(item => {
+        const appId = generateAppId(item);
+        return appId && calendarEventStatus[appId] === undefined;
+      });
 
-      // Orijinal for...of döngüsü (artık displayItems üzerinde)
-      for (const item of displayItems) { 
-          // Ödenmişse takvim kontrolü yapma
-          if (item.isPaid) {
-              continue;
-          }
-          const appIdToCheck = generateAppId(item);
-          if (!appIdToCheck) {
-            console.warn('Could not generate AppID for calendar check:', item);
-            continue;
-          }
-          try {
-            const status = await calendarService.searchEvents(appIdToCheck);
-            newStatus[appIdToCheck] = status;
-          } catch (error: any) {
-            console.error(`Error checking calendar status for AppID: ${appIdToCheck}`, item, error);
-            newStatus[appIdToCheck] = false; // Hata durumunda false ata
-          }
+      // Kontrol edilecek itemler için loading başlat
+      const initialLoadingState: Record<string, boolean> = {};
+      itemsToCheck.forEach(item => {
+        const appId = generateAppId(item);
+        if (appId) {
+          initialLoadingState[appId] = true;
+        }
+      });
+
+      setLoadingItems(initialLoadingState);
+
+      // Eğer kontrol edilecek item yoksa, hemen çık
+      if (itemsToCheck.length === 0) {
+        return;
       }
 
-      console.log("AccountTab Effect: calendar status checked:", newStatus);
-      setCalendarEventStatus(newStatus);
-      // stopGlobalLoading döngüden sonra çağrılıyor
-      dispatch(stopGlobalLoading());
+      // Tüm kontrolleri paralel olarak başlat
+      const checkPromises = itemsToCheck.map(async (item) => {
+        const appIdToCheck = generateAppId(item);
+        if (!appIdToCheck) {
+          console.warn('Could not generate AppID for calendar check:', item);
+          return null;
+        }
+
+        try {
+          const status = await calendarService.searchEvents(appIdToCheck);
+
+          // Her sonuç geldiğinde state'i güncelle
+          setCalendarEventStatus(prev => ({ ...prev, [appIdToCheck]: status }));
+          setLoadingItems(prev => ({ ...prev, [appIdToCheck]: false }));
+
+          return { appId: appIdToCheck, status };
+        } catch (error: any) {
+          console.error(`Error checking calendar status for AppID: ${appIdToCheck}`, item, error);
+
+          setCalendarEventStatus(prev => ({ ...prev, [appIdToCheck]: false }));
+          setLoadingItems(prev => ({ ...prev, [appIdToCheck]: false }));
+
+          return { appId: appIdToCheck, status: false };
+        }
+      });
+
+      // Tüm kontrollerin bitmesini bekle
+      const results = await Promise.all(checkPromises);
+      console.log("AccountTab Effect: calendar status checked:", results.filter(r => r !== null));
     };
 
     checkCalendarEvents();
-  }, [displayItems, userInfo, dispatch]); // Bağımlılık displayItems olarak geri değiştirildi
+  }, [displayItems, userInfo]);
 
   // YENİ useEffect: İzin durumunu otomatik kontrol et
   useEffect(() => {
@@ -171,7 +198,8 @@ const AccountTab: React.FC = () => {
         return;
     }
 
-    dispatch(startGlobalLoading('Takvime ekleniyor...'));
+    // Bu item için loading başlat
+    setLoadingItems(prev => ({ ...prev, [itemKey]: true }));
     try {
       const dueDate = new Date(itemDate);
       dueDate.setHours(10, 0, 0, 0);
@@ -206,7 +234,7 @@ Tutar: ${formatCurrency(item.amount)}`;
       if (calendarEventStatus[itemKey] === true) {
         console.log(`Event ${itemKey} already exists in calendar (checked from state).`);
         dispatch(addToast({ message: 'Bu etkinlik zaten takviminizde mevcut.', duration: 3000, color: 'warning', }));
-        dispatch(stopGlobalLoading());
+        setLoadingItems(prev => ({ ...prev, [itemKey]: false }));
         return;
       }
 
@@ -215,7 +243,7 @@ Tutar: ${formatCurrency(item.amount)}`;
          console.log(`Event ${itemKey} already exists in calendar (checked via API).`);
          setCalendarEventStatus(prevStatus => ({ ...prevStatus, [itemKey]: true }));
         dispatch(addToast({ message: 'Bu etkinlik zaten takviminizde mevcut.', duration: 3000, color: 'warning', }));
-        dispatch(stopGlobalLoading());
+        setLoadingItems(prev => ({ ...prev, [itemKey]: false }));
         return;
       }
 
@@ -227,7 +255,8 @@ Tutar: ${formatCurrency(item.amount)}`;
       console.error('Error adding event to calendar:', error);
       dispatch(addToast({ message: `Takvime eklenirken hata oluştu: ${error.message || 'Bilinmeyen bir hata oluştu.'}`, duration: 3000, color: 'danger', }));
     } finally {
-      dispatch(stopGlobalLoading());
+      // Bu item için loading bitir
+      setLoadingItems(prev => ({ ...prev, [itemKey]: false }));
     }
   };
 
@@ -413,14 +442,15 @@ Kaynak: ${loan.source.toUpperCase()}`;
                      </IonCard>
                   )}
 
-             <DisplayItemList 
+             <DisplayItemList
                 items={displayItems}
                 calendarEventStatus={calendarEventStatus}
+                loadingItems={loadingItems}
                 onItemClick={handleItemClick}
                 onAddToCalendar={handleAddToCalendar}
                 // onAddAllInstallments prop'u kaldırıldı
                 onDeleteManualEntry={handleDeleteManualEntry}
-                onTogglePaidStatus={handleTogglePaidStatus} 
+                onTogglePaidStatus={handleTogglePaidStatus}
              />
           </div>
         )}

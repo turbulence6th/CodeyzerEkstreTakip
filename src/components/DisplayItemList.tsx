@@ -46,26 +46,24 @@ type DisplayItem = ParsedStatement | ManualEntry; // ParsedLoan kaldırıldı
 interface DisplayItemListProps {
     items: DisplayItem[];
     calendarEventStatus: Record<string, boolean>;
+    loadingItems: Record<string, boolean>;
     onItemClick: (item: DisplayItem) => void;
     onAddToCalendar: (item: ParsedStatement | ManualEntry) => void;
     // onAddAllInstallments prop'u kaldırıldı
     onDeleteManualEntry: (id: string) => void;
-    onTogglePaidStatus: (id: string) => void; 
+    onTogglePaidStatus: (id: string) => void;
 }
 
 const DisplayItemList: React.FC<DisplayItemListProps> = ({
     items,
     calendarEventStatus,
+    loadingItems,
     onItemClick,
     onAddToCalendar,
     // onAddAllInstallments prop'u kaldırıldı
     onDeleteManualEntry,
-    onTogglePaidStatus 
+    onTogglePaidStatus
 }) => {
-    // Global loading state'ini al
-    const isLoading = useSelector((state: RootState) => state.loading.isActive);
-    // Global loading mesajını al (spinner'ı hangi işlem için göstereceğimizi bilmek için)
-    const loadingMessage = useSelector((state: RootState) => state.loading.message);
 
     if (items.length === 0) {
         return (
@@ -144,12 +142,10 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                                             fill="clear"
                                             size="small"
                                             onClick={(e) => { e.stopPropagation(); onAddToCalendar(item); }}
-                                            disabled={isLoading || isAdded || !item.dueDate}
+                                            disabled={(appId && loadingItems[appId]) || isAdded || !item.dueDate}
                                             className="calendar-button"
                                         >
-                                            {isLoading && loadingMessage === 'Takvime ekleniyor...' && appId && calendarEventStatus[appId] === undefined ? (
-                                                <IonSpinner name="crescent" style={{ width: '16px', height: '16px' }} />
-                                            ) : isLoading && loadingMessage === 'Takvim kontrol ediliyor...' && appId && calendarEventStatus[appId] === undefined ? (
+                                            {appId && loadingItems[appId] ? (
                                                 <IonSpinner name="crescent" style={{ width: '16px', height: '16px' }} />
                                             ) : (
                                                 <IonIcon slot="icon-only" icon={calendarOutline} color={isAdded ? 'medium' : (isManualEntry(item) ? 'tertiary' : 'primary')} />
