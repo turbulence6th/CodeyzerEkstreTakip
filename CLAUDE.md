@@ -3,7 +3,7 @@
 Bu proje, banka ekstre SMS'lerini ve e-postalarını okuyarak kredi kartı son ödeme tarihlerini ve kredi ilk ödeme tarihlerini listeleyen, React Native/Capacitor ile oluşturulmuş bir Android uygulamasıdır. Önemli ödeme tarihlerini takip etmelerine yardımcı olmak amacıyla Google Takvim ile isteğe bağlı entegrasyon sunar ve finansal takibi otomatikleştirmeyi, manuel veri girişini azaltmayı hedefler.
 
 ## Temel Özellikler:
-*   **Otomatik Veri Ayrıştırma:** Belirli bankalardan gelen SMS'leri (QNB, Garanti BBVA Kredi, Kuveyt Türk) ve e-postaları (Gmail) (Yapı Kredi, Ziraat Bankası, İş Bankası, Kuveyt Türk) işler. Son ödeme tarihlerini, kredi ödeme tarihlerini ve diğer ilgili finansal bilgileri çıkarır. SMS'ler için dinamik, büyük/küçük harfe duyarlı (GLOB) native filtreleme kullanılır. E-posta ekleri (örn. PDF) ayrıştırılabilir.
+*   **Otomatik Veri Ayrıştırma:** Belirli bankalardan gelen SMS'leri (QNB, Garanti BBVA Kredi, Kuveyt Türk) ve e-postaları (Gmail) (Yapı Kredi, Ziraat Bankası, İş Bankası, Garanti BBVA Bonus, Kuveyt Türk, Akbank) işler. Son ödeme tarihlerini, kredi ödeme tarihlerini ve diğer ilgili finansal bilgileri çıkarır. SMS'ler için dinamik, büyük/küçük harfe duyarlı (GLOB) native filtreleme kullanılır. E-posta ekleri (örn. PDF) ayrıştırılabilir. **Son 2 ay içindeki mesajları** otomatik olarak tarar (performans ve veri yönetimi için).
 *   **Manuel Giriş:** Otomatik olarak algılanmayan ödeme kayıtlarını manuel olarak eklemeye olanak tanır.
 *   **Birleşik Liste Görünümü:** Ayrıştırılan ve manuel olarak girilen tüm kayıtları tek, düzenli bir listede görüntüler.
 *   **Google Entegrasyonu:** Güvenli Google oturum açma (OAuth 2.0) ve ödeme etkinliklerini eklemek için Google Takvim API ile entegrasyon. Gmail API aracılığıyla e-posta ekleri alınabilir ve işlenebilir. Takvim etkinlikleri için benzersiz bir AppID sistemi kullanılır.
@@ -100,7 +100,8 @@ Bu proje, banka ekstre SMS'lerini ve e-postalarını okuyarak kredi kartı son �
 *   **Çerçeveler:** React, Ionic Framework, Capacitor
 *   **Durum Yönetimi:** Kalıcı durum için Redux Persist ile Redux Toolkit. Slice'lar `src/store/slices` altında düzenlenmiştir. `auth`, `permissions`, `data` slice'ları `redux-persist-transform-encrypt` ile şifrelenir. Şifreleme anahtarı native `SecureStorage` ile yönetilir. `AndroidManifest.xml` içinde `android:allowBackup="false"` ayarı yapılmıştır.
 *   **Kod Yapısı:** Özelliğe ve sorumluluğa göre modülerleştirilmiştir (bileşenler, sayfalar, servisler, store, yardımcılar).
-*   **Ayrıştırma Mantığı:** Bankaya özel SMS ve e-posta ayrıştırıcıları `src/services/sms-parsing/parsers/` ve `src/services/email-parsing/parsers/` altında bulunur. HTML içeriği için regex tabanlı ayrıştırıcılar ve PDF ekleri için `pdfbox-android` kütüphanesini kullanan native PDF ayrıştırıcı eklentisi (`PdfParserPlugin.java`) mevcuttur.
+*   **Ayrıştırma Mantığı:** Bankaya özel SMS ve e-posta ayrıştırıcıları `src/services/sms-parsing/parsers/` ve `src/services/email-parsing/parsers/` altında bulunur. HTML içeriği için regex tabanlı ayrıştırıcılar ve PDF ekleri için `pdfbox-android` kütüphanesini kullanan native PDF ayrıştırıcı eklentisi (`PdfParserPlugin.java`) mevcuttur. Bazı bankalar farklı kart türleri için farklı e-posta formatları kullanabilir (örn: Garanti BBVA Bonus - Mastercard ve Troy formatları).
+*   **Tarih Filtresi:** `sms-processor.ts` içinde SMS ve e-posta taramaları otomatik olarak son 2 aylık mesajlarla sınırlandırılmıştır (performans optimizasyonu).
 *   **Özel Eklentiler:** SMS okuma, Google kimlik doğrulaması ve PDF ayrıştırma gibi yerel işlevler için özel Capacitor eklentileri kullanılır.
 *   **Test:** Vitest, özellikle ayrıştırma mantığı için birim testlerinde kullanılır. Yeni ayrıştırıcılar birim testleri içermelidir.
 *   **Stil:** Tema ve stiller `src/theme/` altında yönetilir.
@@ -111,6 +112,8 @@ Bu proje, banka ekstre SMS'lerini ve e-postalarını okuyarak kredi kartı son �
 2.  **İşlemciye Ekleme:** Yeni ayrıştırıcıyı `src/services/sms-parsing/sms-processor.ts` dosyasına içe aktarın ve gönderici anahtar kelimelerini, Gmail sorgularını ve ayrıştırıcı örneğini belirterek `availableBankProcessors` dizisine yeni bir banka yapılandırma nesnesi ekleyin.
 3.  **(İsteğe Bağlı) Sahte Veri Ekleme:** Web üzerinde test etmek için ilgili sahte dosyaya (örn: `src/web/*`) örnek mesajlar ekleyin.
 4.  **Test Yazma:** Yeni ayrıştırıcı için `__tests__` dizini altında Vitest ile birim testleri oluşturun.
+    *   **Not:** Test mock'larında tarih kullanırken, dinamik tarihler kullanın (son 2 ay filtresi aktif olduğundan). Statik tarihler yerine `new Date()` ile hesaplanan dinamik tarihler testlerin her zaman geçmesini sağlar.
+5.  **Çoklu Format Desteği:** Eğer banka farklı kart türleri için farklı HTML formatları kullanıyorsa (örn: Mastercard vs Troy), parser'da her iki formatı da destekleyen regex pattern'leri yazın ve her format için ayrı mock dosyası ve test case'i oluşturun.
 
 # Gelecek Geliştirmeler
 

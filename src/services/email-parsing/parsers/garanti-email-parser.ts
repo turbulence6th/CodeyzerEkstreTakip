@@ -30,11 +30,11 @@ export const garantiEmailParser: BankEmailParser = {
         }
 
         // --- Son Ödeme Tarihi ---
-        // New format: <td>Son Ödeme Tarihi:</td><td align="right">21.10.2025</td>
+        // Troy format: <td>Son Ödeme Tarihi:</td><td align="right">21.10.2025</td>
         let dateMatch = content.match(/>Son Ödeme Tarihi:<\/td>\s*<td[^>]*>\s*(\d{2}\.\d{2}\.\d{4})/is);
-        // Old format: <strong>Son Ödeme Tarihi:</strong><br>02.06.2025
+        // Mastercard format: <strong>Son Ödeme Tarihi:</strong><br>03.11.2025
         if (!dateMatch) {
-            dateMatch = content.match(/Son Ödeme Tarihi:<strong><br>(\d{2}\.\d{2}\.\d{4})/i);
+            dateMatch = content.match(/<strong>Son Ödeme Tarihi:<\/strong><br>(\d{2}\.\d{2}\.\d{4})/i);
         }
         
         if (dateMatch && dateMatch[1]) {
@@ -47,11 +47,11 @@ export const garantiEmailParser: BankEmailParser = {
         }
 
         // --- Toplam Borç Tutarı ---
-        // New format: <td>Toplam Borç Tutarı:</td><td align="right">+616,80 TL</td>
+        // Troy format: <td>Toplam Borç Tutarı:</td><td align="right">+616,80 TL</td>
         let amountMatch = content.match(/>Toplam Borç Tutarı:<\/td>\s*<td[^>]*>\s*[+]?([\d.,]+)\s*TL/is);
-        // Old format: <strong>Toplam Borç Tutarı:</strong><br>+2.505,24 TL
+        // Mastercard format: <strong>Toplam Borç Tutarı:</strong><br>+4.461,26 TL
         if (!amountMatch) {
-            amountMatch = content.match(/Toplam Borç Tutarı:<strong><br>[+]?([\d.,]+) TL/i);
+            amountMatch = content.match(/<strong>Toplam Borç Tutarı:<\/strong><br>[+]?([\d.,]+)\s*TL/i);
         }
 
         if (amountMatch && amountMatch[1]) {

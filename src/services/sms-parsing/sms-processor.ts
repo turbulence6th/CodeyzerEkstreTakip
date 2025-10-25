@@ -130,6 +130,11 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
     let parsedStatements: ParsedStatement[] = [];
     const smsPermission = await this.checkSmsPermission();
 
+    // Son 2 aylık mesajlar için tarih filtresi
+    const twoMonthsAgo = new Date();
+    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+    const minDateTimestamp = twoMonthsAgo.getTime();
+
     // --- SMS İşleme (Her banka için ayrı sorgu) ---
     if (smsPermission.readSms === 'granted') {
         for (const processor of availableBankProcessors) {
@@ -139,7 +144,7 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
                     maxCount: 5, // Her banka için az sayıda, en yeni SMS yeterli
                     senders: processor.smsSenderKeywords, // Sadece bu bankanın göndericileri
                     keywords: [processor.smsStatementQueryKeyword], // Sadece ekstre anahtar kelimesi
-                    // minDate: son senkronizasyon zamanı eklenebilir
+                    minDate: minDateTimestamp, // Son 2 ayda gelenler
                 };
 
                 try {
@@ -175,12 +180,18 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
 
     // --- E-posta İşleme ---
     try {
+        // Gmail için tarih filtresi (YYYY/MM/DD formatında)
+        const gmailDateFilter = `${twoMonthsAgo.getFullYear()}/${String(twoMonthsAgo.getMonth() + 1).padStart(2, '0')}/${String(twoMonthsAgo.getDate()).padStart(2, '0')}`;
+
         for (const processor of availableBankProcessors) {
             if (processor.emailParser && processor.gmailQuery) {
+                // Gmail query'sine tarih filtresi ekle
+                const queryWithDate = `${processor.gmailQuery} after:${gmailDateFilter}`;
+
                 // accessToken eklendi ve maxResults düzeltildi
                 // Dönüş tipi açıkça belirtilMİYOR, TS çıkarsın
                 // gmailService yerine localGmailService kullanıldı
-                const emailSearchResult = await localGmailService.searchEmails(processor.gmailQuery, 10);
+                const emailSearchResult = await localGmailService.searchEmails(queryWithDate, 10);
                 // emailSearchResult.messages üzerinde iterate et
                 // messages alanı opsiyonel olduğu için kontrol ekleyelim
                 for (const emailInfo of emailSearchResult?.messages || []) {
@@ -308,6 +319,11 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
     let parsedLoans: ParsedLoan[] = [];
     const smsPermission = await this.checkSmsPermission();
 
+    // Son 2 aylık mesajlar için tarih filtresi
+    const twoMonthsAgo = new Date();
+    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+    const minDateTimestamp = twoMonthsAgo.getTime();
+
     // --- SMS İşleme (Her banka için ayrı sorgu) ---
     if (smsPermission.readSms === 'granted') {
         for (const processor of availableBankProcessors) {
@@ -317,7 +333,7 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
                     maxCount: 5, // Her banka için en yeni kredi SMS'i yeterli
                     senders: processor.smsSenderKeywords, // Sadece bu bankanın göndericileri
                     keywords: [processor.smsLoanQueryKeyword], // Sadece kredi anahtar kelimesi
-                    // minDate: son senkronizasyon zamanı eklenebilir
+                    minDate: minDateTimestamp, // Son 2 ayda gelenler
                 };
 
                 try {

@@ -10,9 +10,11 @@ Kullanıcıların farklı bankalardan gelen ekstre ve kredi bilgilerini tek bir 
 
 *   **Otomatik Veri Ayrıştırma:**
     *   Belirli bankalardan gelen **SMS**'leri okur ve işler (QNB, Garanti BBVA Kredi, Kuveyt Türk).
-    *   Belirli bankalardan gelen **E-postaları** (Gmail) okur ve işler (Yapı Kredi, Ziraat Bankası).
+    *   Belirli bankalardan gelen **E-postaları** (Gmail) okur ve işler (Yapı Kredi, Ziraat Bankası, İş Bankası, Garanti BBVA Bonus, Kuveyt Türk, Akbank).
+    *   Son 2 ay içinde gelen mesajları otomatik olarak tarar (performans ve veri yönetimi için).
     *   Ekstreler için: Son ödeme tarihi, dönem borcu, kartın son 4 hanesi.
     *   Krediler için: İlk ödeme tarihi, taksit tutarı (varsa).
+    *   E-posta ekleri (PDF) ayrıştırılabilir.
 *   **Manuel Kayıt Ekleme:** Otomatik olarak bulunamayan veya farklı türdeki ödemeleri manuel olarak ekleme imkanı.
 *   **Birleşik Liste Görünümü:** Otomatik ayrıştırılan ve manuel eklenen tüm kayıtları tek bir listede gösterir.
 *   **Google Entegrasyonu:**
@@ -109,10 +111,12 @@ Kullanıcıların farklı bankalardan gelen ekstre ve kredi bilgilerini tek bir 
     *   `AccountTab` açıldığında veya yenilendiğinde `fetchAndProcessDataThunk` tetiklenir.
     *   Bu thunk, `statementProcessor` servisinin `fetchAndParseStatements` ve `fetchAndParseLoans` fonksiyonlarını çağırır.
     *   `statementProcessor`:
+        *   **Son 2 ay içindeki mesajları** taramak için otomatik tarih filtresi uygular (SMS: `minDate` parametresi, Gmail: `after:YYYY/MM/DD` sorgu filtresi).
         *   SMS izni varsa, `availableBankProcessors` listesindeki her banka için yapılandırılmış gönderici (`smsSenderKeywords`) ve anahtar kelime (`smsStatementQueryKeyword` veya `smsLoanQueryKeyword`) filtreleriyle native `@plugins/sms-reader` eklentisini kullanarak ilgili **en yeni** SMS'leri çeker.
         *   Gmail API'si için `gmailService`'i kullanarak `availableBankProcessors` listesindeki her banka için yapılandırılmış `gmailQuery` ile **en yeni** e-postaları arar ve detaylarını alır.
         *   Gelen SMS ve e-posta içeriklerini ilgili bankanın parser'ına (`*-parser.ts`) gönderir.
-        *   Parser'lar (örn: `QnbSmsParser`, `ZiraatEmailParser`) mesaj içeriğini ayrıştırarak yapılandırılmış `ParsedStatement` veya `ParsedLoan` nesneleri oluşturur. Tarihler `Date` nesnesi olarak parse edilir.
+        *   Parser'lar (örn: `QnbSmsParser`, `ZiraatEmailParser`, `GarantiEmailParser`) mesaj içeriğini ayrıştırarak yapılandırılmış `ParsedStatement` veya `ParsedLoan` nesneleri oluşturur. Tarihler `Date` nesnesi olarak parse edilir.
+        *   E-posta ekleri (PDF) gerektiğinde native `PdfParserPlugin` ile ayrıştırılır (örn: İş Bankası).
 4.  **State Güncelleme:**
     *   `fetchAndProcessDataThunk`, parser'lardan dönen `ParsedStatement` ve `ParsedLoan` listelerindeki `Date` nesnelerini **ISO string formatına** dönüştürerek Redux (`dataSlice`) state'ini günceller. Bu, state'in serialize edilebilir olmasını sağlar.
     *   Kullanıcı `ManualEntryTab` üzerinden manuel kayıt eklediğinde veya `AccountTab` üzerinden sildiğinde `dataSlice` güncellenir.

@@ -4,24 +4,27 @@ import path from 'path';
 import { garantiEmailParser } from '../garanti-email-parser';
 import type { EmailDetails, DecodedEmailBody } from '../../../sms-parsing/types';
 
-const mockHtmlPath = path.resolve(__dirname, 'mocks/garanti-ekstre-sample.html');
+const mockHtmlTroyPath = path.resolve(__dirname, 'mocks/garanti-ekstre-troy.html');
+const mockHtmlMastercardPath = path.resolve(__dirname, 'mocks/garanti-ekstre-mastercard.html');
 
 describe('Garanti BBVA Email Parser', () => {
-    let mockHtmlContent: string;
     let mockEmailDetails: EmailDetails;
     let mockDecodedBody: DecodedEmailBody;
 
-    beforeEach(() => {
-        try {
-            mockHtmlContent = fs.readFileSync(mockHtmlPath, 'utf-8');
-        } catch (error) {
-            console.error(`Error reading mock file at ${mockHtmlPath}:`, error);
-            mockHtmlContent = '';
-        }
+    const createMockEmail = (htmlContent: string): EmailDetails => ({
+        id: 'test-garanti-email-id',
+        sender: 'garantibbva@garantibbva.com.tr',
+        subject: 'Bonus Ekstresi (TL) - Ekim',
+        date: new Date(2025, 9, 12),
+        plainBody: null,
+        htmlBody: htmlContent,
+        originalResponse: {},
+    });
 
+    beforeEach(() => {
         mockDecodedBody = {
             plainBody: null,
-            htmlBody: mockHtmlContent,
+            htmlBody: '',
         };
 
         mockEmailDetails = {
@@ -30,7 +33,7 @@ describe('Garanti BBVA Email Parser', () => {
             subject: 'Bonus Ekstresi (TL) - Ekim',
             date: new Date(2025, 9, 12),
             plainBody: null,
-            htmlBody: mockHtmlContent,
+            htmlBody: '',
             originalResponse: {},
         };
     });
@@ -62,12 +65,17 @@ describe('Garanti BBVA Email Parser', () => {
     });
 
     describe('parse', () => {
-        it('should correctly parse the mock Garanti ekstre HTML', async () => {
-            if (!mockHtmlContent) {
-                console.warn(`Skipping parse test because mock file could not be read: ${mockHtmlPath}`);
+        it('should correctly parse Troy format Garanti ekstre HTML', async () => {
+            let mockHtmlContent: string;
+            try {
+                mockHtmlContent = fs.readFileSync(mockHtmlTroyPath, 'utf-8');
+            } catch (error) {
+                console.warn(`Skipping Troy test because mock file could not be read: ${mockHtmlTroyPath}`);
                 return;
             }
-            const result = await garantiEmailParser.parse(mockEmailDetails);
+
+            const mockEmail = createMockEmail(mockHtmlContent);
+            const result = await garantiEmailParser.parse(mockEmail);
             expect(result).not.toBeNull();
             if (result) {
                 expect(result.bankName).toBe('Garanti BBVA Bonus');
@@ -80,6 +88,32 @@ describe('Garanti BBVA Email Parser', () => {
                     expect(result.dueDate.getDate()).toBe(21);
                 }
                 expect(result.amount).toBe(616.80);
+            }
+        });
+
+        it('should correctly parse Mastercard format Garanti ekstre HTML', async () => {
+            let mockHtmlContent: string;
+            try {
+                mockHtmlContent = fs.readFileSync(mockHtmlMastercardPath, 'utf-8');
+            } catch (error) {
+                console.warn(`Skipping Mastercard test because mock file could not be read: ${mockHtmlMastercardPath}`);
+                return;
+            }
+
+            const mockEmail = createMockEmail(mockHtmlContent);
+            const result = await garantiEmailParser.parse(mockEmail);
+            expect(result).not.toBeNull();
+            if (result) {
+                expect(result.bankName).toBe('Garanti BBVA Bonus');
+                expect(result.source).toBe('email');
+                expect(result.last4Digits).toBe('9999');
+                expect(result.dueDate).not.toBeNull();
+                if (result.dueDate) {
+                    expect(result.dueDate.getFullYear()).toBe(2025);
+                    expect(result.dueDate.getMonth()).toBe(11); // Aralık (0-index)
+                    expect(result.dueDate.getDate()).toBe(15);
+                }
+                expect(result.amount).toBe(1234.56);
             }
         });
 
