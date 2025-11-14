@@ -29,7 +29,7 @@ import { startGlobalLoading, stopGlobalLoading } from '../store/slices/loadingSl
 import { checkSmsPermissionThunk } from '../store/slices/permissionSlice';
 import { addToast } from '../store/slices/toastSlice';
 
-import { addOutline, mailOutline, cashOutline, calendarOutline, chatbubbleEllipsesOutline, documentTextOutline, trashOutline } from 'ionicons/icons';
+import { addOutline, mailOutline, cashOutline, calendarOutline, chatbubbleEllipsesOutline, documentTextOutline, trashOutline, walletOutline } from 'ionicons/icons';
 
 // Yeni eklenen bileşeni import et
 import DetailsModal from '../components/DetailsModal'; 
@@ -314,6 +314,11 @@ Tutar: ${formatCurrency(item.amount)}`;
       <IonHeader>
         <IonToolbar className="ion-padding-top">
           <IonTitle>Ekstreler</IonTitle>
+          <IonButtons slot="end">
+            <IonButton routerLink="/loan-management" color="primary">
+              <IonIcon slot="icon-only" icon={walletOutline} />
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen className="ion-padding">

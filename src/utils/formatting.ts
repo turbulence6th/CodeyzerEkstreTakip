@@ -77,7 +77,7 @@ export const addMonths = (date: Date, months: number): Date => {
     // Örneğin, 11 (Aralık) + 2 ay = 13. 13 % 12 = 1 (Şubat).
     const expectedMonth = (d.getMonth() + months) % 12;
     d.setMonth(d.getMonth() + months);
-    
+
     // Eğer setMonth sonrası ay, beklenen aydan farklıysa, bu, ayın son gününden taşma olduğunu gösterir.
     // Örn: 31 Ocak'a 1 ay eklenince 31 Şubat (yok) yerine 2 Mart'a atlar. Bu durumda ay 2, beklenen 1 olur.
     // Bu durumda, tarihi bir önceki ayın son gününe (yani beklenen ayın son gününe) ayarlarız.
@@ -85,4 +85,14 @@ export const addMonths = (date: Date, months: number): Date => {
         d.setDate(0); // setDate(0), bir önceki ayın son gününü verir.
     }
     return d;
+};
+
+/**
+ * Verilen tarihin hafta sonuna (Cumartesi veya Pazar) denk gelip gelmediğini kontrol eder.
+ * @param date Kontrol edilecek tarih
+ * @returns Hafta sonuysa true, değilse false
+ */
+export const isWeekend = (date: Date): boolean => {
+    const day = date.getDay();
+    return day === 0 || day === 6; // 0 = Pazar, 6 = Cumartesi
 }; 

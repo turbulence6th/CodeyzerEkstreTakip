@@ -268,6 +268,28 @@ const dataSlice = createSlice({
            console.warn(`Manual entry with ID ${idToDelete} not found for deletion.`);
        }
     },
+    // Tüm krediyi (tüm taksitlerini) silme
+    deleteLoan: (state, action: PayloadAction<string>) => {
+       const loanIdToDelete = action.payload;
+       const initialLength = state.items.length;
+
+       // Bu krediye ait tüm taksitleri sil
+       state.items = state.items.filter(item => {
+         if (isSerializableManualEntry(item) && item.description.includes('Taksit')) {
+           // ID pattern kontrolü: loanId_installment_X
+           return !item.id.startsWith(`${loanIdToDelete}_installment_`);
+         }
+         return true;
+       });
+
+       const deletedCount = initialLength - state.items.length;
+       if (deletedCount > 0) {
+           console.log(`Loan deleted with ${deletedCount} installments: ${loanIdToDelete}`);
+           state.error = null;
+       } else {
+           console.warn(`Loan with ID ${loanIdToDelete} not found for deletion.`);
+       }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -418,7 +440,71 @@ export const selectTotalDebt = createSelector(
   }
 );
 
+// Kredi gruplama tipi
+export interface LoanGroup {
+  loanId: string; // Ana kredi ID'si (taksitlerdeki ortak prefix)
+  description: string; // Kredi açıklaması
+  monthlyAmount: number; // Aylık taksit tutarı
+  totalInstallments: number; // Toplam taksit sayısı
+  paidInstallments: number; // Ödenen taksit sayısı
+  installments: ManualEntry[]; // Tüm taksitler (tarihlere göre sıralı)
+}
+
+// Kredileri gruplandıran selector
+export const selectGroupedLoans = createSelector(
+  [selectAllData],
+  (items): LoanGroup[] => {
+    const loanMap = new Map<string, LoanGroup>();
+
+    items.forEach(item => {
+      // Sadece taksitleri işle
+      if (isSerializableManualEntry(item) && item.description.includes('Taksit')) {
+        // Taksit ID'sinden ana kredi ID'sini çıkar (örn: "loan123_installment_1" -> "loan123")
+        const match = item.id.match(/^(.+)_installment_\d+$/);
+        if (match) {
+          const loanId = match[1];
+
+          // Açıklamadan kredi adını çıkar (örn: "İhtiyaç Kredisi - Taksit 1/12" -> "İhtiyaç Kredisi")
+          const descMatch = item.description.match(/^(.+) - Taksit \d+\/(\d+)$/);
+          const loanDescription = descMatch ? descMatch[1] : item.description;
+          const totalInstallments = descMatch ? parseInt(descMatch[2]) : 1;
+
+          if (!loanMap.has(loanId)) {
+            loanMap.set(loanId, {
+              loanId,
+              description: loanDescription,
+              monthlyAmount: item.amount,
+              totalInstallments,
+              paidInstallments: 0,
+              installments: []
+            });
+          }
+
+          const loanGroup = loanMap.get(loanId)!;
+
+          // Tarihi deserialize et
+          const installment: ManualEntry = {
+            ...item,
+            dueDate: new Date(item.dueDate)
+          };
+
+          loanGroup.installments.push(installment);
+          if (item.isPaid) {
+            loanGroup.paidInstallments++;
+          }
+        }
+      }
+    });
+
+    // Taksitleri tarihe göre sırala ve array'e çevir
+    return Array.from(loanMap.values()).map(loan => ({
+      ...loan,
+      installments: loan.installments.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+    }));
+  }
+);
+
 
 // Yeni action'ı export et
-export const { clearData, addManualEntry, deleteManualEntry, togglePaidStatus } = dataSlice.actions;
+export const { clearData, addManualEntry, deleteManualEntry, togglePaidStatus, deleteLoan } = dataSlice.actions;
 export default dataSlice.reducer;

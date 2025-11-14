@@ -24,6 +24,7 @@ import {
     addOutline,
     arrowUndoCircleOutline, // Yeni ikon
     receiptOutline, // Yeni ikon
+    warningOutline, // Haftasonu uyarısı için
 } from 'ionicons/icons';
 
 // Tipler
@@ -31,7 +32,7 @@ import type { ParsedStatement } from '../services/sms-parsing/types';
 import type { ManualEntry } from '../types/manual-entry.types';
 
 // Yeni utils'leri import et
-import { formatDate, formatCurrency } from '../utils/formatting';
+import { formatDate, formatCurrency, isWeekend } from '../utils/formatting';
 import { isStatement, isManualEntry } from '../utils/typeGuards';
 import { generateAppId } from '../utils/identifiers';
 
@@ -125,13 +126,23 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                                         <h2>{isManualEntry(item) ? item.description : item.bankName}</h2>
                                         {isStatement(item) ? (
                                             <>
-                                                <p>Son Ödeme: <strong>{formatDate(item.dueDate)}</strong></p>
+                                                <p>
+                                                    Son Ödeme: <strong>{formatDate(item.dueDate)}</strong>
+                                                    {isWeekend(item.dueDate) && (
+                                                        <IonIcon icon={warningOutline} color="warning" style={{ marginLeft: '8px', verticalAlign: 'middle' }} />
+                                                    )}
+                                                </p>
                                                 <p>Tutar: <strong>{formatCurrency(item.amount)}</strong></p>
                                                 {item.last4Digits && <p>Kart No: <strong>...{item.last4Digits}</strong></p>}
                                             </>
                                         ) : isManualEntry(item) ? (
                                             <>
-                                                <p>Son Ödeme: <strong>{formatDate(item.dueDate)}</strong></p>
+                                                <p>
+                                                    Son Ödeme: <strong>{formatDate(item.dueDate)}</strong>
+                                                    {isWeekend(item.dueDate) && (
+                                                        <IonIcon icon={warningOutline} color="warning" style={{ marginLeft: '8px', verticalAlign: 'middle' }} />
+                                                    )}
+                                                </p>
                                                 <p>Tutar: <strong>{formatCurrency(item.amount)}</strong></p>
                                             </>
                                         ) : null}
@@ -162,7 +173,8 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                                     >
                                         <IonIcon slot="icon-only" icon={item.isPaid ? arrowUndoCircleOutline : cashOutline}></IonIcon>
                                     </IonItemOption>
-                                    {isManualEntry(item) && (
+                                    {/* Sadece kredi taksiti OLMAYAN manuel girişler için silme butonu göster */}
+                                    {isManualEntry(item) && !item.description.includes('Taksit') && (
                                         <IonItemOption
                                             color="danger"
                                             onClick={() => onDeleteManualEntry(item.id)}

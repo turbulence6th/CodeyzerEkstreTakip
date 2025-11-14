@@ -17,6 +17,7 @@ import AccountTab from './pages/AccountTab';
 import ManualEntryTab from './pages/ManualEntryTab';
 import SettingsTab from './pages/SettingsTab';
 import LoginPage from './pages/LoginPage';
+import LoanManagementPage from './pages/LoanManagementPage';
 import ToastManager from './components/ToastManager';
 import { App as CapacitorApp, URLOpenListenerEvent } from '@capacitor/app';
 import type { PluginListenerHandle } from '@capacitor/core';
@@ -126,6 +127,9 @@ const App: React.FC = () => {
               </Route>
               <Route exact path="/add">
                 <ManualEntryTab />
+              </Route>
+              <Route exact path="/loan-management">
+                <LoanManagementPage />
               </Route>
               <Route path="/settings">
                 <SettingsTab />
