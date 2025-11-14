@@ -36,7 +36,8 @@ const ManualEntryTab: React.FC = () => {
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState<string>(''); // String olarak alıp sonra sayıya çevireceğiz
     const [dueDate, setDueDate] = useState<string | undefined>(new Date().toISOString()); // ISO 8601 formatında string
-    const [entryType, setEntryType] = useState<'debt' | 'expense'>('debt'); // Yeni state
+    const [entryType, setEntryType] = useState<'debt' | 'expense' | 'loan'>('debt'); // Kredi eklendi
+    const [installmentCount, setInstallmentCount] = useState<string>(''); // Kredi için taksit sayısı
     const [formattedDueDate, setFormattedDueDate] = useState<string>(''); // Gösterilecek formatlanmış tarih
 
     // dueDate değiştiğinde formatlanmış tarihi güncelle
@@ -58,9 +59,15 @@ const ManualEntryTab: React.FC = () => {
     }, [dueDate]);
 
     const handleSave = () => {
-        // TODO: Validasyon ekle (description ve dueDate zorunlu, amount sayı olmalı)
+        // Validasyon
         if (!description || !dueDate || !amount) {
              dispatch(addToast({ message: 'Lütfen tüm alanları doldurun.', duration: 3000, color: 'warning' }));
+            return;
+        }
+
+        // Kredi için taksit sayısı kontrolü
+        if (entryType === 'loan' && !installmentCount) {
+             dispatch(addToast({ message: 'Kredi için taksit sayısı girmelisiniz.', duration: 3000, color: 'warning' }));
             return;
         }
 
@@ -69,7 +76,13 @@ const ManualEntryTab: React.FC = () => {
              dispatch(addToast({ message: 'Lütfen geçerli bir tutar girin.', duration: 3000, color: 'warning' }));
             return;
         }
-        
+
+        const parsedInstallmentCount = entryType === 'loan' ? parseInt(installmentCount) : undefined;
+        if (entryType === 'loan' && (isNaN(parsedInstallmentCount!) || parsedInstallmentCount! <= 0)) {
+             dispatch(addToast({ message: 'Lütfen geçerli bir taksit sayısı girin.', duration: 3000, color: 'warning' }));
+            return;
+        }
+
         const dueDateObj = new Date(dueDate);
          // Saati ayarlayalım (isteğe bağlı, örn. öğlen 12)
         dueDateObj.setHours(12, 0, 0, 0);
@@ -84,27 +97,29 @@ const ManualEntryTab: React.FC = () => {
             amount: parsedAmount,
             dueDate: dueDateObj,
             source: 'manual',
-            entryType: entryType, // Seçilen türü ekle
+            entryType: entryType,
+            installmentCount: parsedInstallmentCount,
         };
 
         // Mesaj eklendi
-        dispatch(startGlobalLoading('Kaydediliyor...')); 
+        dispatch(startGlobalLoading('Kaydediliyor...'));
         try {
              // Dispatch işlemi aktifleştirildi
-             dispatch(addManualEntry(newEntry)); 
-             
-             // Loglama kaldırılabilir veya bırakılabilir
-             // console.log("Dispatching addManualEntry with:", newEntry);
-             
-             dispatch(addToast({ 
-                message: 'Kayıt başarıyla eklendi.', 
-                duration: 2000, 
-                color: 'success' 
+             dispatch(addManualEntry(newEntry));
+
+             dispatch(addToast({
+                message: entryType === 'loan'
+                    ? `Kredi kaydı başarıyla eklendi. ${parsedInstallmentCount} taksit oluşturulacak.`
+                    : 'Kayıt başarıyla eklendi.',
+                duration: 2000,
+                color: 'success'
              }));
             // Formu temizle
             setDescription('');
             setAmount('');
             setDueDate(undefined);
+            setInstallmentCount('');
+            setEntryType('debt');
         } catch (error: any) {
              console.error('Error saving manual entry:', error);
              dispatch(addToast({ message: `Kayıt kaydedilirken hata: ${error.message || 'Bilinmeyen hata'}`, duration: 3000, color: 'danger' }));
@@ -130,13 +145,14 @@ const ManualEntryTab: React.FC = () => {
                 <IonList>
                     <IonItem>
                         <IonLabel>Kayıt Türü</IonLabel>
-                        <IonSelect 
-                            value={entryType} 
+                        <IonSelect
+                            value={entryType}
                             onIonChange={e => setEntryType(e.detail.value)}
                             interface="popover"
                         >
                             <IonSelectOption value="debt">Borç</IonSelectOption>
                             <IonSelectOption value="expense">Harcama</IonSelectOption>
+                            <IonSelectOption value="loan">Kredi</IonSelectOption>
                         </IonSelect>
                     </IonItem>
 
@@ -146,31 +162,47 @@ const ManualEntryTab: React.FC = () => {
                             labelPlacement="stacked"
                             value={description}
                             onIonInput={(e) => setDescription(e.detail.value!)}
-                            placeholder="Örn: Kira Ödemesi, Ziraat Ekstre"
+                            placeholder="Örn: Kira Ödemesi, Ziraat Ekstre, İhtiyaç Kredisi"
                             clearInput
                         ></IonInput>
                     </IonItem>
                     <IonItem>
                         <IonInput
-                            label="Tutar (TL)"
+                            label={entryType === 'loan' ? 'Aylık Taksit Tutarı (TL)' : 'Tutar (TL)'}
                             labelPlacement="stacked"
                             type="number" // Klavye için
                             inputmode='decimal' // Daha iyi mobil klavye
                             value={amount}
                             onIonInput={(e) => setAmount(e.detail.value!)}
-                            placeholder="Örn: 1500.50"
+                            placeholder={entryType === 'loan' ? 'Örn: 500.00' : 'Örn: 1500.50'}
                             clearInput
                         ></IonInput>
                     </IonItem>
+
+                    {entryType === 'loan' && (
+                        <IonItem>
+                            <IonInput
+                                label="Taksit Sayısı"
+                                labelPlacement="stacked"
+                                type="number"
+                                inputmode='numeric'
+                                value={installmentCount}
+                                onIonInput={(e) => setInstallmentCount(e.detail.value!)}
+                                placeholder="Örn: 12"
+                                clearInput
+                            ></IonInput>
+                        </IonItem>
+                    )}
+
                     <IonItem lines="none">
-                         <IonLabel>Son Ödeme Tarihi</IonLabel>
+                         <IonLabel>{entryType === 'loan' ? 'İlk Taksit Tarihi' : 'Son Ödeme Tarihi'}</IonLabel>
                          <div slot="end" style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
                              <IonDatetimeButton datetime="dueDate"></IonDatetimeButton>
                              <IonModal keepContentsMounted={true}>
-                                 <IonDatetime 
-                                    id="dueDate" 
-                                    value={dueDate} 
-                                    onIonChange={(e) => setDueDate(e.detail.value?.toString())} 
+                                 <IonDatetime
+                                    id="dueDate"
+                                    value={dueDate}
+                                    onIonChange={(e) => setDueDate(e.detail.value?.toString())}
                                     presentation="date"
                                     showDefaultButtons={true}
                                     doneText="Tamam"
@@ -181,11 +213,11 @@ const ManualEntryTab: React.FC = () => {
                          </div>
                     </IonItem>
                 </IonList>
-                 <IonButton 
-                    expand="block" 
-                    onClick={handleSave} 
+                 <IonButton
+                    expand="block"
+                    onClick={handleSave}
                     style={{ marginTop: '20px' }}
-                    disabled={!description || !dueDate || !amount} // Basit buton pasifleştirme
+                    disabled={!description || !dueDate || !amount || (entryType === 'loan' && !installmentCount)}
                  >
                     Kaydet
                  </IonButton>

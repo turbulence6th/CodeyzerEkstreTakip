@@ -1,5 +1,4 @@
 import { createTransform } from 'redux-persist';
-import type { ParsedStatement, ParsedLoan } from '../../services/sms-parsing/types';
 // Serializable tipleri dataSlice'tan import etmek yerine burada da tanımlayabiliriz veya any kullanabiliriz.
 // Slice'ı import etmek döngüsel bağımlılık yaratabilir. Şimdilik any kullanalım.
 

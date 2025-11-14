@@ -1,5 +1,5 @@
 import { generateAppId } from '../identifiers';
-import type { ParsedStatement, ParsedLoan, SmsDetails, EmailDetails } from '../../services/sms-parsing/types';
+import type { ParsedStatement, SmsDetails } from '../../services/sms-parsing/types';
 import type { ManualEntry } from '../../types/manual-entry.types';
 
 // Ortak mock veriler

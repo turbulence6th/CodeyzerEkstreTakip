@@ -99,8 +99,14 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                         let itemColor = "primary";
 
                         if (isManualEntry(item)) {
-                            itemIcon = item.entryType === 'debt' ? cashOutline : receiptOutline;
-                            itemColor = "tertiary";
+                            // Kredi taksitleri için özel kontrol (description'da "Taksit" geçiyor)
+                            if (item.description.includes('Taksit')) {
+                                itemIcon = cashOutline;
+                                itemColor = "success";
+                            } else {
+                                itemIcon = item.entryType === 'debt' ? cashOutline : receiptOutline;
+                                itemColor = "tertiary";
+                            }
                         } else if (isStatement(item)) {
                             itemIcon = item.source === 'email' ? mailOutline : chatbubbleEllipsesOutline;
                             itemColor = "primary";

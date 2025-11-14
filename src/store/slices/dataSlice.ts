@@ -6,6 +6,7 @@ import { startGlobalLoading, stopGlobalLoading } from './loadingSlice';
 import type { RootState } from '../index';
 // Type guard importları eklendi
 import { isStatement, isManualEntry as isTypeGuardManualEntry } from '../../utils/typeGuards';
+import { addMonths } from '../../utils/formatting'; // addMonths import edildi
 
 // DisplayItem tipi artık ParsedLoan içermiyor.
 type DisplayItem = ParsedStatement | ManualEntry;
@@ -13,7 +14,7 @@ type DisplayItem = ParsedStatement | ManualEntry;
 // --- Serialize edilmiş veri tipi (isPaid eklendi) ---
 type SerializableStatement = Omit<ParsedStatement, 'dueDate'> & { id: string; dueDate: string; isPaid?: boolean; entryType: 'debt'; };
 // SerializableLoan artık state'te saklanmayacak.
-type SerializableManualEntry = Omit<ManualEntry, 'dueDate'> & { dueDate: string; source: 'manual'; isPaid?: boolean; entryType: 'debt' | 'expense'; };
+type SerializableManualEntry = Omit<ManualEntry, 'dueDate'> & { dueDate: string; source: 'manual'; isPaid?: boolean; entryType: 'debt' | 'expense' | 'loan'; installmentCount?: number; };
 type SerializableDisplayItem = SerializableStatement | SerializableManualEntry; // SerializableLoan kaldırıldı
 
 // Thunk dönüş tipi: items artık isPaid içerebilir
@@ -188,7 +189,7 @@ const dataSlice = createSlice({
             console.warn(`Item with ID ${itemId} not found for toggling paid status.`);
         }
     },
-    // Manuel Giriş: isPaid mantığı eklendi
+    // Manuel Giriş: Kredi taksit mantığı eklendi
     addManualEntry: (state, action: PayloadAction<ManualEntry>) => {
         const newEntry = action.payload;
          let dueDateString: string;
@@ -205,26 +206,54 @@ const dataSlice = createSlice({
               return;
          }
 
-        // SerializableManualEntry (isPaid ile)
-        const serializedEntry: SerializableManualEntry = {
-            ...newEntry,
-            id: newEntry.id,
-            dueDate: dueDateString,
-            source: 'manual',
-            isPaid: newEntry.isPaid || false, // isPaid durumunu ekle
-            entryType: newEntry.entryType, // entryType'ı payload'dan al
-        };
+        // Eğer kredi ise, taksitleri oluştur
+        if (newEntry.entryType === 'loan' && newEntry.installmentCount && newEntry.installmentCount > 0) {
+            const baseDate = newEntry.dueDate instanceof Date ? newEntry.dueDate : new Date(newEntry.dueDate);
 
-        // ID kontrolü ve ekleme
-        const existingIndex = state.items.findIndex(item => item.id === serializedEntry.id);
-        if (existingIndex === -1) {
-            state.items.push(serializedEntry);
+            for (let i = 0; i < newEntry.installmentCount; i++) {
+                const installmentDate = addMonths(baseDate, i);
+                const installmentDateString = installmentDate.toISOString();
+                const installmentId = `${newEntry.id}_installment_${i + 1}`;
+
+                const installmentEntry: SerializableManualEntry = {
+                    id: installmentId,
+                    description: `${newEntry.description} - Taksit ${i + 1}/${newEntry.installmentCount}`,
+                    amount: newEntry.amount,
+                    dueDate: installmentDateString,
+                    source: 'manual',
+                    isPaid: false,
+                    entryType: 'debt', // Taksitler borç olarak işaretlenir
+                };
+
+                state.items.push(installmentEntry);
+            }
+
             state.error = null;
             sortItemsByDate(state.items);
-            console.log(`Manual entry added: ${serializedEntry.id}`);
+            console.log(`Loan entry added with ${newEntry.installmentCount} installments: ${newEntry.id}`);
         } else {
-            console.warn(`Entry with ID ${serializedEntry.id} already exists.`);
-            state.error = `Bu ID (${serializedEntry.id}) ile zaten bir giriş mevcut.`;
+            // Normal giriş (borç veya harcama)
+            const serializedEntry: SerializableManualEntry = {
+                ...newEntry,
+                id: newEntry.id,
+                dueDate: dueDateString,
+                source: 'manual',
+                isPaid: newEntry.isPaid || false,
+                entryType: newEntry.entryType,
+                installmentCount: newEntry.installmentCount,
+            };
+
+            // ID kontrolü ve ekleme
+            const existingIndex = state.items.findIndex(item => item.id === serializedEntry.id);
+            if (existingIndex === -1) {
+                state.items.push(serializedEntry);
+                state.error = null;
+                sortItemsByDate(state.items);
+                console.log(`Manual entry added: ${serializedEntry.id}`);
+            } else {
+                console.warn(`Entry with ID ${serializedEntry.id} already exists.`);
+                state.error = `Bu ID (${serializedEntry.id}) ile zaten bir giriş mevcut.`;
+            }
         }
     },
     // Manuel Silme: Aynı kaldı
@@ -330,10 +359,17 @@ export const selectAllData = (state: RootState): SerializableDisplayItem[] => st
 export const selectDataError = (state: RootState): string | null => state.data.error;
 export const selectLastUpdated = (state: RootState): number | null => state.data.lastUpdated;
 
-// Memoized selector: isPaid mantığı kaldırıldı
+// Memoized selector: Tarihleri dönüştür ve 1 ay içindeki taksitleri filtrele
 export const selectAllDataWithDates = createSelector(
   [selectAllData],
-  (items): DisplayItem[] => { // Dönen tip DisplayItem[] (artık isPaid içerebilir)
+  (items): DisplayItem[] => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const oneMonthFromNow = new Date(today);
+    oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1);
+    oneMonthFromNow.setHours(23, 59, 59, 999);
+
     return items.map(item => {
         try {
             if (isSerializableStatement(item)) {
@@ -346,7 +382,17 @@ export const selectAllDataWithDates = createSelector(
         }
         console.warn("Unknown or problematic item type in selectAllDataWithDates, returning null:", item);
         return null;
-    }).filter((item): item is DisplayItem => item !== null);
+    })
+    .filter((item): item is DisplayItem => item !== null)
+    .filter(item => {
+        // Kredi taksitlerini filtrele (description'da "Taksit" geçiyorsa)
+        if (isTypeGuardManualEntry(item) && item.description.includes('Taksit')) {
+            // Sadece 1 ay içindeki taksitleri göster
+            return item.dueDate >= today && item.dueDate <= oneMonthFromNow;
+        }
+        // Diğer kayıtlar için filtreleme yok
+        return true;
+    });
   }
 );
 
