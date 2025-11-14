@@ -27,7 +27,7 @@ import {
 } from 'ionicons/icons';
 
 // Tipler
-import type { ParsedStatement, ParsedLoan } from '../services/sms-parsing/types';
+import type { ParsedStatement } from '../services/sms-parsing/types';
 import type { ManualEntry } from '../types/manual-entry.types';
 
 // Yeni utils'leri import et
@@ -68,7 +68,7 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
     if (items.length === 0) {
         return (
             <IonItem lines="none">
-                <p className="empty-list-message">Görüntülenecek aktif ekstre veya kredi bilgisi bulunamadı. Verileri yenilemek için ekranı aşağı çekebilirsiniz.</p>
+                <p className="empty-list-message">Görüntülenecek aktif ekstre bilgisi bulunamadı. Verileri yenilemek için ekranı aşağı çekebilirsiniz.</p>
             </IonItem>
         );
     }
@@ -102,14 +102,8 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                             itemIcon = item.entryType === 'debt' ? cashOutline : receiptOutline;
                             itemColor = "tertiary";
                         } else if (isStatement(item)) {
-                            // Kredi taksitlerini de burada yakala
-                            if(item.bankName.includes('Kredi Taksidi')) {
-                                itemIcon = cashOutline;
-                                itemColor = "success";
-                            } else {
-                                itemIcon = item.source === 'email' ? mailOutline : chatbubbleEllipsesOutline;
-                                itemColor = "primary";
-                            }
+                            itemIcon = item.source === 'email' ? mailOutline : chatbubbleEllipsesOutline;
+                            itemColor = "primary";
                         }
 
 
@@ -177,7 +171,7 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                 </IonList>
             ) : (
                 <IonItem lines="none">
-                    <p className="empty-list-message">Görüntülenecek aktif ekstre veya kredi bilgisi bulunamadı. Geçmiş kayıtlar otomatik olarak gizlenir. Yeni veri getirmeyi deneyebilirsiniz.</p>
+                    <p className="empty-list-message">Görüntülenecek aktif ekstre bilgisi bulunamadı. Geçmiş kayıtlar otomatik olarak gizlenir. Yeni veri getirmeyi deneyebilirsiniz.</p>
                 </IonItem>
             )}
         </>

@@ -8,7 +8,7 @@ import type {
 } from '../../plugins/google-auth/definitions';
 
 // Tipleri import edelim
-import type { BankProcessor, BankSmsParser, BankEmailParser, ParsedStatement, SmsDetails, EmailDetails, ParsedLoan, DecodedEmailBody } from './types'; // DecodedEmailBody eklendi (canParse için)
+import type { BankProcessor, BankSmsParser, BankEmailParser, ParsedStatement, SmsDetails, EmailDetails, DecodedEmailBody } from './types'; // DecodedEmailBody eklendi (canParse için)
 
 // Gmail Servisi
 // import { gmailService } from '../index'; // <-- İndex üzerinden import kaldırıldı
@@ -22,9 +22,8 @@ import { QnbSmsParser } from './parsers/qnb-parser';
 // import { YapiKrediSmsParser } from './parsers/yapikredi-parser'; // Henüz yok
 import { KuveytTurkSmsParser } from './parsers/kuveytturk-parser'; // Yeni parser'ı import et
 
-// Kredi SMS Parser'ları
-import { qnbLoanParser } from './parsers/qnb-parser';
-import { garantiLoanParser, GarantiParser } from './parsers/garanti-parser'; // Yeni Garanti kredi parser'ını import et
+// Garanti Parser
+import { GarantiParser } from './parsers/garanti-parser';
 import { garantiEmailParser } from 'services/email-parsing/parsers/garanti-email-parser';
 
 // EMAIL Parser'ları
@@ -35,16 +34,14 @@ import { kuveytturkEmailParser } from 'services/email-parsing/parsers/kuveytturk
 import { akbankEmailParser } from 'services/email-parsing/parsers/akbank-email-parser';
 
 // --- Banka İşlemci Yapılandırması --- //
-// Her banka için SMS, Kredi ve E-posta parser'larını ve Gmail sorgusunu burada tanımlayalım
+// Her banka için SMS ve E-posta parser'larını ve Gmail sorgusunu burada tanımlayalım
 // Dışa aktarılıyor:
 export const availableBankProcessors: BankProcessor[] = [
   {
     bankName: 'QNB',
     smsSenderKeywords: ['QNB'],
     smsStatementQueryKeyword: 'borcu', // Ekstre için
-    smsLoanQueryKeyword: 'krediniz', // Kredi için
     smsParser: new QnbSmsParser(),
-    loanSmsParser: qnbLoanParser,
   },
   {
     bankName: 'Yapı Kredi', 
@@ -61,9 +58,7 @@ export const availableBankProcessors: BankProcessor[] = [
     bankName: 'Garanti BBVA Bonus',
     smsSenderKeywords: ['GARANTIBBVA', 'GARANTiBBVA', 'BONUS'],
     smsStatementQueryKeyword: 'ekstresinin',
-    smsLoanQueryKeyword: 'ihtiyac krediniz',
     smsParser: new GarantiParser(),
-    loanSmsParser: garantiLoanParser,
     emailParser: garantiEmailParser,
     gmailQuery: 'from:(garantibbva@garantibbva.com.tr) subject:("Bonus Ekstresi")',
   },
@@ -314,71 +309,6 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
     return finalStatements;
   }
 
-  // --- Kredileri Getir ve Ayrıştır --- //
-  async fetchAndParseLoans(options: SmsFilterOptions = { maxCount: 50 }): Promise<ParsedLoan[]> {
-    let parsedLoans: ParsedLoan[] = [];
-    const smsPermission = await this.checkSmsPermission();
-
-    // Son 2 aylık mesajlar için tarih filtresi
-    const twoMonthsAgo = new Date();
-    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
-    const minDateTimestamp = twoMonthsAgo.getTime();
-
-    // --- SMS İşleme (Her banka için ayrı sorgu) ---
-    if (smsPermission.readSms === 'granted') {
-        for (const processor of availableBankProcessors) {
-            // Sadece KREDİ SMS parser'ı ve gönderici listesi olanları işle
-            if (processor.loanSmsParser && processor.smsSenderKeywords && processor.smsSenderKeywords.length > 0 && processor.smsLoanQueryKeyword) {
-                const fetchLoanOptions: SmsFilterOptions = {
-                    maxCount: 5, // Her banka için en yeni kredi SMS'i yeterli
-                    senders: processor.smsSenderKeywords, // Sadece bu bankanın göndericileri
-                    keywords: [processor.smsLoanQueryKeyword], // Sadece kredi anahtar kelimesi
-                    minDate: minDateTimestamp, // Son 2 ayda gelenler
-                };
-
-                try {
-                    const result = await SmsReader.getMessages(fetchLoanOptions);
-                    const messages: SmsDetails[] = (result.messages || []).map(msg => ({
-                        sender: msg.address || 'Unknown',
-                        body: msg.body || '',
-                        date: msg.date || Date.now(),
-                    }));
-
-                    // Dönen mesajları işle (en yeni ilk sırada)
-                    for (const message of messages) {
-                        if (processor.loanSmsParser.canParse(message.sender, message.body)) {
-                            const loan = processor.loanSmsParser.parse(message);
-                            if (loan) {
-                                parsedLoans.push({ ...loan, source: 'sms'});
-                                break; // Bu banka için en yeniyi bulduk
-                            }
-                        }
-                    }
-                } catch (err) {
-                    console.error(`[Processor] !!! Error fetching/parsing loans for ${processor.bankName}:`, err);
-                }
-            }
-        }
-    } else {
-      console.warn('SMS permission not granted. Cannot fetch loans.');
-    }
-
-    // --- E-posta Kredileri (Gelecekte eklenebilir) ---
-
-    // --- Sonuçları Birleştirme ve Sıralama ---
-    parsedLoans.sort((a, b) => {
-        if (a.firstPaymentDate && b.firstPaymentDate) {
-            return b.firstPaymentDate.getTime() - a.firstPaymentDate.getTime(); // En yeniden eskiye
-        } else if (a.firstPaymentDate) {
-            return -1; // a'nın tarihi var, b'nin yok, a önce gelsin (yeni olduğu için)
-        } else if (b.firstPaymentDate) {
-            return 1; // b'nin tarihi var, a'nın yok, b önce gelsin
-        } else {
-            return 0; // İkisinin de tarihi yok, sıralama değişmesin
-        }
-    });
-    return parsedLoans;
-  }
 }
 
 // Servisin tek bir örneğini oluşturup dışa aktarabiliriz

@@ -1,6 +1,6 @@
 // src/services/sms-parsing/parsers/qnb-parser.test.ts
-import { QnbSmsParser, qnbLoanParser } from '../qnb-parser';
-import { SmsDetails, ParsedStatement, ParsedLoan } from '../../types'; // Doğru tipleri import et
+import { QnbSmsParser } from '../qnb-parser';
+import { SmsDetails, ParsedStatement } from '../../types'; // Doğru tipleri import et
 import { parseDMYDate } from '../../../../utils/parsing'; // Tarih parse fonksiyonunu import edelim
 
 // --- QnbSmsParser (Ekstre) Testleri ---
@@ -62,69 +62,3 @@ describe('QnbSmsParser', () => {
 
   });
 });
-
-// --- qnbLoanParser (Kredi) Testleri ---
-describe('qnbLoanParser', () => {
-  // Bu bir nesne, instance oluşturmaya gerek yok
-
-  describe('canParse', () => {
-    // ... (canParse testleri aynı kalıyor) ...
-    it('should return true for relevant sender and body keywords', () => {
-      expect(qnbLoanParser.canParse('qnb finansbank', '... krediniz ... vadesiz hesabiniza yatirilmistir ... ilk taksitin odeme tarihi ...')).toBe(true);
-    });
-    it('should return false for irrelevant sender', () => {
-       expect(qnbLoanParser.canParse('BaskaBanka', '... krediniz ... vadesiz hesabiniza yatirilmistir ... ilk taksitin odeme tarihi ...')).toBe(false);
-    });
-    it('should return false for missing keywords in body', () => {
-       expect(qnbLoanParser.canParse('qnb', 'Sadece vadesiz hesabiniza yatirilmistir.')).toBe(false);
-       expect(qnbLoanParser.canParse('qnb', 'Sadece ilk taksitin odeme tarihi.')).toBe(false);
-       expect(qnbLoanParser.canParse('qnb', 'Sadece krediniz onaylandi.')).toBe(false);
-    });
-  });
-
-  describe('parse', () => {
-    it('should correctly parse a QNB loan approval SMS', () => {
-      const sms: SmsDetails = {
-        sender: 'QNB Finansbank',
-        body: 'Degerli musterimiz, 15.000,00 TL krediniz 12345678 no\'lu vadesiz hesabiniza yatirilmistir. 36 ay vadeli, 500,00 TL taksitli kredinizin ilk taksitin odeme tarihi 10/08/2024\'dur.',
-        date: new Date('2024-07-20T10:00:00Z').getTime(),
-      };
-
-      const expectedFirstPaymentDate = parseDMYDate('10/08/2024');
-      expect(expectedFirstPaymentDate).not.toBeNull(); // Tarihin parse edildiğinden emin ol
-
-      const expected: Partial<ParsedLoan> = { // Partial yapalım
-        bankName: 'QNB',
-        loanAmount: 15000.00,
-        installmentAmount: 500.00,
-        termMonths: 36,
-        accountNumber: '12345678',
-        source: 'sms',
-      };
-
-      const result = qnbLoanParser.parse(sms);
-
-      expect(result).not.toBeNull();
-       // Alanları ayrı ayrı kontrol et
-      expect(result?.bankName).toBe(expected.bankName);
-      expect(result?.loanAmount).toBe(expected.loanAmount);
-      expect(result?.installmentAmount).toBe(expected.installmentAmount);
-      expect(result?.termMonths).toBe(expected.termMonths);
-      expect(result?.accountNumber).toBe(expected.accountNumber);
-      expect(result?.source).toBe(expected.source);
-      expect(result?.firstPaymentDate?.getTime()).toBe(expectedFirstPaymentDate!.getTime()); // ! ile null olmadığını belirttik
-
-      // Orijinal mesajı kontrol et (tip zorlaması ile)
-      expect(result?.originalMessage).toBeDefined();
-      expect((result?.originalMessage as SmsDetails)?.sender).toBe(sms.sender);
-      expect((result?.originalMessage as SmsDetails)?.body).toBe(sms.body);
-      expect((result?.originalMessage as SmsDetails)?.date).toBe(sms.date);
-    });
-
-    // --- Diğer qnbLoanParser parse testleri kaldırıldı ---
-
-  });
-});
-
-// Utility Omit tipi (TypeScript'te yerleşik değilse - build sırasında sorun çıkarabilir, kaldırmak daha güvenli olabilir)
-// type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>; // Bu satırı kaldırdım, Omit kullanmıyoruz artık.

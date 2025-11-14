@@ -1,5 +1,5 @@
-import { GarantiParser, garantiLoanParser } from '../garanti-parser';
-import type { SmsDetails, ParsedStatement, ParsedLoan } from '../../types';
+import { GarantiParser } from '../garanti-parser';
+import type { SmsDetails, ParsedStatement } from '../../types';
 
 describe('Garanti Parser Tests', () => {
 
@@ -48,35 +48,6 @@ describe('Garanti Parser Tests', () => {
     });
 
     // TODO: Add more test cases for GarantiParser (Bonus Statement)
-  });
-
-  describe('garantiLoanParser', () => {
-      it('should correctly parse a standard loan approval SMS', () => {
-          const testDate = Date.now();
-          const sms: SmsDetails = {
-            sender: 'Garantibbva',
-            body: 'Degerli musterimiz, 15.000 TL tutarinda 12 ay vadeli ihtiyac krediniz hesabiniza aktarilmis, kullaniminiza acilmistir. Saglikli gunlerde kullanmanizi dileriz. Mersis:0879001756600379 B001',
-            date: testDate,
-          };
-
-          const expectedResult: ParsedLoan = {
-              bankName: 'Garanti BBVA',
-              loanAmount: 15000,
-              termMonths: 12,
-              installmentAmount: null,
-              firstPaymentDate: null,
-              accountNumber: undefined,
-              originalMessage: sms,
-              source: 'sms',
-              entryType: 'debt',
-          };
-
-          const result = garantiLoanParser.parse(sms);
-          expect(result).not.toBeNull();
-          expect(result).toEqual(expectedResult); // Tüm nesneyi karşılaştır
-      });
-
-    // TODO: Add more test cases for garantiLoanParser
   });
 
 });

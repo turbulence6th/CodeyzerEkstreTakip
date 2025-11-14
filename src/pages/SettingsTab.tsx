@@ -106,7 +106,7 @@ const SettingsTab: React.FC = () => {
   const presentPermissionAlert = () => {
     presentAlert({
       header: 'SMS İzni Açıklaması',
-      message: 'Uygulamanın çalışabilmesi için bankalardan gelen ekstre ve kredi SMS\'lerini okuyarak son ödeme ve taksit tarihlerini otomatik olarak finansal takviminize eklemesi gerekir. \n\nUygulama SADECE bankalara ait olduğu anlaşılan (gönderici adı ve içerik filtrelemesi ile) ve finansal bilgi içeren SMS\'leri okur, diğer mesajlarınıza erişmez. Okunan veriler sadece cihazınızda işlenir ve KESİNLİKLE paylaşılmaz.',
+      message: 'Uygulamanın çalışabilmesi için bankalardan gelen ekstre SMS\'lerini okuyarak son ödeme tarihlerini otomatik olarak finansal takviminize eklemesi gerekir. \n\nUygulama SADECE bankalara ait olduğu anlaşılan (gönderici adı ve içerik filtrelemesi ile) ve finansal bilgi içeren SMS\'leri okur, diğer mesajlarınıza erişmez. Okunan veriler sadece cihazınızda işlenir ve KESİNLİKLE paylaşılmaz.',
       buttons: [
         {
           text: 'İptal',

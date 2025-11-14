@@ -5,7 +5,7 @@ import { GoogleAuth } from '@plugins/google-auth';
 import type { GoogleUser } from '@plugins/google-auth'; 
 
 // Tipler
-import type { ParsedStatement, ParsedLoan } from '../services/sms-parsing/types';
+import type { ParsedStatement } from '../services/sms-parsing/types';
 import type { SmsDetails, EmailDetails } from '../services/sms-parsing/types';
 import type { ManualEntry } from '../types/manual-entry.types';
 
@@ -70,9 +70,9 @@ const AccountTab: React.FC = () => {
       .then((result) => {
         console.log(`Data Fetch Thunk Başarılı. ${result.totalItems} öğe bulundu.`);
         dispatch(addToast({
-            message: result.totalItems > 0 
+            message: result.totalItems > 0
                 ? `${result.totalItems} kayıt başarıyla getirildi.`
-                : 'İlgili ekstre veya kredi bulunamadı.',
+                : 'İlgili ekstre bulunamadı.',
             duration: 2000,
             color: result.totalItems > 0 ? 'success' : 'warning',
         }));
@@ -260,100 +260,6 @@ Tutar: ${formatCurrency(item.amount)}`;
     }
   };
 
-  // BU FONKSİYON ARTIK KULLANILMAYACAK
-  /*
-  const handleAddAllInstallments = async (loan: ParsedLoan) => {
-    if (!loan.firstPaymentDate || !loan.termMonths || !loan.installmentAmount) {
-        dispatch(addToast({ message: 'Taksitleri eklemek için ilk ödeme tarihi, vade ve taksit tutarı bilgisi gerekli.', duration: 3000, color: 'warning', }));
-        return;
-    }
-
-    dispatch(startGlobalLoading('Taksitler ekleniyor...'));
-    let addedCount = 0;
-    let skippedCount = 0;
-    let errorCount = 0;
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-    try {
-      const firstPayment = new Date(loan.firstPaymentDate);
-
-      for (let i = 0; i < loan.termMonths; i++) {
-          let paymentDate = addMonths(firstPayment, i);
-          
-          const dayOfWeek = paymentDate.getDay();
-          if (dayOfWeek === 0) {
-              paymentDate.setDate(paymentDate.getDate() - 2);
-          } else if (dayOfWeek === 6) {
-              paymentDate.setDate(paymentDate.getDate() - 1);
-          }
-
-          paymentDate.setHours(10, 0, 0, 0);
-          const startTime = paymentDate;
-          const endTime = new Date(startTime.getTime());
-          endTime.setHours(10, 30, 0, 0);
-
-          const startTimeIsoForApi = startTime.toISOString();
-          const endTimeIsoForApi = endTime.toISOString();
-
-          const installmentNumber = i + 1;
-          const summary = `Kredi Taksidi - ${loan.bankName} - Taksit ${installmentNumber}/${loan.termMonths}`;
-          const description = `Tutar: ${formatCurrency(loan.installmentAmount)}
-Banka: ${loan.bankName}
-Kaynak: ${loan.source.toUpperCase()}`;
-          
-          const installmentKey = generateAppId(loan, installmentNumber);
-          if (!installmentKey) {
-              console.warn(`Could not generate AppID for installment ${installmentNumber} of loan:`, loan);
-              errorCount++;
-              continue;
-          }
-          
-          const finalDescription = `${description}\n\n${installmentKey}`;
-
-          try {
-              if (calendarEventStatus[installmentKey] === true) {
-                  console.log(`Installment ${installmentKey} already exists in calendar (checked from state).`);
-                  skippedCount++;
-                  continue;
-              }
-
-              const exists = await calendarService.searchEvents(installmentKey);
-              if (exists) {
-                  console.log(`Installment ${installmentKey} already exists in calendar (checked via API).`);
-                  setCalendarEventStatus(prevStatus => ({ ...prevStatus, [installmentKey]: true }));
-                  skippedCount++;
-                  continue;
-              }
-
-              console.log(`Adding installment to calendar: ${summary} for ${installmentKey}`);
-              await calendarService.createEvent(summary, finalDescription, startTimeIsoForApi, endTimeIsoForApi);
-              setCalendarEventStatus(prevStatus => ({ ...prevStatus, [installmentKey]: true }));
-              addedCount++;
-
-          } catch (searchCreateError: any) {
-              console.error(`Error searching/creating calendar event for installment ${installmentKey}:`, searchCreateError);
-              errorCount++;
-          }
-      }
-    } catch (loopError: any) {
-        console.error('Error processing installments:', loopError);
-        dispatch(addToast({ message: `Taksitler işlenirken bir hata oluştu: ${loopError.message || 'Bilinmeyen hata'}`, duration: 3000, color: 'danger', }));
-    } finally {
-        dispatch(stopGlobalLoading());
-        let resultMessage = "";
-        if (addedCount > 0) resultMessage += `${addedCount} taksit başarıyla eklendi. `; 
-        if (skippedCount > 0) resultMessage += `${skippedCount} taksit zaten mevcuttu. `; 
-        if (errorCount > 0) resultMessage += `${errorCount} taksit eklenirken hata oluştu.`;
-        if (!resultMessage) resultMessage = 'İşlem tamamlandı, eklenen veya güncellenen taksit yok.';
-        
-        dispatch(addToast({ 
-            message: resultMessage.trim(), 
-            duration: 4000, 
-            color: errorCount > 0 ? 'danger' : (addedCount > 0 ? 'success' : 'warning') 
-        }));
-    }
-  };
-  */
 
   const handleItemClick = (item: DisplayItem) => {
       let title = "Detay";
@@ -407,7 +313,7 @@ Kaynak: ${loan.source.toUpperCase()}`;
       />
       <IonHeader>
         <IonToolbar className="ion-padding-top">
-          <IonTitle>Ekstreler & Krediler</IonTitle>
+          <IonTitle>Ekstreler</IonTitle>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen className="ion-padding">
@@ -417,7 +323,7 @@ Kaynak: ${loan.source.toUpperCase()}`;
 
         <IonHeader collapse="condense">
           <IonToolbar>
-            <IonTitle size="large">Ekstreler & Krediler</IonTitle>
+            <IonTitle size="large">Ekstreler</IonTitle>
           </IonToolbar>
         </IonHeader>
 
@@ -437,7 +343,7 @@ Kaynak: ${loan.source.toUpperCase()}`;
                          <IonCardContent className="permission-warning-text ion-text-center">
                              {smsPermission === null
                                ? 'SMS izin durumu kontrol ediliyor...' // Durum null iken mesaj
-                               : 'Ekstre ve kredi bilgilerini otomatik görmek için lütfen Ayarlar sekmesinden SMS okuma iznini verin.'} 
+                               : 'Ekstre bilgilerini otomatik görmek için lütfen Ayarlar sekmesinden SMS okuma iznini verin.'}
                          </IonCardContent>
                      </IonCard>
                   )}

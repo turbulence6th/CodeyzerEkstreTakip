@@ -18,19 +18,6 @@ export interface ParsedStatement {
   entryType: 'debt'; // Otomatik kayıtlar her zaman borçtur
 }
 
-// Ayrıştırılmış kredi onay bilgilerini tutacak yapı
-export interface ParsedLoan {
-  bankName: string;
-  loanAmount: number;
-  installmentAmount: number | null; // null olabilir olarak güncellendi
-  termMonths: number; // Vade (ay)
-  firstPaymentDate: Date | null; // null olabilir olarak güncellendi
-  accountNumber?: string; // Vadesiz hesap numarası (varsa)
-  originalMessage: SmsDetails | EmailDetails; // Şimdilik kredi için de birleştirelim
-  source: 'sms' | 'email'; // Kaynak
-  isPaid?: boolean; // Ödendi durumu
-  entryType: 'debt'; // Otomatik kayıtlar her zaman borçtur
-}
 
 // Tüm banka parser'larının uygulaması gereken interface
 export interface BankSmsParser {
@@ -87,12 +74,6 @@ export interface BankEmailParser {
   parse(email: EmailDetails): Promise<ParsedStatement | null> | ParsedStatement | null;
 }
 
-// --- Loan Parsing Types (Common for SMS/Email if applicable) --- //
-
-// Mevcut ParsedLoan arayüzü genellikle SMS odaklı, e-posta ile kredi onayı
-// gelirse buna benzer ayrı bir tip veya mevcut tipte ayrım yapılabilir.
-// export interface ParsedEmailLoan = ...
-
 // --- Ortak Parser Tipleri --- //
 
 // Tek bir banka için hem SMS hem de E-posta parser'larını tutabilen yapı
@@ -100,9 +81,7 @@ export interface BankProcessor {
   bankName: string;
   smsSenderKeywords?: string[]; // Bankanın SMS gönderirken kullandığı numara/başlıklar (opsiyonel)
   smsStatementQueryKeyword?: string; // Ekstre SMS içeriği için anahtar kelime (opsiyonel)
-  smsLoanQueryKeyword?: string; // Kredi SMS içeriği için anahtar kelime (opsiyonel)
   smsParser?: BankSmsParser; // SMS parser (opsiyonel)
-  loanSmsParser?: any; // Kredi SMS parser (şimdilik any, spesifik tip eklenebilir)
   emailParser?: BankEmailParser; // Email parser (opsiyonel)
   gmailQuery?: string; // Bu bankanın e-postalarını bulmak için Gmail sorgusu
   // Diğer banka özel ayarları buraya eklenebilir

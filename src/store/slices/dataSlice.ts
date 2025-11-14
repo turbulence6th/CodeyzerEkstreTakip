@@ -1,12 +1,11 @@
 import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
-import type { ParsedStatement, ParsedLoan } from '../../services/sms-parsing/types';
+import type { ParsedStatement } from '../../services/sms-parsing/types';
 import type { ManualEntry } from '../../types/manual-entry.types.ts';
 import { statementProcessor } from '../../services/sms-parsing/sms-processor';
 import { startGlobalLoading, stopGlobalLoading } from './loadingSlice';
 import type { RootState } from '../index';
 // Type guard importları eklendi
-import { isStatement, isManualEntry as isTypeGuardManualEntry } from '../../utils/typeGuards'; 
-import { addMonths } from '../../utils/formatting'; // addMonths import edildi
+import { isStatement, isManualEntry as isTypeGuardManualEntry } from '../../utils/typeGuards';
 
 // DisplayItem tipi artık ParsedLoan içermiyor.
 type DisplayItem = ParsedStatement | ManualEntry;
@@ -39,7 +38,6 @@ function isSerializableManualEntry(item: SerializableDisplayItem): item is Seria
 
 // Kararlı bir anahtar oluşturma fonksiyonu
 const createStableKey = (item: ParsedStatement): string => {
-    // Kredi taksitleri (artık ParsedStatement gibi davranıyor) için bankName zaten benzersiz
     // Ekstreler için: banka-son4hane-tutar-sonodemetarihi
     const dateStr = item.dueDate.toISOString().split('T')[0]; // Sadece YYYY-MM-DD
     return `${item.bankName}:${item.last4Digits || 'none'}:${item.amount}:${dateStr}`.toLowerCase();
@@ -68,45 +66,12 @@ export const fetchAndProcessDataThunk = createAsyncThunk<
 
     dispatch(startGlobalLoading("Veriler işleniyor..."));
     try {
-      console.log("[Thunk] Fetching and parsing statements & loans...");
-      const [parsedStatements, parsedLoans] = await Promise.all([
-        statementProcessor.fetchAndParseStatements({ maxCount: 100 }),
-        statementProcessor.fetchAndParseLoans({ maxCount: 100 })
-      ]);
-      console.log("[Thunk] Promise.all for statement/loan fetching completed.");
+      console.log("[Thunk] Fetching and parsing statements...");
+      const parsedStatements = await statementProcessor.fetchAndParseStatements({ maxCount: 100 });
+      console.log("[Thunk] Statement fetching completed.");
 
-      // Kredileri taksitlere ayır ve ekstre gibi davran
-      const installmentStatements: ParsedStatement[] = [];
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Karşılaştırma için bugünün başlangıcı
-      const tenDaysFromNow = new Date();
-      tenDaysFromNow.setDate(tenDaysFromNow.getDate() + 10);
-      tenDaysFromNow.setHours(23, 59, 59, 999); // 10. günün sonu
-
-      for (const loan of parsedLoans) {
-          if (loan.termMonths && loan.firstPaymentDate && loan.installmentAmount) {
-              for (let i = 0; i < loan.termMonths; i++) {
-                  const dueDate = addMonths(loan.firstPaymentDate, i);
-                  // Sadece vadesi bugünden itibaren 10 gün içinde olan taksitleri listeye ekle
-                  if (dueDate >= today && dueDate <= tenDaysFromNow) {
-                    const installment: ParsedStatement = {
-                        bankName: `${loan.bankName} Kredi Taksidi (${i + 1}/${loan.termMonths})`,
-                        dueDate: dueDate,
-                        amount: loan.installmentAmount,
-                        last4Digits: undefined,
-                        originalMessage: loan.originalMessage,
-                        source: loan.source,
-                        entryType: 'debt',
-                        isPaid: false, // Varsayılan
-                    };
-                    installmentStatements.push(installment);
-                  }
-              }
-          }
-      }
-
-      const fetchedItems: (ParsedStatement)[] = [...parsedStatements, ...installmentStatements];
-      console.log(`Parsed ${parsedStatements.length} statements and expanded ${parsedLoans.length} loans into ${installmentStatements.length} installments.`);
+      const fetchedItems: (ParsedStatement)[] = [...parsedStatements];
+      console.log(`Parsed ${parsedStatements.length} statements.`);
 
       // --- YENİ OTOMATİK KAYITLARI SERIALIZE ET ---
       const serializableFetchedItems: (SerializableStatement)[] = [];

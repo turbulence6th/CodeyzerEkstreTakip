@@ -1,5 +1,5 @@
-import { BankSmsParser, ParsedStatement, SmsDetails, ParsedLoan } from "../types";
-import { parseStandardNumber, parseTurkishNumber, parseDMYDate } from "../../../utils/parsing"; 
+import { BankSmsParser, ParsedStatement, SmsDetails } from "../types";
+import { parseStandardNumber, parseDMYDate } from "../../../utils/parsing"; 
 
 export class QnbSmsParser implements BankSmsParser {
   private bankName = "QNB";
@@ -67,70 +67,4 @@ export class QnbSmsParser implements BankSmsParser {
       return null;
     }
   }
-}
-
-// --- QNB Kredi Onay Parser --- //
-
-export const qnbLoanParser = {
-    bankName: "QNB",
-
-    // Bu parser'ın mesajı işleyip işleyemeyeceğini belirler
-    canParse(sender: string, body: string): boolean {
-        const lowerSender = sender.toLowerCase();
-        const lowerBody = body.toLowerCase();
-        return (
-            (lowerSender === 'qnb' || lowerSender.includes('qnb finansbank')) &&
-            lowerBody.includes('krediniz') &&
-            lowerBody.includes('vadesiz hesabiniza yatirilmistir') &&
-            lowerBody.includes('ilk taksitin odeme tarihi')
-        );
-    },
-
-    // Mesajı ayrıştırır
-    parse(message: SmsDetails): ParsedLoan | null {
-        if (!this.canParse(message.sender, message.body)) {
-            return null;
-        }
-
-        try {
-            // Kredi Tutarını Çıkar (Türkçe formatta bekleniyor: 15.000,00 TL)
-            const loanAmountMatch = message.body.match(/ (\d{1,3}(?:[.,]\d{3})*[.,]\d{2}) TL krediniz/i);
-            const loanAmount = loanAmountMatch ? parseTurkishNumber(loanAmountMatch[1]) : null;
-
-            // Taksit Tutarını Çıkar (Türkçe formatta bekleniyor: 5.179,22 TL)
-            const installmentAmountMatch = message.body.match(/ (\d{1,3}(?:[.,]\d{3})*[.,]\d{2}) TL taksitli/i);
-            const installmentAmount = installmentAmountMatch ? parseTurkishNumber(installmentAmountMatch[1]) : null;
-
-            // Vadeyi Çıkar (3 ay)
-            const termMatch = message.body.match(/ (\d+) ay vade/i);
-            const termMonths = termMatch ? parseInt(termMatch[1], 10) : null;
-
-            // İlk Ödeme Tarihini Çıkar (16/06/2025)
-            const dateMatch = message.body.match(/ilk taksitin odeme tarihi (\d{2}\/\d{2}\/\d{4})/i);
-            const firstPaymentDate = dateMatch ? parseDMYDate(dateMatch[1]) : null;
-
-            // Hesap Numarasını Çıkar (108266946 no'lu)
-            const accountMatch = message.body.match(/ (\d+) no'lu vadesiz/i);
-            const accountNumber = accountMatch ? accountMatch[1] : undefined;
-
-            // Gerekli alanlar ayrıştırılabildiyse sonucu döndür
-            if (loanAmount !== null && installmentAmount !== null && termMonths !== null && firstPaymentDate instanceof Date) {
-                return {
-                    bankName: this.bankName,
-                    loanAmount,
-                    installmentAmount,
-                    termMonths,
-                    firstPaymentDate,
-                    accountNumber,
-                    originalMessage: message,
-                    source: 'sms',
-                    entryType: 'debt',
-                };
-            }
-        } catch (error) {
-            console.error(`[qnbLoanParser] Error parsing message: ${message.body}`, error);
-        }
-
-        return null;
-    },
-}; 
+} 
