@@ -33,6 +33,9 @@ import { isbankEmailParser } from '../email-parsing/parsers/isbank-email-parser'
 import { kuveytturkEmailParser } from 'services/email-parsing/parsers/kuveytturk-email-parser';
 import { akbankEmailParser } from 'services/email-parsing/parsers/akbank-email-parser';
 
+// SCREENSHOT Parser'ları
+import { akbankScreenshotParser } from '../screenshot-parsing/parsers/akbank-screenshot-parser';
+
 // --- Banka İşlemci Yapılandırması --- //
 // Her banka için SMS ve E-posta parser'larını ve Gmail sorgusunu burada tanımlayalım
 // Dışa aktarılıyor:
@@ -80,6 +83,7 @@ export const availableBankProcessors: BankProcessor[] = [
   {
     bankName: 'Akbank',
     emailParser: akbankEmailParser,
+    screenshotParser: akbankScreenshotParser, // YENİ: Screenshot parser eklendi
     gmailQuery: 'from:(hizmet@bilgi.akbank.com) subject:("Kredi kartı ekstre bilgileri")',
   },
   // ... Diğer bankalar eklenebilir

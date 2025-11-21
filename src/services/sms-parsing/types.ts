@@ -12,8 +12,8 @@ export interface ParsedStatement {
   dueDate: Date;
   amount: number | null; // Bazen borç bilgisi olmayabilir
   last4Digits?: string; // Kartın son 4 hanesi (varsa)
-  originalMessage: SmsDetails | EmailDetails; // Hem SMS hem E-posta detaylarını kabul etsin
-  source: 'sms' | 'email'; // Kaynağı belirtmek için alan ekleyelim
+  originalMessage: SmsDetails | EmailDetails | ScreenshotDetails; // SMS, E-posta ve Screenshot detaylarını kabul etsin
+  source: 'sms' | 'email' | 'screenshot'; // Kaynağı belirtmek için alan ekleyelim
   isPaid?: boolean; // Ödendi durumu
   entryType: 'debt'; // Otomatik kayıtlar her zaman borçtur
 }
@@ -74,15 +74,46 @@ export interface BankEmailParser {
   parse(email: EmailDetails): Promise<ParsedStatement | null> | ParsedStatement | null;
 }
 
+// --- Screenshot Parsing Types --- //
+
+// Screenshot (OCR'dan gelen) detayları
+export interface ScreenshotDetails {
+  extractedText: string; // OCR'dan çıkan ham metin
+  imageUri?: string; // Görüntü URI'si (isteğe bağlı, log/debug için)
+  date: Date; // Ne zaman çekildi (SmsDetails ve EmailDetails ile tutarlı olmak için 'date' olarak adlandırıldı)
+}
+
+// Screenshot Parser arayüzü
+export interface BankScreenshotParser {
+  bankName: string;
+
+  /**
+   * Bu parser'ın verilen OCR metnini işleyip işleyemeyeceğini belirler.
+   * Bankayı tanımlamak için OCR metninde banka ismini, logosunu veya karakteristik ifadeleri arar.
+   * @param extractedText OCR'dan çıkan metin
+   * @returns Bu banka için parse edilebilirse true
+   */
+  canParse(extractedText: string): boolean;
+
+  /**
+   * OCR metnini ayrıştırarak ekstre bilgilerini çıkarır.
+   * `canParse` true döndürdüğünde çağrılmalıdır.
+   * @param screenshot Screenshot detayları
+   * @returns Ayrıştırılmış ekstre bilgileri veya null (başarısız olursa)
+   */
+  parse(screenshot: ScreenshotDetails): ParsedStatement | null;
+}
+
 // --- Ortak Parser Tipleri --- //
 
-// Tek bir banka için hem SMS hem de E-posta parser'larını tutabilen yapı
+// Tek bir banka için hem SMS hem de E-posta hem de Screenshot parser'larını tutabilen yapı
 export interface BankProcessor {
   bankName: string;
   smsSenderKeywords?: string[]; // Bankanın SMS gönderirken kullandığı numara/başlıklar (opsiyonel)
   smsStatementQueryKeyword?: string; // Ekstre SMS içeriği için anahtar kelime (opsiyonel)
   smsParser?: BankSmsParser; // SMS parser (opsiyonel)
   emailParser?: BankEmailParser; // Email parser (opsiyonel)
+  screenshotParser?: BankScreenshotParser; // Screenshot parser (opsiyonel)
   gmailQuery?: string; // Bu bankanın e-postalarını bulmak için Gmail sorgusu
   // Diğer banka özel ayarları buraya eklenebilir
 }

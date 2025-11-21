@@ -91,11 +91,60 @@ export function parseDottedDate(dateStr: string | null | undefined): Date | null
     const month = parseInt(parts[2], 10) - 1; // Ay 0'dan başlar
     const year = parseInt(parts[3], 10);
     if (isNaN(day) || isNaN(month) || isNaN(year) || month < 0 || month > 11 || day < 1 || day > 31) return null;
-    const date = new Date(year, month, day, 12, 0, 0, 0); 
+    const date = new Date(year, month, day, 12, 0, 0, 0);
     if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
     return date;
   } catch (error) {
     console.error("Error parsing DD.MM.YYYY date:", dateStr, error);
     return null;
   }
+}
+
+/**
+ * "DD Ay" formatındaki tarihi (yıl olmadan) Date objesine çevirir.
+ * Yıl belirtilmediğinde mevcut yılı kullanır, ama geçmiş bir ay ise gelecek yılı kullanır.
+ * Örnek: "26 Kasım" -> 26 Kasım (bu yıl veya gelecek yıl)
+ */
+export function parseTurkishDayMonth(dateStr: string | null | undefined): Date | null {
+    if (!dateStr) return null;
+    try {
+        const parts = dateStr.trim().toLowerCase().split(/\s+/);
+        if (parts.length !== 2) return null;
+
+        const day = parseInt(parts[0], 10);
+        const monthName = parts[1];
+
+        // turkishMonths değişkenine erişim
+        const months: { [key: string]: number } = {
+            'ocak': 0, 'şubat': 1, 'mart': 2, 'nisan': 3, 'mayıs': 4, 'haziran': 5,
+            'temmuz': 6, 'ağustos': 7, 'eylül': 8, 'ekim': 9, 'kasım': 10, 'aralık': 11
+        };
+        const month = months[monthName];
+
+        if (isNaN(day) || month === undefined || month < 0 || month > 11 || day < 1 || day > 31) {
+            return null;
+        }
+
+        // Şu anki tarih
+        const now = new Date();
+        let year = now.getFullYear();
+
+        // Tarihi oluştur
+        const date = new Date(year, month, day, 12, 0, 0, 0);
+
+        // Eğer tarih geçmişte kaldıysa (bugünden önce), gelecek yılı kullan
+        if (date < now) {
+            year++;
+            date.setFullYear(year);
+        }
+
+        if (date.getMonth() !== month || date.getDate() !== day) {
+            return null;
+        }
+
+        return date;
+    } catch (error) {
+        console.error("Error parsing Turkish day-month:", dateStr, error);
+        return null;
+    }
 } 

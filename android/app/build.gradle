@@ -62,6 +62,10 @@ dependencies {
 
     implementation 'com.github.jai-imageio:jai-imageio-core:1.4.0' // Android'de PDFBox için genellikle gerekli
 
+    // --- OCR (ML Kit Text Recognition) İÇİN GEREKLİ BAĞIMLILIKLAR ---
+    implementation 'com.google.android.gms:play-services-mlkit-text-recognition:19.0.0'
+    implementation 'com.google.android.gms:play-services-tasks:18.2.0'
+
     testImplementation 'org.mockito:mockito-core:5.11.0' // Veya daha güncel stabil 5.x sürümü
     testImplementation 'org.mockito:mockito-inline:5.2.0'
     testImplementation 'commons-io:commons-io:2.11.0' // Veya projenle uyumlu en son sürüm

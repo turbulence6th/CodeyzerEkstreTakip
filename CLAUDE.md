@@ -4,8 +4,9 @@ Bu proje, banka ekstre SMS'lerini ve e-postalarını okuyarak kredi kartı son �
 
 ## Temel Özellikler:
 *   **Otomatik Veri Ayrıştırma:** Belirli bankalardan gelen SMS'leri (QNB, Garanti BBVA Kredi, Kuveyt Türk) ve e-postaları (Gmail) (Yapı Kredi, Ziraat Bankası, İş Bankası, Garanti BBVA Bonus, Kuveyt Türk, Akbank) işler. Son ödeme tarihlerini, kredi ödeme tarihlerini ve diğer ilgili finansal bilgileri çıkarır. SMS'ler için dinamik, büyük/küçük harfe duyarlı (GLOB) native filtreleme kullanılır. E-posta ekleri (örn. PDF) ayrıştırılabilir. **Son 2 ay içindeki mesajları** otomatik olarak tarar (performans ve veri yönetimi için).
-*   **Manuel Giriş:** Otomatik olarak algılanmayan ödeme kayıtlarını manuel olarak eklemeye olanak tanır.
-*   **Birleşik Liste Görünümü:** Ayrıştırılan ve manuel olarak girilen tüm kayıtları tek, düzenli bir listede görüntüler.
+*   **OCR ile Ekran Görüntüsü Ayrıştırma:** Banka mobil uygulamalarından alınan ekran görüntülerini Google ML Kit ile okuyarak otomatik ekstre kaydı oluşturur. Akbank (Akbank, Axess, Wings) kart markaları desteklenir. OCR ile kart numarası, son ödeme tarihi ve ekstre tutarı çıkarılır.
+*   **Manuel Giriş:** Otomatik olarak algılanmayan ödeme kayıtlarını manuel olarak eklemeye olanak tanır. Ekran görüntüsünden otomatik form doldurma desteklenir.
+*   **Birleşik Liste Görünümü:** SMS, e-posta, screenshot ve manuel kayıtları tek, düzenli bir listede görüntüler.
 *   **Google Entegrasyonu:** Güvenli Google oturum açma (OAuth 2.0) ve ödeme etkinliklerini eklemek için Google Takvim API ile entegrasyon. Gmail API aracılığıyla e-posta ekleri alınabilir ve işlenebilir. Takvim etkinlikleri için benzersiz bir AppID sistemi kullanılır.
 *   **İzin Yönetimi:** Android SMS okuma izinlerini yönetir. İzin talebi, Google Play Store politikalarına uygun olarak dinamik ve filtrelenmiş SMS okuma ile güçlendirilmiştir.
 *   **Durum Yönetimi:** Uygulama durumunu (oturum, izinler, veriler) yönetmek ve kalıcı hale getirmek için Redux Toolkit ve Redux Persist kullanır. Hassas veriler (`auth`, `permissions`, `data` slice'ları) `redux-persist-transform-encrypt` ile şifrelenir ve anahtar yönetimi native `SecureStorage` ile sağlanır. Android otomatik yedekleme devre dışı bırakılmıştır.
@@ -17,7 +18,7 @@ Bu proje, banka ekstre SMS'lerini ve e-postalarını okuyarak kredi kartı son �
 *   **Mobil Platform:** Capacitor
 *   **Durum Yönetimi:** Redux Toolkit, React Redux, Redux Persist, redux-persist-transform-encrypt
 *   **API Entegrasyonları:** Google Identity Services (Web), Google People API, Gmail API, Google Calendar API
-*   **Yerel Eklentiler (Capacitor):** SMS okuma (`@plugins/sms-reader`), Google kimlik doğrulaması (`@plugins/google-auth`), ve PDF ayrıştırma (`PdfParserPlugin.java` - `com.tom-roush:pdfbox-android` kütüphanesini kullanır) gibi yerel işlevler için özel Capacitor eklentileri.
+*   **Yerel Eklentiler (Capacitor):** SMS okuma (`@plugins/sms-reader`), Google kimlik doğrulaması (`@plugins/google-auth`), PDF ayrıştırma (`PdfParserPlugin.java` - `com.tom-roush:pdfbox-android` kütüphanesini kullanır) ve OCR (`OcrPlugin.java` - Google ML Kit Text Recognition kullanır) gibi yerel işlevler için özel Capacitor eklentileri.
 *   **Test:** Vitest
 
 ## Proje Yapısı:

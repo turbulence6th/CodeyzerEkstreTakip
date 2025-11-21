@@ -15,8 +15,10 @@ import {
     IonModal, // Datetime modalı için
     IonNote,
     IonSelect,
-    IonSelectOption
+    IonSelectOption,
+    IonIcon
 } from '@ionic/react';
+import { cameraOutline } from 'ionicons/icons';
 import { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '../store';
@@ -26,6 +28,10 @@ import { addToast } from '../store/slices/toastSlice';
 
 // Yeni tipi import edelim (Doğru yol)
 import type { ManualEntry } from '../types/manual-entry.types';
+
+// OCR servisleri
+import { ocrService } from '../services/ocr.service';
+import { screenshotProcessor } from '../services/screenshot-parsing/screenshot-processor';
 
 // Eski SMS ile ilgili importlar ve kodlar kaldırıldı
 
@@ -57,6 +63,62 @@ const ManualEntryTab: React.FC = () => {
             setFormattedDueDate(''); // Tarih seçilmemişse boşalt
         }
     }, [dueDate]);
+
+    const handleScreenshotImport = async () => {
+        dispatch(startGlobalLoading('Ekran görüntüsü işleniyor...'));
+
+        try {
+            // 1. Galeriden resim al ve OCR ile metin çıkar
+            const ocrResult = await ocrService.recognizeFromGallery();
+
+            if (!ocrResult.success || !ocrResult.text) {
+                dispatch(addToast({
+                    message: ocrResult.error || 'OCR işlemi başarısız oldu',
+                    duration: 3000,
+                    color: 'warning'
+                }));
+                return;
+            }
+
+            console.log('OCR Text:', ocrResult.text);
+
+            // 2. Screenshot processor ile parse et
+            const parsed = await screenshotProcessor.processScreenshot(ocrResult.text);
+
+            if (!parsed) {
+                dispatch(addToast({
+                    message: 'Ekstre bilgileri okunamadı. Desteklenen bankalar: ' +
+                            screenshotProcessor.getSupportedBanks().join(', '),
+                    duration: 5000,
+                    color: 'warning'
+                }));
+                return;
+            }
+
+            // 3. Formu otomatik doldur
+            const bankDesc = `${parsed.bankName}${parsed.last4Digits ? ' - ****' + parsed.last4Digits : ''}`;
+            setDescription(bankDesc);
+            setAmount(parsed.amount?.toString() || '');
+            setDueDate(parsed.dueDate.toISOString());
+            setEntryType('debt'); // Screenshot'tan gelen kayıtlar her zaman borç
+
+            dispatch(addToast({
+                message: `✅ ${parsed.bankName} ekstre bilgileri otomatik yüklendi!`,
+                duration: 2000,
+                color: 'success'
+            }));
+
+        } catch (error: any) {
+            console.error('Screenshot import error:', error);
+            dispatch(addToast({
+                message: 'Ekran görüntüsü işlenirken hata oluştu: ' + (error.message || 'Bilinmeyen hata'),
+                duration: 3000,
+                color: 'danger'
+            }));
+        } finally {
+            dispatch(stopGlobalLoading());
+        }
+    };
 
     const handleSave = () => {
         // Validasyon
@@ -141,6 +203,17 @@ const ManualEntryTab: React.FC = () => {
                         <IonTitle size="large">Manuel Kayıt Ekle</IonTitle>
                     </IonToolbar>
                 </IonHeader>
+
+                {/* Screenshot Import Button */}
+                <IonButton
+                    expand="block"
+                    fill="outline"
+                    onClick={handleScreenshotImport}
+                    style={{ marginBottom: '20px' }}
+                >
+                    <IonIcon slot="start" icon={cameraOutline} />
+                    Ekran Görüntüsünden Ekle
+                </IonButton>
 
                 <IonList>
                     <IonItem>
