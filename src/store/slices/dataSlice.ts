@@ -4,6 +4,15 @@ import type { ManualEntry } from '../../types/manual-entry.types.ts';
 import { statementProcessor } from '../../services/sms-parsing/sms-processor';
 import { startGlobalLoading, stopGlobalLoading } from './loadingSlice';
 import type { RootState } from '../index';
+import { Capacitor } from '@capacitor/core';
+
+// iOS'ta SMS okuma mümkün değil - platform kontrolü
+const getIsIOSOrWeb = (): boolean => {
+  const platform = Capacitor.getPlatform();
+  const isNative = Capacitor.isNativePlatform();
+  // iOS veya web platformunda SMS izni gerekmez
+  return platform === 'ios' || !isNative;
+};
 // Type guard importları eklendi
 import { isStatement, isManualEntry as isTypeGuardManualEntry } from '../../utils/typeGuards';
 import { addMonths } from '../../utils/formatting'; // addMonths import edildi
@@ -58,7 +67,9 @@ export const fetchAndProcessDataThunk = createAsyncThunk<
     const { user: userInfo } = state.auth;
 
     // İzin ve giriş kontrolü
-    if (smsPermission?.readSms !== 'granted') {
+    // iOS ve web'de SMS izni gerekmez, sadece e-posta ile çalışır
+    const skipSmsPermission = getIsIOSOrWeb();
+    if (!skipSmsPermission && smsPermission?.readSms !== 'granted') {
       return rejectWithValue("Lütfen önce SMS okuma izni verin.");
     }
     if (!userInfo) {

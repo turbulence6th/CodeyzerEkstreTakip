@@ -1,6 +1,15 @@
 import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, /*IonCard,*/ /*IonCardContent,*/ IonButton, useIonToast, useIonAlert } from '@ionic/react';
 import React/*, { useEffect }*/ from 'react'; // useEffect kaldırıldı
 import './SettingsTab.css';
+import { Capacitor } from '@capacitor/core';
+
+// iOS'ta SMS okuma mümkün değil
+const getIsIOSPlatform = (): boolean => {
+  const platform = Capacitor.getPlatform();
+  const isNative = Capacitor.isNativePlatform();
+  // iOS veya native olmayan platform (web) ise SMS izni gerekmez
+  return platform === 'ios' || !isNative;
+};
 
 // İzinler için importlar
 import {
@@ -30,6 +39,7 @@ const translatePermissionStatus = (status: string | undefined): string => {
 };
 
 const SettingsTab: React.FC = () => {
+  const isIOSPlatform = getIsIOSPlatform();
   const dispatch = useDispatch<AppDispatch>();
   const [presentAlert] = useIonAlert();
 
@@ -153,9 +163,9 @@ const SettingsTab: React.FC = () => {
             </div> 
         )}
 
-        {/* Giriş yapılmışsa İzin Yönetimi Kartı göster */} 
-        {userInfo && (
-            <div style={{ marginBottom: '15px' }}> 
+        {/* Giriş yapılmışsa İzin Yönetimi Kartı göster - iOS'ta SMS izni yok */}
+        {userInfo && !isIOSPlatform && (
+            <div style={{ marginBottom: '15px' }}>
                 <p style={{ marginBottom: '10px' }}>
                   SMS Okuma İzin Durumu: <strong>{translatePermissionStatus(smsPermission?.readSms)}</strong>
                   <IonButton fill="clear" size="small" onClick={checkPermission} style={{ marginLeft: '10px' }}>
@@ -170,7 +180,16 @@ const SettingsTab: React.FC = () => {
                 {permissionError && (
                   <p style={{ color: 'var(--ion-color-danger)', marginTop: '10px' }}>İzin Hatası: {permissionError}</p>
                 )}
-            </div> 
+            </div>
+        )}
+
+        {/* iOS'ta SMS uyarısı */}
+        {userInfo && isIOSPlatform && (
+            <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: 'var(--ion-color-light)', borderRadius: '8px' }}>
+                <p style={{ margin: 0, color: 'var(--ion-color-medium)' }}>
+                  iOS'ta SMS okuma özelliği mevcut değildir. Ekstre bilgileri e-posta üzerinden alınacaktır.
+                </p>
+            </div>
         )}
 
         {/* Giriş yapılmamışsa bilgi mesajı */}

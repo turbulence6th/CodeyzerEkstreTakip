@@ -2,7 +2,8 @@ import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonLis
 import './AccountTab.css';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { GoogleAuth } from '@plugins/google-auth';
-import type { GoogleUser } from '@plugins/google-auth'; 
+import type { GoogleUser } from '@plugins/google-auth';
+import { Capacitor } from '@capacitor/core'; 
 
 // Tipler
 import type { ParsedStatement } from '../services/sms-parsing/types';
@@ -45,7 +46,18 @@ type DisplayItem = ParsedStatement | ManualEntry;
 // Helper function to add months safely - BU FONKSİYON ARTIK formatting.ts İÇİNDE
 // function addMonths...
 
+// iOS'ta SMS okuma mümkün değil, bu yüzden SMS izni kontrolünü atla
+const getIsIOSPlatform = (): boolean => {
+  const platform = Capacitor.getPlatform();
+  const isNative = Capacitor.isNativePlatform();
+  console.log('[AccountTab] Platform check:', { platform, isNative });
+  // iOS veya native olmayan platform (web) ise SMS izni gerekmez
+  return platform === 'ios' || !isNative;
+};
+
 const AccountTab: React.FC = () => {
+  // Platform kontrolünü component içinde yapalım
+  const isIOSPlatform = getIsIOSPlatform();
   const dispatch = useDispatch<AppDispatch>();
   const [presentToast] = useIonToast();
   const [calendarEventStatus, setCalendarEventStatus] = useState<Record<string, boolean>>({});
@@ -89,7 +101,9 @@ const AccountTab: React.FC = () => {
 
   useEffect(() => {
     // İlk veri çekme
-    if (userInfo && smsPermission?.readSms === 'granted' && lastUpdated === null) {
+    // iOS'ta SMS izni yok, sadece email ile çalışır
+    const canFetchData = isIOSPlatform || smsPermission?.readSms === 'granted';
+    if (userInfo && canFetchData && lastUpdated === null) {
         console.log('AccountTab: Initial data fetch triggered.');
         fetchAndProcessData();
     }
@@ -161,8 +175,11 @@ const AccountTab: React.FC = () => {
     checkCalendarEvents();
   }, [displayItems, userInfo]);
 
-  // YENİ useEffect: İzin durumunu otomatik kontrol et
+  // YENİ useEffect: İzin durumunu otomatik kontrol et (sadece Android için)
   useEffect(() => {
+      // iOS'ta SMS okuma izni yok, bu yüzden kontrolü atla
+      if (isIOSPlatform) return;
+
       if (smsPermission === null || smsPermission === undefined) {
           console.log('AccountTab: SMS permission status is unknown, dispatching check...');
           dispatch(checkSmsPermissionThunk());
@@ -172,17 +189,19 @@ const AccountTab: React.FC = () => {
   // Yenileme işlemini yönetecek fonksiyon
   const handleRefresh = async (event: CustomEvent<RefresherEventDetail>) => {
     console.log('Pull-to-refresh triggered');
-    if (smsPermission?.readSms !== 'granted') {
-      dispatch(addToast({ 
-        message: 'Verileri yenilemek için SMS okuma izni gerekli.', 
-        duration: 3000, 
+    // iOS'ta SMS izni gerekmez, sadece email ile çalışır
+    const canRefresh = isIOSPlatform || smsPermission?.readSms === 'granted';
+    if (!canRefresh) {
+      dispatch(addToast({
+        message: 'Verileri yenilemek için Ayarlar sekmesinden SMS okuma izni verin.',
+        duration: 3000,
         color: 'warning',
       }));
       event.detail.complete(); // İzin yoksa da refresher'ı bitir
       return;
     }
     // fetchAndProcessData zaten hata durumunda toast gösteriyor
-    await fetchAndProcessData(); 
+    await fetchAndProcessData();
     event.detail.complete(); // İşlem bitince refresher animasyonunu durdur
   };
 
@@ -342,8 +361,8 @@ Tutar: ${formatCurrency(item.amount)}`;
 
         {userInfo && (
           <div>
-                  {/* İzin durumu bilinmiyorsa veya reddedilmişse uyarıyı göster */}
-                  {(smsPermission === null || (smsPermission && smsPermission.readSms !== 'granted')) && (
+                  {/* İzin durumu bilinmiyorsa veya reddedilmişse uyarıyı göster - iOS'ta SMS izni yok */}
+                  {!isIOSPlatform && (smsPermission === null || (smsPermission && smsPermission.readSms !== 'granted')) && (
                      <IonCard /* color="warning" kaldırıldı */ >
                          <IonCardContent className="permission-warning-text ion-text-center">
                              {smsPermission === null

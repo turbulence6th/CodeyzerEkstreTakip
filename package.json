@@ -11,6 +11,7 @@
     "test.unit": "vitest",
     "lint": "eslint",
     "build:android": "npm run build && npx cap sync android",
+    "build:ios": "npm run build && npx cap sync ios",
     "sync:android": "npx cap sync android",
     "open:android": "npx cap open android"
   },
@@ -23,6 +24,7 @@
     "@capacitor/cli": "^7.2.0",
     "@capacitor/core": "^7.2.0",
     "@capacitor/haptics": "^7.0.1",
+    "@capacitor/ios": "^7.4.4",
     "@capacitor/keyboard": "^7.0.1",
     "@capacitor/preferences": "^7.0.1",
     "@capacitor/status-bar": "^7.0.1",
