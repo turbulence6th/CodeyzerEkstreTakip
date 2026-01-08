@@ -1,24 +1,13 @@
 import { configureStore, combineReducers, Store } from '@reduxjs/toolkit';
 import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
-import type { Persistor } from 'redux-persist'; // Persistor tipini import et
-// Storage motoru olarak Capacitor Preferences'ı kullanacağız (daha güvenli)
-// Veya localforage gibi daha gelişmiş bir seçenek de düşünülebilir.
-// Şimdilik basitlik adına localStorage'ı veya AsyncStorage'ı kullanalım.
-// AsyncStorage React Native içindir, Capacitor için Preferences daha uygun.
-// ANCAK: redux-persist doğrudan Preferences ile çalışmayabilir.
-// Bu yüzden en kolayı localStorage veya manuel adaptör.
-// VEYA: Capacitor için özel storage adaptörleri var mı bakalım?
-// Evet, 'redux-persist-capacitor-storage' gibi paketler var ama ekstra bağımlılık.
-// EN BASİT YÖNTEM: localStorage kullanalım (Web ve PWA için çalışır, Native'de de çalışmalı)
-// Daha güvenli alternatif: Capacitor Preferences ile manuel entegrasyon veya özel paket.
-import storage from 'redux-persist/lib/storage'; // localStorage'ı kullanır
-import dateTransform from './transforms/dateTransform'; // Oluşturduğumuz transformu import et
-// import encryptTransform from 'redux-persist-transform-encrypt'; // Eski import kaldırıldı
+import type { Persistor } from 'redux-persist';
+import { Capacitor } from '@capacitor/core';
+import storage from 'redux-persist/lib/storage';
+import dateTransform from './transforms/dateTransform';
 import * as RPTEncrypt from 'redux-persist-transform-encrypt';
-// import { createTransform } from 'redux-persist'; // createTransform kaldırıldı
 
-// Kendi güvenli depolama eklentimizi import edelim
-import { SecureStorage } from '../plugins/secure-storage';
+// Platform kontrolü - iOS'ta şifreleme devre dışı (iOS zaten güvenli - App Sandbox)
+const isIOSPlatform = Capacitor.getPlatform() === 'ios';
 
 // Slice reducer'larını import et
 import authReducer from './slices/authSlice';
@@ -63,15 +52,7 @@ export const getDispatch = (): AppDispatch => {
 
 // Bu fonksiyon anahtarı aldıktan sonra çağrılacak
 export const initializeStore = (encryptionKey: string) => {
-  console.log('[Store Init] Initializing store with encryption key.');
-
-  // Create encrypt transform (sağlanan anahtarla)
-  // encryptor tekrar etkinleştirildi, transform whitelist'i kaldırıldı
-  const encryptor = encryptTransform({
-    secretKey: encryptionKey,
-    onError: (err: Error) => console.error('[Encrypt Transform] Error:', err),
-    // whitelist: ['auth'] // Bu satır kaldırıldı, tüm gelen slice'lar şifrelenecek
-  });
+  console.log('[Store Init] Initializing store. Platform:', Capacitor.getPlatform());
 
   // 1. Ana reducer'ı oluştur
   const rootReducer = combineReducers({
@@ -82,16 +63,31 @@ export const initializeStore = (encryptionKey: string) => {
     toast: toastReducer,
   });
 
-  // 2. RootState tipini tanımla (Bu dışarıda kalabilir veya içeride olabilir, dışarıda kalsın)
-  // export type RootState = ReturnType<typeof rootReducer>;
+  // 2. Transform listesini oluştur
+  // iOS'ta şifreleme devre dışı - iOS App Sandbox zaten güvenli
+  let transforms: any[] = [dateTransform];
+
+  if (!isIOSPlatform) {
+    console.log('[Store Init] Enabling encryption for non-iOS platform.');
+    const encryptor = encryptTransform({
+      secretKey: encryptionKey,
+      onError: (err: Error) => {
+        console.error('[Encrypt Transform] Error:', err);
+        console.warn('[Encrypt Transform] Clearing corrupted persisted state...');
+        storage.removeItem('persist:root').catch(() => {});
+      },
+    });
+    transforms.push(encryptor);
+  } else {
+    console.log('[Store Init] iOS detected - skipping encryption (App Sandbox is secure).');
+  }
 
   // 3. Persist yapılandırmasını tanımla
   const persistConfig = {
     key: 'root',
     storage,
-    whitelist: ['auth', 'permissions', 'data'], // Hepsini persist et
-    // encryptor tekrar eklendi, dateTransform'dan sonra
-    transforms: [dateTransform, encryptor]
+    whitelist: ['auth', 'permissions', 'data'],
+    transforms
   };
 
   // 4. Kalıcı reducer'ı oluştur (RootState tipini kullanarak)

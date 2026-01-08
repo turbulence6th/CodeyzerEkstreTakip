@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>1008857567754-efkc7cugp5piej7romt3l07qm64gsfja.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.1008857567754-efkc7cugp5piej7romt3l07qm64gsfja</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>1008857567754-g2m3i9b7b8uk7fftqn4skclv7ak64r80.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyDUT9Wi28IVQN46PpILCGkPwgYtfBYMNBg</string>
+	<key>GCM_SENDER_ID</key>
+	<string>1008857567754</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.codeyzer.ekstre</string>
+	<key>PROJECT_ID</key>
+	<string>ekstre-takvim-android</string>
+	<key>STORAGE_BUCKET</key>
+	<string>ekstre-takvim-android.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:1008857567754:ios:4d3130bbcd217bd3de05f3</string>
+</dict>
+</plist>

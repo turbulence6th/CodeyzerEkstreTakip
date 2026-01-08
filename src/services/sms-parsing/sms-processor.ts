@@ -1,5 +1,6 @@
 import { SmsReader } from '@plugins/sms-reader'; // Plugin import
 import type { SmsFilterOptions, SmsPermissionStatus } from '@plugins/sms-reader'; // Tipler
+import { Capacitor } from '@capacitor/core'; // Platform detection
 
 // Plugin Definitions Tiplerini Doğrudan Import Et
 import type {
@@ -104,8 +105,19 @@ const availableLoanParsers = [
 
 export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsProcessor -> StatementProcessor
 
+  // Platform iOS mu kontrol et
+  private isIOS(): boolean {
+    return Capacitor.getPlatform() === 'ios';
+  }
+
   // İzin durumunu kontrol et
   async checkSmsPermission(): Promise<SmsPermissionStatus> {
+    // iOS'ta SMS okuma API'si yok
+    if (this.isIOS()) {
+      console.log('[StatementProcessor] iOS platform - SMS reading not available');
+      return { readSms: 'denied' };
+    }
+
     try {
       return await SmsReader.checkPermissions();
     } catch (err) {
@@ -116,6 +128,12 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
 
   // İzin iste
   async requestSmsPermission(): Promise<SmsPermissionStatus> {
+    // iOS'ta SMS izni istenemez
+    if (this.isIOS()) {
+      console.warn('[StatementProcessor] iOS platform - SMS permission cannot be requested');
+      return { readSms: 'denied' };
+    }
+
     try {
       return await SmsReader.requestPermissions();
     } catch (err) {
@@ -135,7 +153,8 @@ export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsPro
     const minDateTimestamp = twoMonthsAgo.getTime();
 
     // --- SMS İşleme (Her banka için ayrı sorgu) ---
-    if (smsPermission.readSms === 'granted') {
+    // iOS'ta SMS okuma mevcut değil, bu blok atlanacak
+    if (smsPermission.readSms === 'granted' && !this.isIOS()) {
         for (const processor of availableBankProcessors) {
             // Sadece SMS parser'ı ve gönderici listesi olanları işle
             if (processor.smsParser && processor.smsSenderKeywords && processor.smsSenderKeywords.length > 0 && processor.smsStatementQueryKeyword) {
