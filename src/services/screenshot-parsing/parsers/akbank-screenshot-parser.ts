@@ -20,11 +20,14 @@ export const akbankScreenshotParser: BankScreenshotParser = {
 
         // Akbank tanımlama: "akbank", "axess" veya "wings" kelimelerinden biri geçmeli
         // OCR hataları için "axess" yerine "aixess", "aıxess" gibi varyasyonları da kabul et
+        // Wings için "w/ngs", "/ngs" gibi OCR hatalarını da kabul et
         const hasAkbank = lowerText.includes('akbank') ||
                          lowerText.includes('axess') ||
                          lowerText.includes('aixess') || // OCR: "aIxess" -> "aixess"
                          lowerText.includes('aıxess') || // OCR: "aıxess"
-                         lowerText.includes('wings');
+                         lowerText.includes('wings') ||
+                         lowerText.includes('w/ngs') || // OCR: "W/NGS" -> "w/ngs"
+                         lowerText.includes('/ngs');     // OCR bazen W'yi kaçırabilir
 
         // Ekstre ile ilgili kelimeler: "son gün" veya "ekstre" veya "öde"
         const hasStatement = lowerText.includes('son gün') ||
@@ -47,12 +50,18 @@ export const akbankScreenshotParser: BankScreenshotParser = {
         let last4Digits: string | undefined = undefined;
 
         // --- Kart Numarası (Son 4 Hane) ---
-        // Format: "****1234" (başında yıldızlar olan 4 rakam)
+        // Format 1: "****1234" (başında yıldızlar olan 4 rakam - Axess kartları)
+        // Format 2: Sadece "1234" (Wings kartları - kart tipi altında)
         // OCR bazen yıldızları "co0e", "c00e" gibi okuyabilir
         let cardMatch = text.match(/\*+(\d{4})/);
         if (!cardMatch) {
             // OCR hatası için alternatif pattern: "co0e 1234", "c00e 1234" gibi
             cardMatch = text.match(/c[o0]+e\s+(\d{4})/i);
+        }
+        if (!cardMatch) {
+            // Wings kartları için: BLACK/PLATINUM/CLASSIC kelimesinden sonra gelen 4 rakam
+            // Örnek: "BLACK\n5678\nKredi kartı"
+            cardMatch = text.match(/(?:BLACK|PLATINUM|CLASSIC|classic)\s*\n?\s*(\d{4})/i);
         }
         if (cardMatch && cardMatch[1]) {
             last4Digits = cardMatch[1];
