@@ -2,32 +2,37 @@ import { createTransform } from 'redux-persist';
 // Serializable tipleri dataSlice'tan import etmek yerine burada da tanımlayabiliriz veya any kullanabiliriz.
 // Slice'ı import etmek döngüsel bağımlılık yaratabilir. Şimdilik any kullanalım.
 
-// Type guards (string tarihli objeler için)
-function isStatementWithStringDate(item: any): item is { dueDate: string } {
-    return item && typeof item === 'object' && typeof item.dueDate === 'string';
-}
-function isLoanWithStringDate(item: any): item is { firstPaymentDate: string | null } {
-    return item && typeof item === 'object' && (typeof item.firstPaymentDate === 'string' || item.firstPaymentDate === null);
-}
+// Persist edilmeyecek gereksiz alanlar (HTML içerikleri, büyük objeler)
+const FIELDS_TO_EXCLUDE = ['originalMessage', 'originalResponse', 'htmlContent', 'body', 'rawContent'];
+
+// Item'dan gereksiz alanları temizle
+const cleanItem = (item: any): any => {
+    if (!item || typeof item !== 'object') return item;
+
+    const cleaned = { ...item };
+    FIELDS_TO_EXCLUDE.forEach(field => {
+        delete cleaned[field];
+    });
+    return cleaned;
+};
 
 const dateTransform = createTransform<
     any, // inbound state type (slice state)
     any  // outbound state type (stored state)
 >(
-    // state -> storage (inbound): Tarihleri ISO string'e çevir.
-    // Bu, thunk içinde yapıldığı için burada tekrar yapmaya gerek YOK.
-    // Ancak manuel girişlerde Date nesnesi gelme ihtimaline karşı yapılabilir.
-    // Şimdilik boş bırakalım, thunk ve reducer'ın doğru formatta eklediğini varsayalım.
+    // state -> storage (inbound): Gereksiz alanları temizle
     (inboundState, key) => {
-        // console.log(`Persisting state for key: ${key}`); 
-        return inboundState; // Gelen state'i olduğu gibi depola (string tarihli olmalı)
+        if (key === 'data' && inboundState && Array.isArray(inboundState.items)) {
+            return {
+                ...inboundState,
+                items: inboundState.items.map(cleanItem)
+            };
+        }
+        return inboundState;
     },
-    // storage -> state (outbound): Depodan okunan string'leri state'e yazarken DÖNÜŞTÜRME.
-    // State'in zaten string tarihli olmasını istiyoruz.
+    // storage -> state (outbound): Depodan okunan state'i olduğu gibi döndür
     (outboundState, key) => {
-        // console.log(`Rehydrating state for key: ${key}`);
-        // Depodan gelen state'i olduğu gibi döndür, DÖNÜŞÜM YAPMA.
-        return outboundState; 
+        return outboundState;
     },
     // Bu transformun hangi slice'a uygulanacağını belirtelim
      { whitelist: ['data'] }
