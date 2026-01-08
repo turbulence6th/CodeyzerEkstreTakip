@@ -1,2 +1,83 @@
 /* For information on how to create your own theme, please see:
 http://ionicframework.com/docs/theming/ */
+
+/* ===== iOS Safe Area Support ===== */
+:root {
+  --ion-safe-area-top: env(safe-area-inset-top);
+  --ion-safe-area-bottom: env(safe-area-inset-bottom);
+  --ion-safe-area-left: env(safe-area-inset-left);
+  --ion-safe-area-right: env(safe-area-inset-right);
+}
+
+/* Status bar alanı için arka plan - içerik görünmez */
+ion-header::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top);
+  background: var(--ion-toolbar-background, var(--ion-background-color, #fff));
+  z-index: 99999;
+}
+
+@media (prefers-color-scheme: dark) {
+  ion-header::before {
+    background: var(--ion-toolbar-background, var(--ion-background-color, #1c1c1d));
+  }
+}
+
+/* Toolbar içeriğini safe area altına it */
+ion-header ion-toolbar:first-of-type {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Tab bar'ı en alta sabitle */
+ion-tab-bar {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ion-refresher arka planlı olsun, içerik görünmesin */
+ion-refresher {
+  z-index: -1 !important;
+}
+
+ion-refresher-content {
+  background: var(--ion-background-color, #fff);
+}
+
+@media (prefers-color-scheme: dark) {
+  ion-refresher-content {
+    background: var(--ion-background-color, #1c1c1d);
+  }
+}
+
+/* ===== iOS Compact UI ===== */
+.ios {
+  /* Compact toolbar */
+  ion-toolbar {
+    --min-height: 44px;
+  }
+
+
+  /* Tab buttons - vertically centered */
+  ion-tab-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Reduce large title padding */
+  ion-header[collapse="condense"] ion-title[size="large"] {
+    padding-top: 0;
+    padding-bottom: 4px;
+    font-size: 28px;
+  }
+
+  /* Compact card margins */
+  ion-card {
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+}

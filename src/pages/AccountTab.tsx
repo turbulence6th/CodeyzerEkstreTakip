@@ -331,7 +331,7 @@ Tutar: ${formatCurrency(item.amount)}`;
         onDismiss={() => setIsModalOpen(false)}
       />
       <IonHeader>
-        <IonToolbar className="ion-padding-top">
+        <IonToolbar>
           <IonTitle>Ekstreler</IonTitle>
           <IonButtons slot="end">
             <IonButton routerLink="/loan-management" color="primary">

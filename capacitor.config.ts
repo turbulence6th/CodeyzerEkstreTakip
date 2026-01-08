@@ -5,11 +5,11 @@ const config: CapacitorConfig = {
   appName: 'Codeyzer Ekstre Takip',
   webDir: 'dist',
   ios: {
-    contentInset: 'automatic',
+    contentInset: 'never',
     preferredContentMode: 'mobile',
     backgroundColor: '#ffffff',
-    // Disable backup for security (sensitive data in Redux store)
-    allowsLinkPreview: true
+    allowsLinkPreview: true,
+    scrollEnabled: true
   },
   android: {
     allowMixedContent: false
@@ -20,8 +20,12 @@ const config: CapacitorConfig = {
       resizeOnFullScreen: true
     },
     StatusBar: {
-      style: 'dark',
-      backgroundColor: '#ffffff'
+      style: 'default',
+      overlaysWebView: true
+    },
+    SplashScreen: {
+      launchAutoHide: true,
+      showSpinner: false
     }
   }
 };

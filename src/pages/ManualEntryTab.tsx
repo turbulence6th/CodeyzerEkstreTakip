@@ -193,7 +193,7 @@ const ManualEntryTab: React.FC = () => {
     return (
         <IonPage>
             <IonHeader>
-                <IonToolbar className="ion-padding-top">
+                <IonToolbar>
                     <IonTitle>Manuel Kayıt Ekle</IonTitle>
                 </IonToolbar>
             </IonHeader>
