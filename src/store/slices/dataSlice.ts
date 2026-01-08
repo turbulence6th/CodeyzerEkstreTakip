@@ -301,6 +301,26 @@ const dataSlice = createSlice({
            console.warn(`Loan with ID ${loanIdToDelete} not found for deletion.`);
        }
     },
+    // Verileri import et (cihazlar arası aktarım için)
+    importData: (state, action: PayloadAction<{ items: SerializableDisplayItem[], merge: boolean }>) => {
+       const { items: importedItems, merge } = action.payload;
+
+       if (merge) {
+         // Mevcut verilere ekle (aynı ID varsa atla)
+         const existingIds = new Set(state.items.map(item => item.id));
+         const newItems = importedItems.filter(item => !existingIds.has(item.id));
+         state.items.push(...newItems);
+         console.log(`Imported ${newItems.length} new items (merged)`);
+       } else {
+         // Tüm verileri değiştir
+         state.items = importedItems;
+         console.log(`Imported ${importedItems.length} items (replaced)`);
+       }
+
+       sortItemsByDate(state.items);
+       state.error = null;
+       state.lastUpdated = Date.now();
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -517,5 +537,5 @@ export const selectGroupedLoans = createSelector(
 
 
 // Yeni action'ı export et
-export const { clearData, addManualEntry, deleteManualEntry, togglePaidStatus, deleteLoan } = dataSlice.actions;
+export const { clearData, addManualEntry, deleteManualEntry, togglePaidStatus, deleteLoan, importData } = dataSlice.actions;
 export default dataSlice.reducer;
