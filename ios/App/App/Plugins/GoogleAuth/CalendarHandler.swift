@@ -90,7 +90,11 @@ class CalendarHandler {
         }
 
         // Aynı günün başı ve sonu
-        let calendar = Calendar.current
+        var calendar = Calendar(identifier: .gregorian)
+        if let tz = TimeZone(identifier: "Europe/Istanbul") {
+            calendar.timeZone = tz
+        }
+        
         let startOfDay = calendar.startOfDay(for: date)
         guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
             completion(.success(["eventFound": false]))
