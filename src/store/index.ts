@@ -11,7 +11,6 @@ const isIOSPlatform = Capacitor.getPlatform() === 'ios';
 
 // Slice reducer'larını import et
 import authReducer from './slices/authSlice';
-import permissionReducer from './slices/permissionSlice';
 import dataReducer from './slices/dataSlice';
 import loadingReducer from './slices/loadingSlice'; // Yeni loading reducer'ı import et
 import toastReducer from './slices/toastSlice'; // Yeni toast reducer'ı import et
@@ -57,7 +56,6 @@ export const initializeStore = (encryptionKey: string) => {
   // 1. Ana reducer'ı oluştur
   const rootReducer = combineReducers({
     auth: authReducer,
-    permissions: permissionReducer,
     data: dataReducer,
     loading: loadingReducer,
     toast: toastReducer,
@@ -86,7 +84,7 @@ export const initializeStore = (encryptionKey: string) => {
   const persistConfig = {
     key: 'root',
     storage,
-    whitelist: ['auth', 'permissions', 'data'],
+    whitelist: ['auth', 'data'],
     transforms
   };
 
@@ -118,7 +116,6 @@ export const initializeStore = (encryptionKey: string) => {
 // Bu tipleri dışarıda export etmeye devam et
 const rootReducerPlaceholder = combineReducers({
   auth: authReducer,
-  permissions: permissionReducer,
   data: dataReducer,
   loading: loadingReducer,
   toast: toastReducer,

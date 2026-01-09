@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { akbankEmailParser } from '../akbank-email-parser';
-import type { EmailDetails, DecodedEmailBody } from '../../../sms-parsing/types';
+import type { EmailDetails, DecodedEmailBody } from '../../../statement-parsing/types';
 
 const mockHtmlPath = path.resolve(__dirname, 'mocks/akbank-ekstre-sample.html');
 

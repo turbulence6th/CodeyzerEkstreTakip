@@ -1,4 +1,4 @@
-import type { ParsedStatement } from '../services/sms-parsing/types';
+import type { ParsedStatement } from '../services/statement-parsing/types';
 import type { ManualEntry } from '../types/manual-entry.types';
 import { formatTargetDate } from './formatting'; // Tarih formatlama fonksiyonunu import edelim
 import { isStatement, isManualEntry } from './typeGuards';

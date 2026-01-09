@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { ziraatEmailParser } from '../ziraat-email-parser'; // Parser'ı import et
-import type { EmailDetails, DecodedEmailBody } from '../../../sms-parsing/types';
+import type { EmailDetails, DecodedEmailBody } from '../../../statement-parsing/types';
 
 // Mock HTML dosyasının yolu (test dosyasının konumuna göre ayarla)
 const mockHtmlPath = path.resolve(__dirname, 'mocks/ziraat-ekstre-sample.html');

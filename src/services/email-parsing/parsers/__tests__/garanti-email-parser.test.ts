@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { garantiEmailParser } from '../garanti-email-parser';
-import type { EmailDetails, DecodedEmailBody } from '../../../sms-parsing/types';
+import type { EmailDetails, DecodedEmailBody } from '../../../statement-parsing/types';
 
 const mockHtmlTroyPath = path.resolve(__dirname, 'mocks/garanti-ekstre-troy.html');
 const mockHtmlMastercardPath = path.resolve(__dirname, 'mocks/garanti-ekstre-mastercard.html');

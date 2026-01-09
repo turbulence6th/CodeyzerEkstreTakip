@@ -28,7 +28,7 @@ import {
 } from 'ionicons/icons';
 
 // Tipler
-import type { ParsedStatement } from '../services/sms-parsing/types';
+import type { ParsedStatement } from '../services/statement-parsing/types';
 import type { ManualEntry } from '../types/manual-entry.types';
 
 // Yeni utils'leri import et
@@ -109,8 +109,8 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                                 itemColor = "tertiary";
                             }
                         } else if (isStatement(item)) {
-                            itemIcon = item.source === 'email' ? mailOutline : chatbubbleEllipsesOutline;
-                            itemColor = "primary";
+                            itemIcon = item.source === 'email' ? mailOutline : documentTextOutline; // screenshot için
+                            itemColor = item.source === 'email' ? "primary" : "success"; // Screenshot farklı renk
                         }
 
 

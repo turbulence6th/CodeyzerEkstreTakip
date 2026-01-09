@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { kuveytturkEmailParser } from '../kuveytturk-email-parser'; // Test edilecek parser
-import type { EmailDetails, DecodedEmailBody } from '../../../sms-parsing/types';
+import type { EmailDetails, DecodedEmailBody } from '../../../statement-parsing/types';
 
 // Mock HTML dosyasının yolu
 const mockHtmlPath = path.resolve(__dirname, 'mocks/kuveytturk-ekstre-sample.html');

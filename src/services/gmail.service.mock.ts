@@ -1,9 +1,9 @@
 // src/services/gmail.service.mock.ts
-import type { EmailDetails, DecodedEmailBody } from "./sms-parsing/types"; // DecodedEmailBody eklendi
+import type { EmailDetails, DecodedEmailBody } from "./statement-parsing/types"; // DecodedEmailBody eklendi
 
 const MOCK_DELAY = 500; // Sahte ağ gecikmesi
 
-// Mock verisini, sms-processor'ın beklediği payload.headers yapısını içerecek şekilde güncelleyelim
+// Mock verisini, statement-processor'ın beklediği payload.headers yapısını içerecek şekilde güncelleyelim
 const mockEmails = [
     {
         id: 'mock_email_1', threadId: 'thread_1',

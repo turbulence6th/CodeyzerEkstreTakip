@@ -1,18 +1,10 @@
 import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
-import type { ParsedStatement } from '../../services/sms-parsing/types';
+import type { ParsedStatement } from '../../services/statement-parsing/types';
 import type { ManualEntry } from '../../types/manual-entry.types.ts';
-import { statementProcessor } from '../../services/sms-parsing/sms-processor';
+import { statementProcessor } from '../../services/statement-parsing/statement-processor';
 import { startGlobalLoading, stopGlobalLoading } from './loadingSlice';
 import type { RootState } from '../index';
-import { Capacitor } from '@capacitor/core';
 
-// iOS'ta SMS okuma mümkün değil - platform kontrolü
-const getIsIOSOrWeb = (): boolean => {
-  const platform = Capacitor.getPlatform();
-  const isNative = Capacitor.isNativePlatform();
-  // iOS veya web platformunda SMS izni gerekmez
-  return platform === 'ios' || !isNative;
-};
 // Type guard importları eklendi
 import { isStatement, isManualEntry as isTypeGuardManualEntry } from '../../utils/typeGuards';
 import { addMonths } from '../../utils/formatting'; // addMonths import edildi
@@ -63,15 +55,9 @@ export const fetchAndProcessDataThunk = createAsyncThunk<
   'data/fetchAndProcess',
   async (_, { getState, dispatch, rejectWithValue }) => {
     const state = getState();
-    const { sms: smsPermission } = state.permissions;
     const { user: userInfo } = state.auth;
 
-    // İzin ve giriş kontrolü
-    // iOS ve web'de SMS izni gerekmez, sadece e-posta ile çalışır
-    const skipSmsPermission = getIsIOSOrWeb();
-    if (!skipSmsPermission && smsPermission?.readSms !== 'granted') {
-      return rejectWithValue("Lütfen önce SMS okuma izni verin.");
-    }
+    // Giriş kontrolü
     if (!userInfo) {
       return rejectWithValue("Lütfen önce Google ile giriş yapın.");
     }
@@ -79,7 +65,7 @@ export const fetchAndProcessDataThunk = createAsyncThunk<
     dispatch(startGlobalLoading("Veriler işleniyor..."));
     try {
       console.log("[Thunk] Fetching and parsing statements...");
-      const parsedStatements = await statementProcessor.fetchAndParseStatements({ maxCount: 100 });
+      const parsedStatements = await statementProcessor.fetchAndParseStatements();
       console.log("[Thunk] Statement fetching completed.");
 
       const fetchedItems: (ParsedStatement)[] = [...parsedStatements];

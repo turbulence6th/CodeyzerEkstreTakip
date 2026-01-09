@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { yapikrediEmailParser } from '../yapikredi-email-parser'; // Parser'ı import et
-import type { EmailDetails, DecodedEmailBody } from '../../../sms-parsing/types';
+import type { EmailDetails, DecodedEmailBody } from '../../../statement-parsing/types';
 
 // Mock HTML dosyasının yolu
 const mockHtmlPath = path.resolve(__dirname, 'mocks/yapikredi-ekstre-sample.html');

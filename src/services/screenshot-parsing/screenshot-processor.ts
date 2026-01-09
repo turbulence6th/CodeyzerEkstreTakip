@@ -1,5 +1,5 @@
-import type { BankScreenshotParser, ScreenshotDetails, ParsedStatement } from '../sms-parsing/types';
-import { availableBankProcessors } from '../sms-parsing/sms-processor';
+import type { BankScreenshotParser, ScreenshotDetails, ParsedStatement } from '../statement-parsing/types';
+import { availableBankProcessors } from '../statement-parsing/statement-processor';
 
 /**
  * Screenshot Processor Service

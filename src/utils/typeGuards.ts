@@ -1,7 +1,7 @@
 // src/utils/typeGuards.ts
 
 // Gerekli tipleri import et (doğru yolları kontrol et)
-import type { ParsedStatement } from '../services/sms-parsing/types';
+import type { ParsedStatement } from '../services/statement-parsing/types';
 import type { ManualEntry } from '../types/manual-entry.types';
 
 // DisplayItem tipini burada da tanımla veya ortak bir tipler dosyasından import et.
@@ -12,7 +12,7 @@ type DisplayItem = ParsedStatement | ManualEntry;
  * Verilen öğenin bir ParsedStatement olup olmadığını kontrol eder.
  */
 export function isStatement(item: DisplayItem): item is ParsedStatement {
-    return item.source !== 'manual';
+    return item.source === 'email' || item.source === 'screenshot';
 }
 
 /**

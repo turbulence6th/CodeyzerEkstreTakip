@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { akbankScreenshotParser } from '../akbank-screenshot-parser';
-import type { ScreenshotDetails } from '../../../sms-parsing/types';
+import type { ScreenshotDetails } from '../../../statement-parsing/types';
 
 describe('Akbank Screenshot Parser - Real OCR Test', () => {
     it('should parse real Akbank Axess Platinum mobile app screenshot', () => {

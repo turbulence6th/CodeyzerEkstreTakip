@@ -1,4 +1,4 @@
-import type { BankEmailParser, EmailDetails, ParsedStatement, DecodedEmailBody } from '../../sms-parsing/types'; // DecodedEmailBody import edildi
+import type { BankEmailParser, EmailDetails, ParsedStatement, DecodedEmailBody } from '../../statement-parsing/types'; // DecodedEmailBody import edildi
 import { parseTurkishDate } from "../../../utils/parsing"; // parseTurkishNumber kaldırıldı
 
 export const yapikrediEmailParser: BankEmailParser = {

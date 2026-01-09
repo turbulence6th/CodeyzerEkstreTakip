@@ -6,13 +6,13 @@ import type { GoogleUser } from '@plugins/google-auth';
 import { Capacitor } from '@capacitor/core'; 
 
 // Tipler
-import type { ParsedStatement } from '../services/sms-parsing/types';
-import type { SmsDetails, EmailDetails } from '../services/sms-parsing/types';
+import type { ParsedStatement } from '../services/statement-parsing/types';
+import type { EmailDetails, ScreenshotDetails } from '../services/statement-parsing/types';
 import type { ManualEntry } from '../types/manual-entry.types';
 
 // Servisler
 import { gmailService, calendarService } from '../services';
-import { statementProcessor } from '../services/sms-parsing/sms-processor';
+import { statementProcessor } from '../services/statement-parsing/statement-processor';
 import { calendarService as oldCalendarService } from '../services/calendar.service';
 
 // Redux
@@ -27,7 +27,6 @@ import {
   togglePaidStatus, // togglePaidStatus import edildi
 } from '../store/slices/dataSlice';
 import { startGlobalLoading, stopGlobalLoading } from '../store/slices/loadingSlice';
-import { checkSmsPermissionThunk } from '../store/slices/permissionSlice';
 import { addToast } from '../store/slices/toastSlice';
 
 import { addOutline, mailOutline, cashOutline, calendarOutline, chatbubbleEllipsesOutline, documentTextOutline, trashOutline, walletOutline } from 'ionicons/icons';
@@ -46,18 +45,7 @@ type DisplayItem = ParsedStatement | ManualEntry;
 // Helper function to add months safely - BU FONKSİYON ARTIK formatting.ts İÇİNDE
 // function addMonths...
 
-// iOS'ta SMS okuma mümkün değil, bu yüzden SMS izni kontrolünü atla
-const getIsIOSPlatform = (): boolean => {
-  const platform = Capacitor.getPlatform();
-  const isNative = Capacitor.isNativePlatform();
-  console.log('[AccountTab] Platform check:', { platform, isNative });
-  // iOS veya native olmayan platform (web) ise SMS izni gerekmez
-  return platform === 'ios' || !isNative;
-};
-
 const AccountTab: React.FC = () => {
-  // Platform kontrolünü component içinde yapalım
-  const isIOSPlatform = getIsIOSPlatform();
   const dispatch = useDispatch<AppDispatch>();
   const [presentToast] = useIonToast();
   const [calendarEventStatus, setCalendarEventStatus] = useState<Record<string, boolean>>({});
@@ -67,13 +55,12 @@ const AccountTab: React.FC = () => {
   const [modalTitle, setModalTitle] = useState<string>("Detay");
 
   const { user: userInfo, error: authError } = useSelector((state: RootState) => state.auth);
-  const { sms: smsPermission, error: permissionError } = useSelector((state: RootState) => state.permissions);
   const displayItems = useSelector(selectAllDataWithDates);
   const dataError = useSelector((state: RootState) => state.data.error);
   const lastUpdated = useSelector((state: RootState) => state.data.lastUpdated);
   const isLoading = useSelector((state: RootState) => state.loading.isActive);
 
-  const combinedError = authError || permissionError || dataError;
+  const combinedError = authError || dataError;
 
   // fetchAndProcessData fonksiyonunu useCallback ile sarmala (useEffect bağımlılıkları için)
   const fetchAndProcessData = useCallback(async () => {
@@ -101,14 +88,12 @@ const AccountTab: React.FC = () => {
 
   useEffect(() => {
     // İlk veri çekme
-    // iOS'ta SMS izni yok, sadece email ile çalışır
-    const canFetchData = isIOSPlatform || smsPermission?.readSms === 'granted';
-    if (userInfo && canFetchData && lastUpdated === null) {
+    if (userInfo && lastUpdated === null) {
         console.log('AccountTab: Initial data fetch triggered.');
         fetchAndProcessData();
     }
     // fetchAndProcessData bağımlılığı güncellendi
-  }, [userInfo, smsPermission, lastUpdated, fetchAndProcessData]);
+  }, [userInfo, lastUpdated, fetchAndProcessData]);
 
   useEffect(() => {
     const checkCalendarEvents = async () => {
@@ -178,31 +163,9 @@ const AccountTab: React.FC = () => {
     checkCalendarEvents();
   }, [displayItems, userInfo]);
 
-  // YENİ useEffect: İzin durumunu otomatik kontrol et (sadece Android için)
-  useEffect(() => {
-      // iOS'ta SMS okuma izni yok, bu yüzden kontrolü atla
-      if (isIOSPlatform) return;
-
-      if (smsPermission === null || smsPermission === undefined) {
-          console.log('AccountTab: SMS permission status is unknown, dispatching check...');
-          dispatch(checkSmsPermissionThunk());
-      }
-  }, [dispatch, smsPermission]);
-
   // Yenileme işlemini yönetecek fonksiyon
   const handleRefresh = async (event: CustomEvent<RefresherEventDetail>) => {
     console.log('Pull-to-refresh triggered');
-    // iOS'ta SMS izni gerekmez, sadece email ile çalışır
-    const canRefresh = isIOSPlatform || smsPermission?.readSms === 'granted';
-    if (!canRefresh) {
-      dispatch(addToast({
-        message: 'Verileri yenilemek için Ayarlar sekmesinden SMS okuma izni verin.',
-        duration: 3000,
-        color: 'warning',
-      }));
-      event.detail.complete(); // İzin yoksa da refresher'ı bitir
-      return;
-    }
     // fetchAndProcessData zaten hata durumunda toast gösteriyor
     await fetchAndProcessData();
     event.detail.complete(); // İşlem bitince refresher animasyonunu durdur
@@ -292,12 +255,12 @@ Tutar: ${formatCurrency(item.amount)}`;
           content = `Açıklama: ${item.description}\nSon Ödeme: ${formatDate(item.dueDate)}\nTutar: ${formatCurrency(item.amount)}\nID: ${item.id}`;
       } else if (isStatement(item) && item.originalMessage) {
           title = `${item.bankName} Ekstre Detayı`;
-          if (item.source === 'sms') {
-              const sms = item.originalMessage as SmsDetails;
-              content = `Gönderen: ${sms.sender}\nZaman: ${new Date(sms.date).toLocaleString('tr-TR')}\n\n${sms.body}`;
-          } else {
+          if (item.source === 'email') {
               const email = item.originalMessage as EmailDetails;
               content = `Gönderen: ${email.sender}\nKonu: ${email.subject}\nZaman: ${new Date(email.date).toLocaleString('tr-TR')}\n\n--- İçerik ---\n${email.plainBody || 'Düz metin içerik yok.'}`;
+          } else if (item.source === 'screenshot') {
+              const screenshot = item.originalMessage as ScreenshotDetails;
+              content = `Screenshot OCR\nZaman: ${new Date(screenshot.date).toLocaleString('tr-TR')}\n\n--- Çıkarılan Metin ---\n${screenshot.extractedText || 'Metin çıkarılamadı.'}`;
           }
       } else {
           content = 'Detaylar görüntülenemiyor.';
@@ -364,17 +327,6 @@ Tutar: ${formatCurrency(item.amount)}`;
 
         {userInfo && (
           <div>
-                  {/* İzin durumu bilinmiyorsa veya reddedilmişse uyarıyı göster - iOS'ta SMS izni yok */}
-                  {!isIOSPlatform && (smsPermission === null || (smsPermission && smsPermission.readSms !== 'granted')) && (
-                     <IonCard /* color="warning" kaldırıldı */ >
-                         <IonCardContent className="permission-warning-text ion-text-center">
-                             {smsPermission === null
-                               ? 'SMS izin durumu kontrol ediliyor...' // Durum null iken mesaj
-                               : 'Ekstre bilgilerini otomatik görmek için lütfen Ayarlar sekmesinden SMS okuma iznini verin.'}
-                         </IonCardContent>
-                     </IonCard>
-                  )}
-
              <DisplayItemList
                 items={displayItems}
                 calendarEventStatus={calendarEventStatus}

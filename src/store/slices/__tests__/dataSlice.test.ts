@@ -8,7 +8,7 @@ import dataReducer, {
   deleteLoan,
 } from '../dataSlice';
 import type { ManualEntry } from '../../../types/manual-entry.types';
-import type { ParsedStatement } from '../../../services/sms-parsing/types';
+import type { ParsedStatement } from '../../../services/statement-parsing/types';
 
 // DisplayItem tipi (dataSlice'dakiyle aynı)
 type DisplayItem = ParsedStatement | ManualEntry;

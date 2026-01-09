@@ -1,4 +1,4 @@
-import { BankEmailParser, ParsedStatement, EmailDetails, DecodedEmailBody } from '../../sms-parsing/types'; // Tipleri sms-parsing'den alıyoruz
+import { BankEmailParser, ParsedStatement, EmailDetails, DecodedEmailBody } from '../../statement-parsing/types'; // Tipleri statement-parsing'den alıyoruz
 import { gmailService } from '../../index'; // Gmail servisi
 // import { Plugins } from '@capacitor/core'; // Eski import
 import { parseTurkishNumber } from '../../../utils/parsing'; // Sayı ayrıştırma yardımcısını ekle

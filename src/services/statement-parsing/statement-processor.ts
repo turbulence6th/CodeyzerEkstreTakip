@@ -1,7 +1,3 @@
-import { SmsReader } from '@plugins/sms-reader'; // Plugin import
-import type { SmsFilterOptions, SmsPermissionStatus } from '@plugins/sms-reader'; // Tipler
-import { Capacitor } from '@capacitor/core'; // Platform detection
-
 // Plugin Definitions Tiplerini Doğrudan Import Et
 import type {
     GmailSearchResponse, // EKLENDİ
@@ -9,7 +5,7 @@ import type {
 } from '../../plugins/google-auth/definitions';
 
 // Tipleri import edelim
-import type { BankProcessor, BankSmsParser, BankEmailParser, ParsedStatement, SmsDetails, EmailDetails, DecodedEmailBody } from './types'; // DecodedEmailBody eklendi (canParse için)
+import type { BankProcessor, BankEmailParser, ParsedStatement, EmailDetails, DecodedEmailBody } from './types'; // DecodedEmailBody eklendi (canParse için)
 
 // Gmail Servisi
 // import { gmailService } from '../index'; // <-- İndex üzerinden import kaldırıldı
@@ -18,13 +14,7 @@ import { GmailService } from '../gmail.service'; // <-- Doğrudan import edildi
 // Servisi yerel olarak başlatalım
 const localGmailService = new GmailService();
 
-// SMS Parser'ları
-import { QnbSmsParser } from './parsers/qnb-parser';
-// import { YapiKrediSmsParser } from './parsers/yapikredi-parser'; // Henüz yok
-import { KuveytTurkSmsParser } from './parsers/kuveytturk-parser'; // Yeni parser'ı import et
-
-// Garanti Parser
-import { GarantiParser } from './parsers/garanti-parser';
+// EMAIL Parser'ları
 import { garantiEmailParser } from 'services/email-parsing/parsers/garanti-email-parser';
 
 // EMAIL Parser'ları
@@ -38,53 +28,38 @@ import { akbankEmailParser } from 'services/email-parsing/parsers/akbank-email-p
 import { akbankScreenshotParser } from '../screenshot-parsing/parsers/akbank-screenshot-parser';
 
 // --- Banka İşlemci Yapılandırması --- //
-// Her banka için SMS ve E-posta parser'larını ve Gmail sorgusunu burada tanımlayalım
+// Her banka için E-posta ve Screenshot parser'larını ve Gmail sorgusunu burada tanımlayalım
 // Dışa aktarılıyor:
 export const availableBankProcessors: BankProcessor[] = [
   {
-    bankName: 'QNB',
-    smsSenderKeywords: ['QNB'],
-    smsStatementQueryKeyword: 'borcu', // Ekstre için
-    smsParser: new QnbSmsParser(),
-  },
-  {
-    bankName: 'Yapı Kredi', 
+    bankName: 'Yapı Kredi',
     emailParser: yapikrediEmailParser,
     gmailQuery: 'from:(ekstre@ekstre.yapikredi.com.tr) subject:("Hesap Özeti")',
   },
   {
     bankName: 'Ziraat Bankası',
-    smsSenderKeywords: ['ZIRAATBANK'],
     emailParser: ziraatEmailParser,
     gmailQuery: 'from:(ziraat@ileti.ziraatbank.com.tr) subject:("e-ekstre")',
   },
   {
     bankName: 'Garanti BBVA Bonus',
-    smsSenderKeywords: ['GARANTIBBVA', 'GARANTiBBVA', 'BONUS'],
-    smsStatementQueryKeyword: 'ekstresinin',
-    smsParser: new GarantiParser(),
     emailParser: garantiEmailParser,
     gmailQuery: 'from:(garantibbva@garantibbva.com.tr) subject:("Bonus Ekstresi")',
   },
   {
     bankName: 'Kuveyt Türk',
-    smsSenderKeywords: ['KUVEYT TURK'], // Büyük harf olabilir, SMS başlığına göre düzelt
-    smsStatementQueryKeyword: 'ekstresi kesildi', // Kuveyt Türk ekstre SMS'i için anahtar kelime
-    smsParser: new KuveytTurkSmsParser(), // Yeni eklenen SMS parser
     emailParser: kuveytturkEmailParser,
     gmailQuery: 'from:(bilgilendirme@kuveytturk.com.tr) subject:("Kuveyt Türk Kredi Kartı Hesap Ekstreniz")',
   },
-  // --- YENİ EKLENEN İŞ BANKASI ---
   {
     bankName: 'İş Bankası',
-    emailParser: isbankEmailParser, // Yeni PDF işleyecek parser
-    // Gmail sorgusu: gönderen ve konu başlangıcına göre (kart no/tarih kısmı değişken olabilir)
+    emailParser: isbankEmailParser,
     gmailQuery: 'from:(bilgilendirme@ileti.isbank.com.tr) subject:("Maximum Kredi Kartı Hesap Özeti")',
   },
   {
     bankName: 'Akbank',
     emailParser: akbankEmailParser,
-    screenshotParser: akbankScreenshotParser, // YENİ: Screenshot parser eklendi
+    screenshotParser: akbankScreenshotParser,
     gmailQuery: 'from:(hizmet@bilgi.akbank.com) subject:("Kredi kartı ekstre bilgileri")',
   },
   // ... Diğer bankalar eklenebilir
@@ -103,98 +78,15 @@ const availableLoanParsers = [
 // --- Yapılandırma Sonu ---
 
 
-export class StatementProcessor { // Sınıf adını daha genel yapalım: SmsProcessor -> StatementProcessor
+export class StatementProcessor {
 
-  // Platform iOS mu kontrol et
-  private isIOS(): boolean {
-    return Capacitor.getPlatform() === 'ios';
-  }
-
-  // İzin durumunu kontrol et
-  async checkSmsPermission(): Promise<SmsPermissionStatus> {
-    // iOS'ta SMS okuma API'si yok
-    if (this.isIOS()) {
-      console.log('[StatementProcessor] iOS platform - SMS reading not available');
-      return { readSms: 'denied' };
-    }
-
-    try {
-      return await SmsReader.checkPermissions();
-    } catch (err) {
-      console.error('Error checking SMS permissions:', err);
-      return { readSms: 'denied' }; // Hata durumunda denied varsayalım
-    }
-  }
-
-  // İzin iste
-  async requestSmsPermission(): Promise<SmsPermissionStatus> {
-    // iOS'ta SMS izni istenemez
-    if (this.isIOS()) {
-      console.warn('[StatementProcessor] iOS platform - SMS permission cannot be requested');
-      return { readSms: 'denied' };
-    }
-
-    try {
-      return await SmsReader.requestPermissions();
-    } catch (err) {
-      console.error('Error requesting SMS permissions:', err);
-      return { readSms: 'denied' };
-    }
-  }
-
-  // Belirtilen filtreye göre SMS ve E-postaları getir ve ekstreleri ayrıştır
-  async fetchAndParseStatements(options: SmsFilterOptions = { maxCount: 100 }): Promise<ParsedStatement[]> {
+  // E-postaları getir ve ekstreleri ayrıştır
+  async fetchAndParseStatements(): Promise<ParsedStatement[]> {
     let parsedStatements: ParsedStatement[] = [];
-    const smsPermission = await this.checkSmsPermission();
 
     // Son 2 aylık mesajlar için tarih filtresi
     const twoMonthsAgo = new Date();
     twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
-    const minDateTimestamp = twoMonthsAgo.getTime();
-
-    // --- SMS İşleme (Her banka için ayrı sorgu) ---
-    // iOS'ta SMS okuma mevcut değil, bu blok atlanacak
-    if (smsPermission.readSms === 'granted' && !this.isIOS()) {
-        for (const processor of availableBankProcessors) {
-            // Sadece SMS parser'ı ve gönderici listesi olanları işle
-            if (processor.smsParser && processor.smsSenderKeywords && processor.smsSenderKeywords.length > 0 && processor.smsStatementQueryKeyword) {
-                const fetchStatementOptions: SmsFilterOptions = {
-                    maxCount: 5, // Her banka için az sayıda, en yeni SMS yeterli
-                    senders: processor.smsSenderKeywords, // Sadece bu bankanın göndericileri
-                    keywords: [processor.smsStatementQueryKeyword], // Sadece ekstre anahtar kelimesi
-                    minDate: minDateTimestamp, // Son 2 ayda gelenler
-                };
-
-                try {
-                    // Native filtreleme ile mesajları çek
-                    const result = await SmsReader.getMessages(fetchStatementOptions);
-                    const messages: SmsDetails[] = (result.messages || []).map(msg => ({
-                        sender: msg.address || 'Unknown',
-                        body: msg.body || '',
-                        date: msg.date || Date.now(),
-                    }));
-
-                    // Dönen mesajları işle (en yeni ilk sırada)
-                    for (const message of messages) {
-                         // canParse kontrolü hala gerekli olabilir (keyword body'de geçse de format uymayabilir)
-                         if (processor.smsParser.canParse(message.sender, message.body)) {
-                            const statement = processor.smsParser.parse(message);
-                            if (statement) {
-                                parsedStatements.push({ ...statement, source: 'sms' });
-                                // break; // Bu banka için en yeniyi bulduk, sonraki mesajlara bakma
-                            }
-                         } else {
-                            // console.log(` -> Message from ${message.sender} did not pass canParse for ${processor.bankName}`);
-                         }
-                    }
-                } catch (err) {
-                    console.error(`Error fetching/parsing statements for ${processor.bankName}:`, err);
-                }
-            }
-        }
-    } else {
-      console.warn('SMS permission not granted. Skipping SMS statement check.');
-    }
 
     // --- E-posta İşleme ---
     try {

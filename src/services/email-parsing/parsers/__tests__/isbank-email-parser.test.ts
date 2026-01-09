@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { isbankEmailParser } from '../isbank-email-parser';
-import type { EmailDetails, ParsedStatement } from '../../../sms-parsing/types';
+import type { EmailDetails, ParsedStatement } from '../../../statement-parsing/types';
 import type { ParsePdfResult } from '../../../../plugins/pdf-parser/definitions';
 
 // --- Mocking Dependencies --- //

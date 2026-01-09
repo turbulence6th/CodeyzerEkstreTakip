@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ocrService } from '../services/ocr.service';
 import { screenshotProcessor } from '../services/screenshot-parsing/screenshot-processor';
-import type { ParsedStatement } from '../services/sms-parsing/types';
+import type { ParsedStatement } from '../services/statement-parsing/types';
 
 /**
  * Screenshot Import Hook

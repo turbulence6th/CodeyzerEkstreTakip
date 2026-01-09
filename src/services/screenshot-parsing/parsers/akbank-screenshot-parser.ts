@@ -1,4 +1,4 @@
-import type { BankScreenshotParser, ScreenshotDetails, ParsedStatement } from '../../sms-parsing/types';
+import type { BankScreenshotParser, ScreenshotDetails, ParsedStatement } from '../../statement-parsing/types';
 import { parseTurkishNumber, parseTurkishDayMonth } from '../../../utils/parsing';
 
 /**

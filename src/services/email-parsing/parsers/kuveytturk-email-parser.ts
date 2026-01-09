@@ -1,4 +1,4 @@
-import type { BankEmailParser, EmailDetails, ParsedStatement, DecodedEmailBody } from '../../sms-parsing/types';
+import type { BankEmailParser, EmailDetails, ParsedStatement, DecodedEmailBody } from '../../statement-parsing/types';
 import { parseDMYDate, parseDottedDate, parseStandardNumber, parseTurkishNumber } from "../../../utils/parsing";
 
 export const kuveytturkEmailParser: BankEmailParser = {

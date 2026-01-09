@@ -1,9 +1,16 @@
 import { generateAppId } from '../identifiers';
-import type { ParsedStatement, SmsDetails } from '../../services/sms-parsing/types';
+import type { ParsedStatement, EmailDetails } from '../../services/statement-parsing/types';
 import type { ManualEntry } from '../../types/manual-entry.types';
 
 // Ortak mock veriler
-const mockSms: SmsDetails = { sender: 'test', body: 'test body', date: Date.now() };
+const mockEmail: EmailDetails = {
+    id: 'test-email-id',
+    sender: 'test@example.com',
+    subject: 'Test Subject',
+    plainBody: 'test body',
+    htmlBody: null,
+    date: new Date()
+};
 
 describe('generateAppId Utility Function', () => {
 
@@ -13,8 +20,8 @@ describe('generateAppId Utility Function', () => {
             dueDate: new Date('2024-07-15T12:00:00Z'),
             amount: 1500.75,
             last4Digits: '1234',
-            originalMessage: { sender: 'YAPIKREDI', body: 'Test', date: Date.now() },
-            source: 'sms',
+            originalMessage: mockEmail,
+            source: 'email',
             entryType: 'debt',
         };
         const appId = generateAppId(statement);
