@@ -29,7 +29,7 @@ const LoginPage: React.FC = () => {
   return (
     <IonPage>
       <IonHeader>
-        <IonToolbar className="ion-padding-top">
+        <IonToolbar>
           <IonTitle>Giriş Yap</IonTitle>
         </IonToolbar>
       </IonHeader>

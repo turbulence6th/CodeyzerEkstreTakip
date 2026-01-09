@@ -126,50 +126,53 @@ const AccountTab: React.FC = () => {
       });
 
       // Kontrol edilecek itemler için loading başlat
-      const initialLoadingState: Record<string, boolean> = {};
-      itemsToCheck.forEach(item => {
-        const appId = generateAppId(item);
-        if (appId) {
-          initialLoadingState[appId] = true;
-        }
+      setLoadingItems(prev => {
+          const nextState = { ...prev };
+          itemsToCheck.forEach(item => {
+            const appId = generateAppId(item);
+            if (appId) {
+              nextState[appId] = true;
+            }
+          });
+          return nextState;
       });
-
-      setLoadingItems(initialLoadingState);
 
       // Eğer kontrol edilecek item yoksa, hemen çık
       if (itemsToCheck.length === 0) {
         return;
       }
 
-      // Tüm kontrolleri paralel olarak başlat
-      const checkPromises = itemsToCheck.map(async (item) => {
-        const appIdToCheck = generateAppId(item);
-        if (!appIdToCheck) {
-          console.warn('Could not generate AppID for calendar check:', item);
-          return null;
-        }
+      // Tüm kontrolleri sırayla yap (Sequential)
+      // Bu işlem arka planda çalışır ve UI'ı bloklamaz.
+      // Sıralı olması, API çakışmalarını önler ve kararlılığı artırır.
+      const checkSequentially = async () => {
+          const results = [];
+          for (const item of itemsToCheck) {
+              const appIdToCheck = generateAppId(item);
+              if (!appIdToCheck) {
+                  console.warn('Could not generate AppID for calendar check:', item);
+                  continue;
+              }
 
-        try {
-          const status = await calendarService.searchEvents(appIdToCheck);
+              try {
+                  const status = await calendarService.searchEvents(appIdToCheck);
 
-          // Her sonuç geldiğinde state'i güncelle
-          setCalendarEventStatus(prev => ({ ...prev, [appIdToCheck]: status }));
-          setLoadingItems(prev => ({ ...prev, [appIdToCheck]: false }));
+                  // Her sonuç geldiğinde state'i güncelle (Progressive update)
+                  setCalendarEventStatus(prev => ({ ...prev, [appIdToCheck]: status }));
+                  results.push({ appId: appIdToCheck, status });
+              } catch (error: any) {
+                  console.error(`Error checking calendar status for AppID: ${appIdToCheck}`, item, error);
 
-          return { appId: appIdToCheck, status };
-        } catch (error: any) {
-          console.error(`Error checking calendar status for AppID: ${appIdToCheck}`, item, error);
+                  setCalendarEventStatus(prev => ({ ...prev, [appIdToCheck]: false }));
+                  results.push({ appId: appIdToCheck, status: false });
+              } finally {
+                  setLoadingItems(prev => ({ ...prev, [appIdToCheck]: false }));
+              }
+          }
+          console.log("AccountTab Effect: calendar status checked (sequential):", results);
+      };
 
-          setCalendarEventStatus(prev => ({ ...prev, [appIdToCheck]: false }));
-          setLoadingItems(prev => ({ ...prev, [appIdToCheck]: false }));
-
-          return { appId: appIdToCheck, status: false };
-        }
-      });
-
-      // Tüm kontrollerin bitmesini bekle
-      const results = await Promise.all(checkPromises);
-      console.log("AccountTab Effect: calendar status checked:", results.filter(r => r !== null));
+      checkSequentially();
     };
 
     checkCalendarEvents();
@@ -331,7 +334,7 @@ Tutar: ${formatCurrency(item.amount)}`;
         onDismiss={() => setIsModalOpen(false)}
       />
       <IonHeader>
-        <IonToolbar className="ion-padding-top">
+        <IonToolbar>
           <IonTitle>Ekstreler</IonTitle>
           <IonButtons slot="end">
             <IonButton routerLink="/loan-management" color="primary">

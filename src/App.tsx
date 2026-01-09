@@ -21,7 +21,9 @@ import LoanManagementPage from './pages/LoanManagementPage';
 import ToastManager from './components/ToastManager';
 import { App as CapacitorApp, URLOpenListenerEvent } from '@capacitor/app';
 import type { PluginListenerHandle } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 import { AppLauncher } from '@capacitor/app-launcher';
+import { StatusBar, Style } from '@capacitor/status-bar';
 
 
 /* Core CSS required for Ionic components to work properly */
@@ -60,6 +62,22 @@ import type { RootState } from './store';
 import { selectTotalDebt } from './store/slices/dataSlice';
 
 setupIonicReact();
+
+// iOS StatusBar yapılandırması
+const configureStatusBar = async () => {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      // Default: sistem temasına göre otomatik (açık modda siyah yazı, koyu modda beyaz yazı)
+      await StatusBar.setStyle({ style: Style.Default });
+      // WebView tam ekran, safe area CSS ile yönetiliyor
+      await StatusBar.setOverlaysWebView({ overlay: true });
+    } catch (error) {
+      console.log('StatusBar configuration error:', error);
+    }
+  }
+};
+
+configureStatusBar();
 
 const App: React.FC = () => {
   // Global state'leri al

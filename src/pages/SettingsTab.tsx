@@ -274,7 +274,7 @@ const SettingsTab: React.FC = () => {
   return (
     <IonPage>
       <IonHeader>
-        <IonToolbar className="ion-padding-top">
+        <IonToolbar>
           <IonTitle>Ayarlar</IonTitle>
         </IonToolbar>
       </IonHeader>

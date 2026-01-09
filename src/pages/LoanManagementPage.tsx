@@ -65,7 +65,7 @@ const LoanManagementPage: React.FC = () => {
     return (
         <IonPage>
             <IonHeader>
-                <IonToolbar className="ion-padding-top">
+                <IonToolbar>
                     <IonButtons slot="start">
                         <IonBackButton defaultHref="/tabs/account" text="Geri" />
                     </IonButtons>

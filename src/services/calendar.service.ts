@@ -20,7 +20,8 @@ async function callNativeGoogleApi<T>(
     return await nativeApiFunction();
   } catch (e) {
     const error = e as NativePluginError;
-    if (error && (error.code === "SIGN_IN_REQUIRED" || error.code === "INVALID_GRANT")) {
+    // iOS 'NOT_SIGNED_IN', Android 'SIGN_IN_REQUIRED' döndürebilir. Her ikisini de kapsayalım.
+    if (error && (error.code === "SIGN_IN_REQUIRED" || error.code === "INVALID_GRANT" || error.code === "NOT_SIGNED_IN")) {
       if (isRetry) {
         console.error(
           'callNativeGoogleApi: Silent sign-in was already attempted and failed, or the API call failed again after retry. Logging out.'
