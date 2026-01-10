@@ -32,9 +32,9 @@ ion-header ion-toolbar:first-of-type {
   padding-top: env(safe-area-inset-top);
 }
 
-/* Tab bar - safe area olmadan */
+/* Tab bar - safe area ile */
 ion-tab-bar {
-  padding-bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* ion-refresher arka planlı olsun, içerik görünmesin */

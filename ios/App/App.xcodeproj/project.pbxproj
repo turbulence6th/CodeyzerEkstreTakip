@@ -8,10 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		146675C62F0F06350018B268 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 146675C52F0F06350018B268 /* GoogleService-Info.plist */; };
-		146675D92F0F06A80018B268 /* SmsReaderPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 146675D52F0F06A80018B268 /* SmsReaderPlugin.m */; };
 		146675DA2F0F06A80018B268 /* SecureStoragePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146675D32F0F06A80018B268 /* SecureStoragePlugin.swift */; };
 		146675DB2F0F06A80018B268 /* PdfParserPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 146675CF2F0F06A80018B268 /* PdfParserPlugin.m */; };
-		146675DC2F0F06A80018B268 /* SmsReaderPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146675D62F0F06A80018B268 /* SmsReaderPlugin.swift */; };
 		146675DD2F0F06A80018B268 /* PdfParserPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146675D02F0F06A80018B268 /* PdfParserPlugin.swift */; };
 		146675DE2F0F06A80018B268 /* OcrPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146675CD2F0F06A80018B268 /* OcrPlugin.swift */; };
 		146675DF2F0F06A80018B268 /* CalendarHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146675C72F0F06A80018B268 /* CalendarHandler.swift */; };
@@ -43,8 +41,6 @@
 		146675D02F0F06A80018B268 /* PdfParserPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PdfParserPlugin.swift; sourceTree = "<group>"; };
 		146675D22F0F06A80018B268 /* SecureStoragePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SecureStoragePlugin.m; sourceTree = "<group>"; };
 		146675D32F0F06A80018B268 /* SecureStoragePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureStoragePlugin.swift; sourceTree = "<group>"; };
-		146675D52F0F06A80018B268 /* SmsReaderPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SmsReaderPlugin.m; sourceTree = "<group>"; };
-		146675D62F0F06A80018B268 /* SmsReaderPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmsReaderPlugin.swift; sourceTree = "<group>"; };
 		146675E52F0F15300018B268 /* CustomBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomBridgeViewController.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
@@ -110,15 +106,6 @@
 			path = SecureStorage;
 			sourceTree = "<group>";
 		};
-		146675D72F0F06A80018B268 /* SmsReader */ = {
-			isa = PBXGroup;
-			children = (
-				146675D52F0F06A80018B268 /* SmsReaderPlugin.m */,
-				146675D62F0F06A80018B268 /* SmsReaderPlugin.swift */,
-			);
-			path = SmsReader;
-			sourceTree = "<group>";
-		};
 		146675D82F0F06A80018B268 /* Plugins */ = {
 			isa = PBXGroup;
 			children = (
@@ -126,7 +113,6 @@
 				146675CE2F0F06A80018B268 /* Ocr */,
 				146675D12F0F06A80018B268 /* PdfParser */,
 				146675D42F0F06A80018B268 /* SecureStorage */,
-				146675D72F0F06A80018B268 /* SmsReader */,
 			);
 			path = Plugins;
 			sourceTree = "<group>";
@@ -301,10 +287,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
-				146675D92F0F06A80018B268 /* SmsReaderPlugin.m in Sources */,
 				146675DA2F0F06A80018B268 /* SecureStoragePlugin.swift in Sources */,
 				146675DB2F0F06A80018B268 /* PdfParserPlugin.m in Sources */,
-				146675DC2F0F06A80018B268 /* SmsReaderPlugin.swift in Sources */,
 				146675DD2F0F06A80018B268 /* PdfParserPlugin.swift in Sources */,
 				146675DE2F0F06A80018B268 /* OcrPlugin.swift in Sources */,
 				146675DF2F0F06A80018B268 /* CalendarHandler.swift in Sources */,

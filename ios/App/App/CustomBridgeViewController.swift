@@ -32,7 +32,6 @@ class CustomBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(GoogleAuthPlugin())
         bridge?.registerPluginInstance(PdfParserPlugin())
         bridge?.registerPluginInstance(OcrPlugin())
-        bridge?.registerPluginInstance(SmsReaderPlugin())
 
         print("[CustomBridgeViewController] All plugins registered")
     }
