@@ -172,17 +172,12 @@ const SettingsTab: React.FC = () => {
 
   return (
     <IonPage>
-      <IonHeader>
+      <IonHeader className="safe-area-header">
         <IonToolbar>
           <IonTitle>Ayarlar</IonTitle>
         </IonToolbar>
       </IonHeader>
-      <IonContent fullscreen className="ion-padding">
-        <IonHeader collapse="condense">
-          <IonToolbar>
-            <IonTitle size="large">Ayarlar</IonTitle>
-          </IonToolbar>
-        </IonHeader>
+      <IonContent className="ion-padding">
         {/* ExploreContainer kaldırıldı */}
         {/* <ExploreContainer name="Ayarlar page" /> */}
 

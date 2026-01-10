@@ -28,18 +28,12 @@ const LoginPage: React.FC = () => {
 
   return (
     <IonPage>
-      <IonHeader>
+      <IonHeader className="safe-area-header">
         <IonToolbar>
           <IonTitle>Giriş Yap</IonTitle>
         </IonToolbar>
       </IonHeader>
-      <IonContent fullscreen className="ion-padding">
-        <IonHeader collapse="condense">
-          <IonToolbar>
-            <IonTitle size="large">Giriş Yap</IonTitle>
-          </IonToolbar>
-        </IonHeader>
-
+      <IonContent className="ion-padding">
         <IonCard style={{ maxWidth: '400px', margin: 'auto', marginTop: '50px' }}>
           <IonCardHeader>
             <IonCardTitle className="ion-text-center">Ekstre Takvim</IonCardTitle>

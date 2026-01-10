@@ -1,4 +1,4 @@
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonList, IonItem, IonLabel, IonSpinner, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonIcon, IonNote, useIonToast, IonModal, IonButtons, IonFooter, IonItemSliding, IonItemOptions, IonItemOption, IonRefresher, IonRefresherContent, RefresherEventDetail, IonAlert } from '@ionic/react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, IonList, IonItem, IonLabel, IonSpinner, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonIcon, IonNote, useIonToast, IonModal, IonButtons, IonFooter, IonItemSliding, IonItemOptions, IonItemOption, IonRefresher, IonRefresherContent, RefresherEventDetail, IonAlert, createAnimation } from '@ionic/react';
 import './AccountTab.css';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { GoogleAuth } from '@plugins/google-auth';
@@ -32,8 +32,9 @@ import { addToast } from '../store/slices/toastSlice';
 import { addOutline, mailOutline, cashOutline, calendarOutline, chatbubbleEllipsesOutline, documentTextOutline, trashOutline, walletOutline } from 'ionicons/icons';
 
 // Yeni eklenen bileşeni import et
-import DetailsModal from '../components/DetailsModal'; 
+import DetailsModal from '../components/DetailsModal';
 import DisplayItemList from '../components/DisplayItemList'; // Yeni liste bileşeni import edildi
+import LoanManagementPage from './LoanManagementPage';
 
 // Utils importları
 import { formatDate, formatCurrency, formatTargetDate } from '../utils/formatting';
@@ -42,8 +43,31 @@ import { isStatement, isManualEntry } from '../utils/typeGuards';
 
 type DisplayItem = ParsedStatement | ManualEntry;
 
-// Helper function to add months safely - BU FONKSİYON ARTIK formatting.ts İÇİNDE
-// function addMonths...
+// Sağdan gelen modal animasyonu
+const enterAnimation = (baseEl: HTMLElement) => {
+  const root = baseEl.shadowRoot || baseEl;
+  const backdropEl = root.querySelector('ion-backdrop');
+  const wrapperEl = root.querySelector('.modal-wrapper');
+
+  const backdropAnimation = createAnimation()
+    .addElement(backdropEl!)
+    .fromTo('opacity', '0', 'var(--backdrop-opacity)');
+
+  const wrapperAnimation = createAnimation()
+    .addElement(wrapperEl!)
+    .fromTo('transform', 'translateX(100%)', 'translateX(0)')
+    .fromTo('opacity', '1', '1');
+
+  return createAnimation()
+    .addElement(baseEl)
+    .easing('ease-out')
+    .duration(300)
+    .addAnimation([backdropAnimation, wrapperAnimation]);
+};
+
+const leaveAnimation = (baseEl: HTMLElement) => {
+  return enterAnimation(baseEl).direction('reverse');
+};
 
 const AccountTab: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -53,6 +77,7 @@ const AccountTab: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalContent, setModalContent] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState<string>("Detay");
+  const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
 
   const { user: userInfo, error: authError } = useSelector((state: RootState) => state.auth);
   const displayItems = useSelector(selectAllDataWithDates);
@@ -296,26 +321,29 @@ Tutar: ${formatCurrency(item.amount)}`;
         content={modalContent}
         onDismiss={() => setIsModalOpen(false)}
       />
-      <IonHeader>
+      <IonHeader className="safe-area-header">
         <IonToolbar>
           <IonTitle>Ekstreler</IonTitle>
           <IonButtons slot="end">
-            <IonButton routerLink="/loan-management" color="primary">
+            <IonButton onClick={() => setIsLoanModalOpen(true)} color="primary">
               <IonIcon slot="icon-only" icon={walletOutline} />
             </IonButton>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
-      <IonContent fullscreen className="ion-padding">
+
+      <IonModal
+        isOpen={isLoanModalOpen}
+        onDidDismiss={() => setIsLoanModalOpen(false)}
+        enterAnimation={enterAnimation}
+        leaveAnimation={leaveAnimation}
+      >
+        <LoanManagementPage onClose={() => setIsLoanModalOpen(false)} />
+      </IonModal>
+      <IonContent className="ion-padding">
         <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
           <IonRefresherContent></IonRefresherContent>
         </IonRefresher>
-
-        <IonHeader collapse="condense">
-          <IonToolbar>
-            <IonTitle size="large">Ekstreler</IonTitle>
-          </IonToolbar>
-        </IonHeader>
 
         {combinedError && (
           <IonCard color="warning">

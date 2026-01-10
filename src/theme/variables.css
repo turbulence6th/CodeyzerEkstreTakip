@@ -9,48 +9,27 @@ http://ionicframework.com/docs/theming/ */
   --ion-safe-area-right: env(safe-area-inset-right);
 }
 
-/* Status bar alanı için arka plan - içerik görünmez */
-ion-header::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: env(safe-area-inset-top);
-  background: var(--ion-toolbar-background, var(--ion-background-color, #fff));
-  z-index: 99999;
+/* Üstteki header - safe area ve background */
+ion-header.safe-area-header {
+  background: var(--ion-background-color, #fff);
+}
+
+ion-header.safe-area-header ion-toolbar:first-of-type {
+  padding-top: env(safe-area-inset-top);
 }
 
 @media (prefers-color-scheme: dark) {
-  ion-header::before {
-    background: var(--ion-toolbar-background, var(--ion-background-color, #1c1c1d));
+  ion-header.safe-area-header {
+    background: var(--ion-background-color, #1c1c1d);
   }
 }
 
-/* Toolbar içeriğini safe area altına it */
-ion-header ion-toolbar:first-of-type {
-  padding-top: env(safe-area-inset-top);
-}
 
 /* Tab bar - safe area ile */
 ion-tab-bar {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* ion-refresher arka planlı olsun, içerik görünmesin */
-ion-refresher {
-  z-index: -1 !important;
-}
-
-ion-refresher-content {
-  background: var(--ion-background-color, #fff);
-}
-
-@media (prefers-color-scheme: dark) {
-  ion-refresher-content {
-    background: var(--ion-background-color, #1c1c1d);
-  }
-}
 
 /* ===== iOS Compact UI ===== */
 .ios {

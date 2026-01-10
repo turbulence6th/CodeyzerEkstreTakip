@@ -9,20 +9,15 @@ import {
     IonCardHeader,
     IonCardTitle,
     IonCardContent,
-    IonItem,
-    IonLabel,
     IonButton,
     IonIcon,
     IonBackButton,
     IonButtons,
-    IonItemSliding,
-    IonItemOptions,
-    IonItemOption,
     IonBadge,
     IonProgressBar,
     IonAlert,
 } from '@ionic/react';
-import { trashOutline, cashOutline, checkmarkCircleOutline } from 'ionicons/icons';
+import { trashOutline, cashOutline, checkmarkCircleOutline, closeOutline } from 'ionicons/icons';
 import { useSelector, useDispatch } from 'react-redux';
 import { useState } from 'react';
 import type { RootState, AppDispatch } from '../store';
@@ -30,7 +25,11 @@ import { selectGroupedLoans, deleteLoan, type LoanGroup } from '../store/slices/
 import { addToast } from '../store/slices/toastSlice';
 import { formatDate, formatCurrency } from '../utils/formatting';
 
-const LoanManagementPage: React.FC = () => {
+interface LoanManagementPageProps {
+    onClose?: () => void;
+}
+
+const LoanManagementPage: React.FC<LoanManagementPageProps> = ({ onClose }) => {
     const dispatch = useDispatch<AppDispatch>();
     const loans = useSelector((state: RootState) => selectGroupedLoans(state));
     const [deletingLoanId, setDeletingLoanId] = useState<string | null>(null);
@@ -62,109 +61,88 @@ const LoanManagementPage: React.FC = () => {
         return unpaidInstallments * loan.monthlyAmount;
     };
 
-    return (
-        <IonPage>
-            <IonHeader>
+    const content = (
+        <>
+            <IonHeader className={onClose ? '' : 'safe-area-header'}>
                 <IonToolbar>
                     <IonButtons slot="start">
-                        <IonBackButton defaultHref="/tabs/account" text="Geri" />
+                        {onClose ? (
+                            <IonButton onClick={onClose}>
+                                <IonIcon slot="icon-only" icon={closeOutline} />
+                            </IonButton>
+                        ) : (
+                            <IonBackButton defaultHref="/statements" text="Geri" />
+                        )}
                     </IonButtons>
                     <IonTitle>Kredi Yönetimi</IonTitle>
                 </IonToolbar>
             </IonHeader>
-            <IonContent fullscreen className="ion-padding">
-                <IonHeader collapse="condense">
-                    <IonToolbar>
-                        <IonTitle size="large">Kredi Yönetimi</IonTitle>
-                    </IonToolbar>
-                </IonHeader>
-
+            <IonContent>
                 {loans.length === 0 ? (
-                    <IonCard>
-                        <IonCardContent>
-                            <p style={{ textAlign: 'center', color: 'var(--ion-color-medium)' }}>
-                                Henüz kredi kaydı bulunmamaktadır.
-                            </p>
-                        </IonCardContent>
-                    </IonCard>
+                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--ion-color-medium)' }}>
+                        Henüz kredi kaydı bulunmamaktadır.
+                    </div>
                 ) : (
-                    <IonList lines="none">
+                    <IonList lines="none" style={{ padding: '8px' }}>
                         {loans.map((loan) => {
                             const progress = calculateProgress(loan);
                             const remainingAmount = calculateRemainingAmount(loan);
 
                             return (
-                                <IonCard key={loan.loanId}>
-                                    <IonCardHeader>
+                                <IonCard key={loan.loanId} style={{ margin: '8px 0' }}>
+                                    <IonCardHeader style={{ paddingBottom: '0' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <IonCardTitle>{loan.description}</IonCardTitle>
-                                            <IonButton
-                                                fill="clear"
-                                                color="danger"
-                                                onClick={() => handleDeleteLoan(loan.loanId)}
-                                            >
+                                            <IonCardTitle style={{ fontSize: '18px' }}>{loan.description}</IonCardTitle>
+                                            <IonButton fill="clear" color="danger" size="small" onClick={() => handleDeleteLoan(loan.loanId)}>
                                                 <IonIcon slot="icon-only" icon={trashOutline} />
                                             </IonButton>
                                         </div>
                                     </IonCardHeader>
-                                    <IonCardContent>
-                                        <IonList lines="full" style={{ marginTop: '0' }}>
-                                            <IonItem>
-                                                <IonLabel>
-                                                    <p>Aylık Taksit</p>
-                                                    <h2><strong>{formatCurrency(loan.monthlyAmount)}</strong></h2>
-                                                </IonLabel>
-                                            </IonItem>
-                                            <IonItem>
-                                                <IonLabel>
-                                                    <p>İlerleme</p>
-                                                    <h3>
-                                                        <IonBadge color={progress === 100 ? 'success' : 'primary'}>
-                                                            {loan.paidInstallments}/{loan.totalInstallments} Taksit
-                                                        </IonBadge>
-                                                    </h3>
-                                                </IonLabel>
-                                            </IonItem>
-                                            <IonItem lines="none">
-                                                <IonProgressBar value={progress / 100} color={progress === 100 ? 'success' : 'primary'} />
-                                            </IonItem>
-                                            <IonItem>
-                                                <IonLabel>
-                                                    <p>Kalan Toplam</p>
-                                                    <h2><strong>{formatCurrency(remainingAmount)}</strong></h2>
-                                                </IonLabel>
-                                            </IonItem>
-                                        </IonList>
+                                    <IonCardContent style={{ paddingTop: '8px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                            <div>
+                                                <p style={{ margin: 0, fontSize: '12px', color: 'var(--ion-color-medium)' }}>Aylık Taksit</p>
+                                                <strong>{formatCurrency(loan.monthlyAmount)}</strong>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <p style={{ margin: 0, fontSize: '12px', color: 'var(--ion-color-medium)' }}>Kalan</p>
+                                                <strong>{formatCurrency(remainingAmount)}</strong>
+                                            </div>
+                                        </div>
 
-                                        <h3 style={{ marginTop: '16px', marginBottom: '8px', fontSize: '14px', color: 'var(--ion-color-medium)' }}>
-                                            Taksitler
-                                        </h3>
-                                        <IonList lines="full" style={{ background: 'var(--ion-color-light)', borderRadius: '8px', padding: '4px' }}>
-                                            {loan.installments.map((installment) => (
-                                                <IonItem
-                                                    key={installment.id}
-                                                    className={installment.isPaid ? 'item-paid' : ''}
-                                                    style={{ '--background': 'transparent' }}
-                                                >
-                                                    <IonIcon
-                                                        slot="start"
-                                                        icon={installment.isPaid ? checkmarkCircleOutline : cashOutline}
-                                                        color={installment.isPaid ? 'success' : 'medium'}
-                                                    />
-                                                    <IonLabel>
-                                                        <p style={{ fontSize: '12px' }}>{installment.description}</p>
-                                                        <p style={{ fontSize: '13px' }}>
-                                                            <strong>{formatDate(installment.dueDate)}</strong>
-                                                        </p>
-                                                    </IonLabel>
-                                                    <IonLabel slot="end" style={{ textAlign: 'right' }}>
-                                                        <p style={{ fontSize: '14px', fontWeight: 'bold' }}>
-                                                            {formatCurrency(installment.amount)}
-                                                        </p>
-                                                    </IonLabel>
-                                                </IonItem>
-                                            ))}
-                                        </IonList>
+                                        <div style={{ marginBottom: '12px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                <IonBadge color={progress === 100 ? 'success' : 'primary'}>
+                                                    {loan.paidInstallments}/{loan.totalInstallments} Taksit
+                                                </IonBadge>
+                                            </div>
+                                            <IonProgressBar value={progress / 100} color={progress === 100 ? 'success' : 'primary'} />
+                                        </div>
+
+                                        <p style={{ margin: '0 0 4px', fontSize: '13px', color: 'var(--ion-color-medium)' }}>Taksitler</p>
+                                        {loan.installments.map((installment) => (
+                                            <div
+                                                key={installment.id}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    padding: '6px 0',
+                                                    borderBottom: '1px solid var(--ion-color-light)',
+                                                    opacity: installment.isPaid ? 0.6 : 1
+                                                }}
+                                            >
+                                                <IonIcon
+                                                    icon={installment.isPaid ? checkmarkCircleOutline : cashOutline}
+                                                    color={installment.isPaid ? 'success' : 'medium'}
+                                                    style={{ marginRight: '8px', fontSize: '18px' }}
+                                                />
+                                                <div style={{ flex: 1 }}>
+                                                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--ion-color-medium)' }}>{installment.description}</p>
+                                                    <strong style={{ fontSize: '13px' }}>{formatDate(installment.dueDate)}</strong>
+                                                </div>
+                                                <strong style={{ fontSize: '13px' }}>{formatCurrency(installment.amount)}</strong>
+                                            </div>
+                                        ))}
                                     </IonCardContent>
                                 </IonCard>
                             );
@@ -190,8 +168,10 @@ const LoanManagementPage: React.FC = () => {
                     ]}
                 />
             </IonContent>
-        </IonPage>
+        </>
     );
+
+    return onClose ? content : <IonPage>{content}</IonPage>;
 };
 
 export default LoanManagementPage;

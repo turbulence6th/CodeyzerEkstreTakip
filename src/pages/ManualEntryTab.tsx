@@ -192,18 +192,12 @@ const ManualEntryTab: React.FC = () => {
 
     return (
         <IonPage>
-            <IonHeader>
+            <IonHeader className="safe-area-header">
                 <IonToolbar>
                     <IonTitle>Manuel Kayıt Ekle</IonTitle>
                 </IonToolbar>
             </IonHeader>
-            <IonContent fullscreen className="ion-padding">
-                <IonHeader collapse="condense">
-                    <IonToolbar>
-                        <IonTitle size="large">Manuel Kayıt Ekle</IonTitle>
-                    </IonToolbar>
-                </IonHeader>
-
+            <IonContent className="ion-padding">
                 {/* Screenshot Import Button */}
                 <IonButton
                     expand="block"
