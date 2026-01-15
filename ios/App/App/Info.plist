@@ -88,5 +88,9 @@
 	<!-- Disable file sharing for security -->
 	<key>UIFileSharingEnabled</key>
 	<false/>
+
+	<!-- App Store - Şifreleme beyanı (HTTPS kullanılıyor, özel şifreleme yok) -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

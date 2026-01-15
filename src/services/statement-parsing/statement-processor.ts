@@ -23,6 +23,7 @@ import { ziraatEmailParser } from '../email-parsing/parsers/ziraat-email-parser'
 import { isbankEmailParser } from '../email-parsing/parsers/isbank-email-parser'; // <-- YENİ İŞ BANKASI PARSER IMPORTU
 import { kuveytturkEmailParser } from 'services/email-parsing/parsers/kuveytturk-email-parser';
 import { akbankEmailParser } from 'services/email-parsing/parsers/akbank-email-parser';
+import { qnbEmailParser } from '../email-parsing/parsers/qnb-email-parser';
 
 // SCREENSHOT Parser'ları
 import { akbankScreenshotParser } from '../screenshot-parsing/parsers/akbank-screenshot-parser';
@@ -61,6 +62,11 @@ export const availableBankProcessors: BankProcessor[] = [
     emailParser: akbankEmailParser,
     screenshotParser: akbankScreenshotParser,
     gmailQuery: 'from:(hizmet@bilgi.akbank.com) subject:("Kredi kartı ekstre bilgileri")',
+  },
+  {
+    bankName: 'QNB Finansbank',
+    emailParser: qnbEmailParser,
+    gmailQuery: 'from:(eekstre@eekstre.qnb.com.tr)',
   },
   // ... Diğer bankalar eklenebilir
 ];

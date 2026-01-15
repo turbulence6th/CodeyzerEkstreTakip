@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'fs';
 
 // 1. EML dosyasını oku
-const eml = readFileSync('garanti.eml', 'utf8');
+const eml = readFileSync('qnb.eml', 'utf8');
 
 // 2. Boundary'yi bul
 const boundaryMatch = eml.match(/boundary="([^"]+)"/);
@@ -22,9 +22,56 @@ for (const part of parts) {
     const contentParts = part.split(/\r?\n\r?\n/);
     if (contentParts.length > 1) {
       html = contentParts.slice(1).join('\r\n\r\n').trim();
-      // İçerik base64 ise decode et
+      
       if (part.includes('Content-Transfer-Encoding: base64')) {
-        html = Buffer.from(html.replace(/\r?\n/g, ''), 'base64').toString('utf8');
+        // Base64 decode
+        const buffer = Buffer.from(html.replace(/\r?\n/g, ''), 'base64');
+        const decoder = new TextDecoder('utf-8'); // Varsayılan utf-8, gerekirse charset parse edilebilir
+        html = decoder.decode(buffer);
+      } else if (part.includes('Content-Transfer-Encoding: quoted-printable')) {
+        // Quoted-Printable decode
+        // 1. Soft line breaks (=\r\n) kaldır
+        let decoded = html.replace(/=\r?\n/g, '');
+        // 2. Hex karakterleri (örn =3D) byte array'e çevir
+        const bytes = [];
+        for (let i = 0; i < decoded.length; i++) {
+          if (decoded[i] === '=') {
+            const hex = decoded.substr(i + 1, 2);
+            if (/^[0-9A-F]{2}$/i.test(hex)) {
+              bytes.push(parseInt(hex, 16));
+              i += 2;
+            } else {
+              bytes.push(decoded.charCodeAt(i));
+            }
+          } else {
+            bytes.push(decoded.charCodeAt(i));
+          }
+        }
+        
+        // 3. Charset'e göre decode et (ISO-8859-9 Türkçe için)
+        let charset = 'utf-8';
+        const charsetMatch = part.match(/charset=["']?([a-zA-Z0-9-]+)["']?/i);
+        if (charsetMatch) {
+          charset = charsetMatch[1].toLowerCase();
+        } else {
+            // Fallback: check within the HTML content itself if available
+            const metaCharsetMatch = html.match(/charset=["']?([a-zA-Z0-9-]+)["']?/i);
+            if (metaCharsetMatch) {
+                 charset = metaCharsetMatch[1].toLowerCase();
+            }
+        }
+        
+        console.log(`Detected charset: ${charset}`);
+
+        const buffer = new Uint8Array(bytes);
+        try {
+             const decoder = new TextDecoder(charset);
+             html = decoder.decode(buffer);
+        } catch (e) {
+             console.warn(`Charset ${charset} not supported, falling back to utf-8`);
+             const decoder = new TextDecoder('utf-8');
+             html = decoder.decode(buffer);
+        }
       }
       break;
     }
