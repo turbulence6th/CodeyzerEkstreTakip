@@ -108,4 +108,65 @@ Arama ve asistan`;
         expect(result?.source).toBe('screenshot');
         expect(result?.entryType).toBe('debt');
     });
+
+    it('should parse Akbank Axess Platinum screenshot with extended info format', () => {
+        // Gerçek OCR çıktısı (hassas bilgiler maskelenmiş)
+        const realOcrText = `11:45
+Kredi kartı
+alxess
+PLATINUM
+..00 4321
+Dönem içi harcama
+3.250,75 TL
+Kullanılabilir limit: 125.000,00 TL
+Toplam limit 150.000,00 TL
+• Kazanılan Chip-Para:
+• Toplam Chip-Para:
+0,00 TL
+0,00 TL
+Daha az
+Ekstre kesim tarihi:
+Son ödeme tarihi:
+Sonraki ekstre kesimi:
+Sonraki son ödeme:
+-
+16.01.2026
+26.01.2026
+16.02.2026
+26.02.2026
+Son gün: 26 Ocak
+4.875,50 TL
+Ekstreni öde
+[| Ekstre
+Harcamalar
+Ekstre Böldür
+Kredi kartı borcunu taksitlere böl,
+rahat rahat öde!
+Ana sayfa
+Transfer ve ödemeler
+Senin için
+•
+Arama ve asistan`;
+
+        const screenshot: ScreenshotDetails = {
+            extractedText: realOcrText,
+            date: new Date(),
+        };
+
+        // canParse testi
+        expect(akbankScreenshotParser.canParse(realOcrText)).toBe(true);
+
+        // parse testi
+        const result = akbankScreenshotParser.parse(screenshot);
+
+        expect(result).not.toBeNull();
+        expect(result?.bankName).toBe('Akbank');
+        expect(result?.last4Digits).toBe('4321'); // OCR'dan gelen kart numarası
+        expect(result?.amount).toBe(4875.50); // Son gün tutarı
+        expect(result?.dueDate).toBeInstanceOf(Date);
+        expect(result?.dueDate?.getDate()).toBe(26);
+        expect(result?.dueDate?.getMonth()).toBe(0); // Ocak = 0 (0-indexed)
+        expect(result?.source).toBe('screenshot');
+        expect(result?.entryType).toBe('debt');
+    });
 });

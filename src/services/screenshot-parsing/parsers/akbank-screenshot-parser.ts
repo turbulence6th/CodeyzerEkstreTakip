@@ -19,15 +19,12 @@ export const akbankScreenshotParser: BankScreenshotParser = {
         const lowerText = extractedText.toLowerCase();
 
         // Akbank tanımlama: "akbank", "axess" veya "wings" kelimelerinden biri geçmeli
-        // OCR hataları için "axess" yerine "aixess", "aıxess" gibi varyasyonları da kabul et
-        // Wings için "w/ngs", "/ngs" gibi OCR hatalarını da kabul et
+        // OCR hataları için regex kullanılıyor:
+        // - "axess" için: a.?xess (a + opsiyonel karakter + xess) -> axess, aixess, alxess, aıxess vb.
+        // - "wings" için: w?[/iı]?ngs (opsiyonel w + opsiyonel /,i,ı + ngs) -> wings, w/ngs, /ngs vb.
         const hasAkbank = lowerText.includes('akbank') ||
-                         lowerText.includes('axess') ||
-                         lowerText.includes('aixess') || // OCR: "aIxess" -> "aixess"
-                         lowerText.includes('aıxess') || // OCR: "aıxess"
-                         lowerText.includes('wings') ||
-                         lowerText.includes('w/ngs') || // OCR: "W/NGS" -> "w/ngs"
-                         lowerText.includes('/ngs');     // OCR bazen W'yi kaçırabilir
+                         /a.?xess/i.test(lowerText) ||
+                         /w?[/iı]?ngs/i.test(lowerText);
 
         // Ekstre ile ilgili kelimeler: "son gün" veya "ekstre" veya "öde"
         const hasStatement = lowerText.includes('son gün') ||
@@ -52,11 +49,15 @@ export const akbankScreenshotParser: BankScreenshotParser = {
         // --- Kart Numarası (Son 4 Hane) ---
         // Format 1: "****1234" (başında yıldızlar olan 4 rakam - Axess kartları)
         // Format 2: Sadece "1234" (Wings kartları - kart tipi altında)
-        // OCR bazen yıldızları "co0e", "c00e" gibi okuyabilir
+        // OCR bazen yıldızları farklı karakterler olarak okuyabilir:
+        // - "co0e", "c00e" gibi
+        // - "..00", "...0" gibi (noktalar ve sıfırlar)
+        // Genel pattern: yıldız/nokta/sıfır kombinasyonları + boşluk + 4 rakam
         let cardMatch = text.match(/\*+(\d{4})/);
         if (!cardMatch) {
-            // OCR hatası için alternatif pattern: "co0e 1234", "c00e 1234" gibi
-            cardMatch = text.match(/c[o0]+e\s+(\d{4})/i);
+            // OCR hatası için alternatif pattern: maskelenmiş karakterler + 4 rakam
+            // Örnek: "co0e 1234", "c00e 1234", "..00 1234", "...0 1234"
+            cardMatch = text.match(/[c.*0oe]+\s+(\d{4})/i);
         }
         if (!cardMatch) {
             // Wings kartları için: BLACK/PLATINUM/CLASSIC kelimesinden sonra gelen 4 rakam
