@@ -38,10 +38,10 @@ class CalendarHandler {
         endDateTime.timeZone = timeZone
         event.end = endDateTime
 
-        // Hatırlatıcı ekle (1 gün önce)
+        // Hatırlatıcı ekle (etkinlik vaktinde)
         let reminder = GTLRCalendar_EventReminder()
         reminder.method = "popup"
-        reminder.minutes = NSNumber(value: 60 * 24)  // 1 gün önce
+        reminder.minutes = NSNumber(value: 0)  // Etkinlik vaktinde
 
         let reminders = GTLRCalendar_Event_Reminders()
         reminders.useDefault = false

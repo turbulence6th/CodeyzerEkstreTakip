@@ -231,7 +231,7 @@ Tutar: ${formatCurrency(item.amount)}`;
           summary = `${item.bankName} Kredi Kartı Son Ödeme`;
           description = `Son Ödeme Tarihi: ${formatDate(item.dueDate)}`;
           if (item.amount !== null && item.amount !== undefined) {
-             description += `\nSon Ödeme Tutarı: ${formatCurrency(item.amount)}`;
+             description += `\nTutar: ${formatCurrency(item.amount)}`;
           }
           if (item.last4Digits) {
                description += `\nKart: ...${item.last4Digits}`;
