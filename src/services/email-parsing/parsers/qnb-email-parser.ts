@@ -40,14 +40,30 @@ export const qnbEmailParser: BankEmailParser = {
         if (amountMatch && amountMatch[1]) {
             const amountStr = amountMatch[1];
             // Ayrıştırma stratejisi:
-            // 1. Virgül içeriyorsa kesinlikle Türkçe formatıdır (1.234,56 veya 12,50)
-            // 2. Virgül yok, nokta varsa:
+            // 1. Hem virgül hem nokta varsa: son gelen ayırıcı ondalık ayırıcıdır
+            //    a. Nokta sonda -> İngilizce format (1,119.55) -> virgülü kaldır, parseFloat
+            //    b. Virgül sonda -> Türkçe format (1.119,55) -> parseTurkishNumber
+            // 2. Sadece virgül varsa -> Türkçe format (12,50)
+            // 3. Sadece nokta varsa:
             //    a. Tek bir nokta varsa ve sondan 2 basamak ayırıyorsa (123.45) -> Standart (nokta ondalık)
             //    b. Diğer durumlar (1.000 veya 1.000.000) -> Türkçe (nokta binlik)
-            
-            if (amountStr.includes(',')) {
+
+            const hasComma = amountStr.includes(',');
+            const hasDot = amountStr.includes('.');
+
+            if (hasComma && hasDot) {
+                const lastComma = amountStr.lastIndexOf(',');
+                const lastDot = amountStr.lastIndexOf('.');
+                if (lastDot > lastComma) {
+                    // İngilizce format: 1,119.55
+                    amount = parseFloat(amountStr.replace(/,/g, ''));
+                } else {
+                    // Türkçe format: 1.119,55
+                    amount = parseTurkishNumber(amountStr);
+                }
+            } else if (hasComma) {
                  amount = parseTurkishNumber(amountStr);
-            } else if (amountStr.includes('.')) {
+            } else if (hasDot) {
                 const firstDotIndex = amountStr.indexOf('.');
                 const lastDotIndex = amountStr.lastIndexOf('.');
                 const decimals = amountStr.length - lastDotIndex - 1;

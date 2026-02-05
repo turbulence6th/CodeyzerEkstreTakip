@@ -24,7 +24,7 @@ describe('QNB Email Parser', () => {
 
     it('should parse valid QNB statement (Turkish format amount)', async () => {
         const html = baseHtmlTemplate
-            .replace('0.00 TL', '1.250,50 TL') 
+            .replace('1,119.55 TL', '1.250,50 TL')
             .replace('26/01/2026', '28/02/2026');
 
         const result = await qnbEmailParser.parse({ ...mockEmail, htmlBody: html });
@@ -36,20 +36,19 @@ describe('QNB Email Parser', () => {
         expect(result?.dueDate).toEqual(new Date(2026, 1, 28, 12, 0, 0, 0));
     });
 
-    it('should parse valid QNB statement (Dot decimal amount - 0.00)', async () => {
+    it('should parse valid QNB statement (default template amount - 1,119.55)', async () => {
         const html = baseHtmlTemplate
             .replace('26/01/2026', '28/02/2026');
-        // Amount is already 0.00 TL in template
 
         const result = await qnbEmailParser.parse({ ...mockEmail, htmlBody: html });
 
         expect(result).not.toBeNull();
-        expect(result?.amount).toBe(0);
+        expect(result?.amount).toBe(1119.55);
     });
-    
+
      it('should parse valid QNB statement (Dot decimal amount - 123.45)', async () => {
         const html = baseHtmlTemplate
-            .replace('0.00 TL', '123.45 TL')
+            .replace('1,119.55 TL', '123.45 TL')
             .replace('26/01/2026', '28/02/2026');
 
         const result = await qnbEmailParser.parse({ ...mockEmail, htmlBody: html });
