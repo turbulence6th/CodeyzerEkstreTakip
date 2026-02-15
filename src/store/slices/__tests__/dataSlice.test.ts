@@ -8,6 +8,7 @@ import dataReducer, {
   deleteLoan,
   setUserAmount,
   clearUserAmount,
+  updateItemDueDate,
 } from '../dataSlice';
 import type { ManualEntry } from '../../../types/manual-entry.types';
 import type { ParsedStatement } from '../../../services/statement-parsing/types';
@@ -704,6 +705,76 @@ describe('dataSlice - Manuel Kredi Girişi', () => {
       const totalDebt = selectTotalDebt(testStore.getState() as any);
       // 1000 (userAmount) + 2000 (amount) + 0 (null, no userAmount) = 3000
       expect(totalDebt).toBe(3000);
+    });
+  });
+
+  describe('updateItemDueDate', () => {
+    it('should update the dueDate of an installment', () => {
+      const today = new Date();
+
+      const loanEntry: ManualEntry = {
+        id: 'loan_date_update',
+        description: 'Tarih Test Kredisi',
+        amount: 500,
+        dueDate: today,
+        source: 'manual',
+        entryType: 'loan',
+        installmentCount: 3,
+      };
+
+      store.dispatch(addManualEntry(loanEntry));
+
+      const state = store.getState().data;
+      const firstInstallment = state.items.find(i => i.id === 'loan_date_update_installment_1');
+      expect(firstInstallment).toBeDefined();
+
+      // Yeni tarih: 2 gün sonrası
+      const newDate = new Date(today);
+      newDate.setDate(newDate.getDate() + 2);
+      const newDateIso = newDate.toISOString();
+
+      store.dispatch(updateItemDueDate({ id: 'loan_date_update_installment_1', dueDate: newDateIso }));
+
+      const updatedState = store.getState().data;
+      const updatedItem = updatedState.items.find(i => i.id === 'loan_date_update_installment_1');
+      expect(updatedItem).toBeDefined();
+      expect(updatedItem!.dueDate).toBe(newDateIso);
+    });
+
+    it('should maintain sort order after dueDate update', () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // İki ayrı borç ekle
+      const entry1: ManualEntry = {
+        id: 'sort_test_1',
+        description: 'Erken Borç',
+        amount: 100,
+        dueDate: new Date(today.getTime() + 86400000), // yarın
+        source: 'manual',
+        entryType: 'debt',
+      };
+
+      const entry2: ManualEntry = {
+        id: 'sort_test_2',
+        description: 'Geç Borç',
+        amount: 200,
+        dueDate: new Date(today.getTime() + 86400000 * 10), // 10 gün sonra
+        source: 'manual',
+        entryType: 'debt',
+      };
+
+      store.dispatch(addManualEntry(entry1));
+      store.dispatch(addManualEntry(entry2));
+
+      // entry1'in tarihini 20 gün sonrasına güncelle (entry2'den sonraya)
+      const newDate = new Date(today.getTime() + 86400000 * 20);
+      store.dispatch(updateItemDueDate({ id: 'sort_test_1', dueDate: newDate.toISOString() }));
+
+      const state = store.getState().data;
+      // En yeniden eskiye sıralı olduğu için entry1 (artık daha geç) ilk sırada olmalı
+      expect(state.items[0].id).toBe('sort_test_1');
+      expect(state.items[1].id).toBe('sort_test_2');
     });
   });
 });

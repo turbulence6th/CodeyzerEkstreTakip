@@ -309,6 +309,18 @@ const dataSlice = createSlice({
            console.warn(`Loan with ID ${loanIdToDelete} not found for deletion.`);
        }
     },
+    // Taksit tarihini güncelleme reducer'ı
+    updateItemDueDate: (state, action: PayloadAction<{ id: string; dueDate: string }>) => {
+        const { id, dueDate } = action.payload;
+        const item = state.items.find(i => i.id === id);
+        if (item) {
+            item.dueDate = dueDate;
+            sortItemsByDate(state.items);
+            console.log(`Item ${id} dueDate updated to: ${dueDate}`);
+        } else {
+            console.warn(`Item with ID ${id} not found for updating dueDate.`);
+        }
+    },
     // Verileri import et (cihazlar arası aktarım için)
     importData: (state, action: PayloadAction<{ items: SerializableDisplayItem[], merge: boolean }>) => {
        const { items: importedItems, merge } = action.payload;
@@ -544,5 +556,5 @@ export const selectGroupedLoans = createSelector(
 
 
 // Yeni action'ı export et
-export const { clearData, addManualEntry, deleteManualEntry, togglePaidStatus, deleteLoan, importData, setUserAmount, clearUserAmount } = dataSlice.actions;
+export const { clearData, addManualEntry, deleteManualEntry, togglePaidStatus, deleteLoan, importData, setUserAmount, clearUserAmount, updateItemDueDate } = dataSlice.actions;
 export default dataSlice.reducer;

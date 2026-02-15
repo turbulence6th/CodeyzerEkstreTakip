@@ -26,6 +26,7 @@ import {
   selectAllDataWithDates,
   togglePaidStatus,
   setUserAmount,
+  updateItemDueDate,
 } from '../store/slices/dataSlice';
 import { startGlobalLoading, stopGlobalLoading } from '../store/slices/loadingSlice';
 import { addToast } from '../store/slices/toastSlice';
@@ -319,6 +320,10 @@ Tutar: ${formatCurrency(item.amount)}`;
       dispatch(setUserAmount({ id, amount }));
   };
 
+  const handleUpdateDueDate = (id: string, dueDate: string) => {
+      dispatch(updateItemDueDate({ id, dueDate }));
+  };
+
   return (
     <IonPage>
       <DetailsModal 
@@ -371,6 +376,7 @@ Tutar: ${formatCurrency(item.amount)}`;
                 onDeleteManualEntry={handleDeleteManualEntry}
                 onTogglePaidStatus={handleTogglePaidStatus}
                 onSetUserAmount={handleSetUserAmount}
+                onUpdateDueDate={handleUpdateDueDate}
              />
           </div>
         )}

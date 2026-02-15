@@ -14,6 +14,13 @@ import {
     IonItemOptions,
     IonItemOption,
     IonAlert,
+    IonModal,
+    IonDatetime,
+    IonButtons,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
+    IonContent,
 } from '@ionic/react';
 import {
     mailOutline,
@@ -56,6 +63,7 @@ interface DisplayItemListProps {
     onDeleteManualEntry: (id: string) => void;
     onTogglePaidStatus: (id: string) => void;
     onSetUserAmount: (id: string, amount: number) => void;
+    onUpdateDueDate: (id: string, dueDate: string) => void;
 }
 
 const DisplayItemList: React.FC<DisplayItemListProps> = ({
@@ -67,9 +75,12 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
     // onAddAllInstallments prop'u kaldırıldı
     onDeleteManualEntry,
     onTogglePaidStatus,
-    onSetUserAmount
+    onSetUserAmount,
+    onUpdateDueDate
 }) => {
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
+    const [editingDateItemId, setEditingDateItemId] = useState<string | null>(null);
+    const [editingDateValue, setEditingDateValue] = useState<string | undefined>(undefined);
 
     if (items.length === 0) {
         return (
@@ -188,6 +199,24 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                                             <IonIcon slot="icon-only" icon={createOutline}></IonIcon>
                                         </IonItemOption>
                                     )}
+                                    {/* Kredi taksitleri için tarih düzenleme butonu */}
+                                    {isManualEntry(item) && item.description.includes('Taksit') && (
+                                        <IonItemOption
+                                            color="tertiary"
+                                            onClick={() => {
+                                                if (itemId) {
+                                                    const currentDate = item.dueDate instanceof Date
+                                                        ? item.dueDate.toISOString()
+                                                        : new Date(item.dueDate).toISOString();
+                                                    setEditingDateValue(currentDate);
+                                                    setEditingDateItemId(itemId);
+                                                }
+                                            }}
+                                            disabled={!itemId}
+                                        >
+                                            <IonIcon slot="icon-only" icon={calendarOutline}></IonIcon>
+                                        </IonItemOption>
+                                    )}
                                     <IonItemOption
                                         color={item.isPaid ? "warning" : "success"}
                                         onClick={() => itemId && onTogglePaidStatus(itemId)}
@@ -241,6 +270,50 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                 ]}
                 onDidDismiss={() => setEditingItemId(null)}
             />
+            <IonModal
+                isOpen={editingDateItemId !== null}
+                onDidDismiss={() => {
+                    setEditingDateItemId(null);
+                    setEditingDateValue(undefined);
+                }}
+            >
+                <IonHeader>
+                    <IonToolbar>
+                        <IonTitle>Tarih Düzenle</IonTitle>
+                        <IonButtons slot="start">
+                            <IonButton onClick={() => {
+                                setEditingDateItemId(null);
+                                setEditingDateValue(undefined);
+                            }}>İptal</IonButton>
+                        </IonButtons>
+                        <IonButtons slot="end">
+                            <IonButton
+                                strong
+                                onClick={() => {
+                                    if (editingDateItemId && editingDateValue) {
+                                        onUpdateDueDate(editingDateItemId, new Date(editingDateValue).toISOString());
+                                    }
+                                    setEditingDateItemId(null);
+                                    setEditingDateValue(undefined);
+                                }}
+                            >Kaydet</IonButton>
+                        </IonButtons>
+                    </IonToolbar>
+                </IonHeader>
+                <IonContent className="ion-padding">
+                    <IonDatetime
+                        presentation="date"
+                        value={editingDateValue}
+                        onIonChange={(e) => {
+                            const val = e.detail.value;
+                            if (typeof val === 'string') {
+                                setEditingDateValue(val);
+                            }
+                        }}
+                        locale="tr-TR"
+                    />
+                </IonContent>
+            </IonModal>
         </>
     );
 };
