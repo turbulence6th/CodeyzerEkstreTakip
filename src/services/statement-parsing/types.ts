@@ -7,6 +7,7 @@ export interface ParsedStatement {
   originalMessage: EmailDetails | ScreenshotDetails; // E-posta ve Screenshot detaylarını kabul etsin
   source: 'email' | 'screenshot'; // Kaynağı belirtmek için alan ekleyelim
   isPaid?: boolean; // Ödendi durumu
+  userAmount?: number; // Kullanıcının elle girdiği tutar (amount null olduğunda)
   entryType: 'debt'; // Otomatik kayıtlar her zaman borçtur
 }
 

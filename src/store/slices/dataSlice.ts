@@ -13,7 +13,7 @@ import { addMonths } from '../../utils/formatting'; // addMonths import edildi
 type DisplayItem = ParsedStatement | ManualEntry;
 
 // --- Serialize edilmiş veri tipi (isPaid eklendi) ---
-type SerializableStatement = Omit<ParsedStatement, 'dueDate'> & { id: string; dueDate: string; isPaid?: boolean; entryType: 'debt'; };
+type SerializableStatement = Omit<ParsedStatement, 'dueDate'> & { id: string; dueDate: string; isPaid?: boolean; userAmount?: number; entryType: 'debt'; };
 // SerializableLoan artık state'te saklanmayacak.
 type SerializableManualEntry = Omit<ManualEntry, 'dueDate'> & { dueDate: string; source: 'manual'; isPaid?: boolean; entryType: 'debt' | 'expense' | 'loan'; installmentCount?: number; };
 type SerializableDisplayItem = SerializableStatement | SerializableManualEntry; // SerializableLoan kaldırıldı
@@ -175,6 +175,28 @@ const dataSlice = createSlice({
       state.error = null;
       state.lastUpdated = null;
     },
+    // Kullanıcının elle tutar girmesi için reducer
+    setUserAmount: (state, action: PayloadAction<{ id: string; amount: number }>) => {
+        const { id, amount } = action.payload;
+        const item = state.items.find(i => i.id === id);
+        if (item && isSerializableStatement(item)) {
+            item.userAmount = amount;
+            console.log(`Item ${id} userAmount set to: ${amount}`);
+        } else {
+            console.warn(`Item with ID ${id} not found or not a statement for setting userAmount.`);
+        }
+    },
+    // Kullanıcının girdiği tutarı kaldırma reducer'ı
+    clearUserAmount: (state, action: PayloadAction<string>) => {
+        const itemId = action.payload;
+        const item = state.items.find(i => i.id === itemId);
+        if (item && isSerializableStatement(item)) {
+            delete item.userAmount;
+            console.log(`Item ${itemId} userAmount cleared.`);
+        } else {
+            console.warn(`Item with ID ${itemId} not found or not a statement for clearing userAmount.`);
+        }
+    },
     // Ödendi durumunu değiştiren yeni reducer
     togglePaidStatus: (state, action: PayloadAction<string>) => {
         const itemId = action.payload;
@@ -314,28 +336,26 @@ const dataSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchAndProcessDataThunk.fulfilled, (state, action: PayloadAction<FetchDataResult>) => {
-        // Mevcut öğelerin isPaid durumlarını bir haritada sakla.
+        // Mevcut öğelerin isPaid durumlarını ve userAmount değerlerini haritada sakla.
         // ID'ler stabil olmadığı için, stabil bir anahtar kullan.
         const paidStatusMap = new Map<string, boolean>();
+        const userAmountMap = new Map<string, number>();
         state.items.forEach(item => {
-            if (item.isPaid) {
-                 // Manuel girişler için ID stabil.
-                if(isSerializableManualEntry(item)) {
-                    paidStatusMap.set(item.id, true);
-                } else if (isSerializableStatement(item)) {
-                    // Otomatik girişler için stabil anahtar oluştur.
-                    // Bu, tarihlerin Date nesnesine çevrilmesini gerektirir.
-                     try {
-                        const deserializedItem = {
-                            ...item,
-                            dueDate: new Date(item.dueDate)
-                        }
-                        // Type guard'ları düzelt
-                        const key = createStableKey(deserializedItem as any);
-                        paidStatusMap.set(key, true);
-                    } catch(e) {
-                         console.error("Error creating stable key for existing item:", item, e);
+            // Manuel girişler için ID stabil.
+            if(isSerializableManualEntry(item)) {
+                if (item.isPaid) paidStatusMap.set(item.id, true);
+            } else if (isSerializableStatement(item)) {
+                // Otomatik girişler için stabil anahtar oluştur.
+                try {
+                    const deserializedItem = {
+                        ...item,
+                        dueDate: new Date(item.dueDate)
                     }
+                    const key = createStableKey(deserializedItem as any);
+                    if (item.isPaid) paidStatusMap.set(key, true);
+                    if (item.userAmount !== undefined) userAmountMap.set(key, item.userAmount);
+                } catch(e) {
+                     console.error("Error creating stable key for existing item:", item, e);
                 }
             }
         });
@@ -343,7 +363,7 @@ const dataSlice = createSlice({
         // Thunk'tan gelen yeni otomatik kayıtlar
         const newAutomaticEntries = action.payload.items;
 
-        // Yeni otomatik kayıtlara eski isPaid durumunu uygula
+        // Yeni otomatik kayıtlara eski isPaid durumunu ve userAmount değerini uygula
         const updatedAutomaticEntries = newAutomaticEntries.map(item => {
             let key = '';
             try {
@@ -356,10 +376,11 @@ const dataSlice = createSlice({
                 console.error("Error creating stable key for new item:", item, e);
             }
 
-            if (paidStatusMap.has(key)) {
-                return { ...item, isPaid: true };
-            }
-            return item;
+            const updates: Partial<typeof item> = {};
+            if (paidStatusMap.has(key)) updates.isPaid = true;
+            if (userAmountMap.has(key)) updates.userAmount = userAmountMap.get(key);
+
+            return Object.keys(updates).length > 0 ? { ...item, ...updates } : item;
         });
 
         // Mevcut manuel kayıtları koru ve isPaid durumlarını güncelle
@@ -412,7 +433,7 @@ export const selectAllDataWithDates = createSelector(
     return items.map(item => {
         try {
             if (isSerializableStatement(item)) {
-                return { ...item, dueDate: new Date(item.dueDate), isPaid: !!item.isPaid, entryType: 'debt' } as DisplayItem;
+                return { ...item, dueDate: new Date(item.dueDate), isPaid: !!item.isPaid, userAmount: item.userAmount, entryType: 'debt' } as DisplayItem;
             } else if (isSerializableManualEntry(item)) {
                  return { ...item, dueDate: new Date(item.dueDate), isPaid: !!item.isPaid, entryType: item.entryType } as DisplayItem;
             }
@@ -448,7 +469,7 @@ export const selectTotalDebt = createSelector(
       // Tarih kontrolü kaldırıldı. Sadece ödenmemiş borçları topla.
       let currentAmount = 0;
       if (isSerializableStatement(item)) {
-        currentAmount = item.amount ?? 0;
+        currentAmount = item.userAmount ?? item.amount ?? 0;
       } else if (isSerializableManualEntry(item)) {
         currentAmount = item.amount;
       }
@@ -523,5 +544,5 @@ export const selectGroupedLoans = createSelector(
 
 
 // Yeni action'ı export et
-export const { clearData, addManualEntry, deleteManualEntry, togglePaidStatus, deleteLoan, importData } = dataSlice.actions;
+export const { clearData, addManualEntry, deleteManualEntry, togglePaidStatus, deleteLoan, importData, setUserAmount, clearUserAmount } = dataSlice.actions;
 export default dataSlice.reducer;

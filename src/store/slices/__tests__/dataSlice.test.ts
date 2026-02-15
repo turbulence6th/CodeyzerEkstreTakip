@@ -6,6 +6,8 @@ import dataReducer, {
   selectTotalDebt,
   selectGroupedLoans,
   deleteLoan,
+  setUserAmount,
+  clearUserAmount,
 } from '../dataSlice';
 import type { ManualEntry } from '../../../types/manual-entry.types';
 import type { ParsedStatement } from '../../../services/statement-parsing/types';
@@ -569,6 +571,139 @@ describe('dataSlice - Manuel Kredi Girişi', () => {
       // Hiçbir şey silinmemeli
       state = store.getState().data;
       expect(state.items.length).toBe(initialLength);
+    });
+  });
+
+  describe('userAmount - Elle Tutar Girme', () => {
+    // Otomatik kayıtları (statement) simüle etmek için yardımcı fonksiyon
+    const createStoreWithStatements = (statements: any[]) => {
+      return configureStore({
+        reducer: { data: dataReducer },
+        preloadedState: {
+          data: {
+            items: statements,
+            error: null,
+            lastUpdated: Date.now(),
+          },
+        },
+      });
+    };
+
+    const makeStatement = (overrides: Partial<any> = {}) => ({
+      id: 'stmt_1',
+      bankName: 'Yapı Kredi',
+      dueDate: new Date().toISOString(),
+      amount: null,
+      last4Digits: '1234',
+      source: 'email',
+      isPaid: false,
+      entryType: 'debt',
+      originalMessage: { id: 'msg1', sender: 'test@test.com', subject: 'Ekstre', date: new Date().toISOString(), plainBody: null, htmlBody: null },
+      ...overrides,
+    });
+
+    it('should set userAmount on a statement item', () => {
+      const stmt = makeStatement();
+      const testStore = createStoreWithStatements([stmt]);
+
+      testStore.dispatch(setUserAmount({ id: 'stmt_1', amount: 1500.50 }));
+
+      const state = testStore.getState().data;
+      expect((state.items[0] as any).userAmount).toBe(1500.50);
+    });
+
+    it('should clear userAmount from a statement item', () => {
+      const stmt = makeStatement({ userAmount: 2000 });
+      const testStore = createStoreWithStatements([stmt]);
+
+      // Önce userAmount'un var olduğunu doğrula
+      expect((testStore.getState().data.items[0] as any).userAmount).toBe(2000);
+
+      testStore.dispatch(clearUserAmount('stmt_1'));
+
+      const state = testStore.getState().data;
+      expect((state.items[0] as any).userAmount).toBeUndefined();
+    });
+
+    it('should not set userAmount on a manual entry item', () => {
+      const testStore = createStoreWithStatements([]);
+
+      // Manuel kayıt ekle
+      const manualEntry: ManualEntry = {
+        id: 'manual_1',
+        description: 'Test Kayıt',
+        amount: 500,
+        dueDate: new Date(),
+        source: 'manual',
+        entryType: 'debt',
+      };
+      testStore.dispatch(addManualEntry(manualEntry));
+
+      // Manuel kayıtta userAmount ayarlamaya çalış - statement olmadığı için uygulanmamalı
+      testStore.dispatch(setUserAmount({ id: 'manual_1', amount: 999 }));
+
+      const state = testStore.getState().data;
+      expect((state.items[0] as any).userAmount).toBeUndefined();
+    });
+
+    it('should use userAmount in selectTotalDebt when amount is null', () => {
+      const stmt = makeStatement({ amount: null, userAmount: 3000 });
+      const testStore = createStoreWithStatements([stmt]);
+
+      const totalDebt = selectTotalDebt(testStore.getState() as any);
+      expect(totalDebt).toBe(3000);
+    });
+
+    it('should use userAmount over amount in selectTotalDebt when both exist', () => {
+      const stmt = makeStatement({ amount: 1000, userAmount: 2500 });
+      const testStore = createStoreWithStatements([stmt]);
+
+      const totalDebt = selectTotalDebt(testStore.getState() as any);
+      expect(totalDebt).toBe(2500);
+    });
+
+    it('should fall back to amount when userAmount is not set', () => {
+      const stmt = makeStatement({ amount: 1800 });
+      const testStore = createStoreWithStatements([stmt]);
+
+      const totalDebt = selectTotalDebt(testStore.getState() as any);
+      expect(totalDebt).toBe(1800);
+    });
+
+    it('should treat amount as 0 when both amount and userAmount are absent', () => {
+      const stmt = makeStatement({ amount: null });
+      const testStore = createStoreWithStatements([stmt]);
+
+      const totalDebt = selectTotalDebt(testStore.getState() as any);
+      expect(totalDebt).toBe(0);
+    });
+
+    it('should include userAmount in selectAllDataWithDates output', () => {
+      const stmt = makeStatement({ amount: null, userAmount: 4500 });
+      const testStore = createStoreWithStatements([stmt]);
+
+      const items = selectAllDataWithDates(testStore.getState() as any);
+      expect(items.length).toBe(1);
+      expect((items[0] as any).userAmount).toBe(4500);
+    });
+
+    it('should not affect paid items in total debt even with userAmount', () => {
+      const stmt = makeStatement({ amount: null, userAmount: 5000, isPaid: true });
+      const testStore = createStoreWithStatements([stmt]);
+
+      const totalDebt = selectTotalDebt(testStore.getState() as any);
+      expect(totalDebt).toBe(0);
+    });
+
+    it('should handle multiple statements with mixed userAmount and amount', () => {
+      const stmt1 = makeStatement({ id: 'stmt_1', amount: null, userAmount: 1000 });
+      const stmt2 = makeStatement({ id: 'stmt_2', amount: 2000, last4Digits: '5678' });
+      const stmt3 = makeStatement({ id: 'stmt_3', amount: null, last4Digits: '9012' }); // Ne amount ne userAmount
+      const testStore = createStoreWithStatements([stmt1, stmt2, stmt3]);
+
+      const totalDebt = selectTotalDebt(testStore.getState() as any);
+      // 1000 (userAmount) + 2000 (amount) + 0 (null, no userAmount) = 3000
+      expect(totalDebt).toBe(3000);
     });
   });
 });

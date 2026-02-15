@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     IonCard,
     IonCardHeader,
@@ -13,6 +13,7 @@ import {
     IonSpinner,
     IonItemOptions,
     IonItemOption,
+    IonAlert,
 } from '@ionic/react';
 import {
     mailOutline,
@@ -25,6 +26,7 @@ import {
     arrowUndoCircleOutline, // Yeni ikon
     receiptOutline, // Yeni ikon
     warningOutline, // Haftasonu uyarısı için
+    createOutline, // Tutar düzenleme ikonu (swipe)
 } from 'ionicons/icons';
 
 // Tipler
@@ -53,6 +55,7 @@ interface DisplayItemListProps {
     // onAddAllInstallments prop'u kaldırıldı
     onDeleteManualEntry: (id: string) => void;
     onTogglePaidStatus: (id: string) => void;
+    onSetUserAmount: (id: string, amount: number) => void;
 }
 
 const DisplayItemList: React.FC<DisplayItemListProps> = ({
@@ -63,8 +66,10 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
     onAddToCalendar,
     // onAddAllInstallments prop'u kaldırıldı
     onDeleteManualEntry,
-    onTogglePaidStatus
+    onTogglePaidStatus,
+    onSetUserAmount
 }) => {
+    const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
     if (items.length === 0) {
         return (
@@ -132,7 +137,14 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                                                         <IonIcon icon={warningOutline} color="warning" style={{ marginLeft: '8px', verticalAlign: 'middle' }} />
                                                     )}
                                                 </p>
-                                                <p>Tutar: <strong>{formatCurrency(item.amount)}</strong></p>
+                                                <p>
+                                                    Tutar: <strong style={item.amount === null && !item.userAmount ? { color: 'var(--ion-color-medium)' } : undefined}>
+                                                        {formatCurrency(item.userAmount ?? item.amount)}
+                                                    </strong>
+                                                    {item.amount === null && !item.userAmount && (
+                                                        <span style={{ fontSize: '0.8em', color: 'var(--ion-color-medium)', marginLeft: '4px' }}>(Kaydırarak girin)</span>
+                                                    )}
+                                                </p>
                                                 {item.last4Digits && <p>Kart No: <strong>...{item.last4Digits}</strong></p>}
                                             </>
                                         ) : isManualEntry(item) ? (
@@ -166,6 +178,16 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                                 </IonItem>
 
                                 <IonItemOptions side="end">
+                                    {/* Tutarı null olan statement'lar için tutar girme butonu */}
+                                    {isStatement(item) && item.amount === null && (
+                                        <IonItemOption
+                                            color="primary"
+                                            onClick={() => itemId && setEditingItemId(itemId)}
+                                            disabled={!itemId}
+                                        >
+                                            <IonIcon slot="icon-only" icon={createOutline}></IonIcon>
+                                        </IonItemOption>
+                                    )}
                                     <IonItemOption
                                         color={item.isPaid ? "warning" : "success"}
                                         onClick={() => itemId && onTogglePaidStatus(itemId)}
@@ -192,6 +214,33 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                     <p className="empty-list-message">Görüntülenecek aktif ekstre bilgisi bulunamadı. Geçmiş kayıtlar otomatik olarak gizlenir. Yeni veri getirmeyi deneyebilirsiniz.</p>
                 </IonItem>
             )}
+            <IonAlert
+                isOpen={editingItemId !== null}
+                header="Tutar Girin"
+                message="Bu ekstre için tutar bilgisi bulunamadı. Lütfen tutarı elle girin."
+                inputs={[
+                    {
+                        name: 'amount',
+                        type: 'number',
+                        placeholder: 'Tutar (TL)',
+                        min: 0,
+                    },
+                ]}
+                buttons={[
+                    { text: 'İptal', role: 'cancel', handler: () => setEditingItemId(null) },
+                    {
+                        text: 'Kaydet',
+                        handler: (data) => {
+                            const amount = parseFloat(data.amount);
+                            if (editingItemId && !isNaN(amount) && amount > 0) {
+                                onSetUserAmount(editingItemId, amount);
+                            }
+                            setEditingItemId(null);
+                        },
+                    },
+                ]}
+                onDidDismiss={() => setEditingItemId(null)}
+            />
         </>
     );
 };

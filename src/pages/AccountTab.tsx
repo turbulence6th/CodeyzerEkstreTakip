@@ -24,7 +24,8 @@ import {
   fetchAndProcessDataThunk,
   deleteManualEntry,
   selectAllDataWithDates,
-  togglePaidStatus, // togglePaidStatus import edildi
+  togglePaidStatus,
+  setUserAmount,
 } from '../store/slices/dataSlice';
 import { startGlobalLoading, stopGlobalLoading } from '../store/slices/loadingSlice';
 import { addToast } from '../store/slices/toastSlice';
@@ -230,8 +231,9 @@ Tutar: ${formatCurrency(item.amount)}`;
       } else {
           summary = `${item.bankName} Kredi Kartı Son Ödeme`;
           description = `Son Ödeme Tarihi: ${formatDate(item.dueDate)}`;
-          if (item.amount !== null && item.amount !== undefined) {
-             description += `\nTutar: ${formatCurrency(item.amount)}`;
+          const calendarAmount = item.userAmount ?? item.amount;
+          if (calendarAmount !== null && calendarAmount !== undefined) {
+             description += `\nTutar: ${formatCurrency(calendarAmount)}`;
           }
           if (item.last4Digits) {
                description += `\nKart: ...${item.last4Digits}`;
@@ -313,6 +315,10 @@ Tutar: ${formatCurrency(item.amount)}`;
       dispatch(togglePaidStatus(id));
   };
 
+  const handleSetUserAmount = (id: string, amount: number) => {
+      dispatch(setUserAmount({ id, amount }));
+  };
+
   return (
     <IonPage>
       <DetailsModal 
@@ -364,6 +370,7 @@ Tutar: ${formatCurrency(item.amount)}`;
                 // onAddAllInstallments prop'u kaldırıldı
                 onDeleteManualEntry={handleDeleteManualEntry}
                 onTogglePaidStatus={handleTogglePaidStatus}
+                onSetUserAmount={handleSetUserAmount}
              />
           </div>
         )}
