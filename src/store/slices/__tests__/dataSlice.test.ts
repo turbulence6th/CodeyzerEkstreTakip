@@ -9,9 +9,11 @@ import dataReducer, {
   setUserAmount,
   clearUserAmount,
   updateItemDueDate,
+  fetchAndProcessDataThunk,
 } from '../dataSlice';
 import type { ManualEntry } from '../../../types/manual-entry.types';
 import type { ParsedStatement } from '../../../services/statement-parsing/types';
+import { BANK_NAMES } from '../../../services/bank-registry';
 
 // DisplayItem tipi (dataSlice'dakiyle aynı)
 type DisplayItem = ParsedStatement | ManualEntry;
@@ -592,7 +594,7 @@ describe('dataSlice - Manuel Kredi Girişi', () => {
 
     const makeStatement = (overrides: Partial<any> = {}) => ({
       id: 'stmt_1',
-      bankName: 'Yapı Kredi',
+      bankName: BANK_NAMES.YAPI_KREDI,
       dueDate: new Date().toISOString(),
       amount: null,
       last4Digits: '1234',
@@ -705,6 +707,221 @@ describe('dataSlice - Manuel Kredi Girişi', () => {
       const totalDebt = selectTotalDebt(testStore.getState() as any);
       // 1000 (userAmount) + 2000 (amount) + 0 (null, no userAmount) = 3000
       expect(totalDebt).toBe(3000);
+    });
+  });
+
+  describe('Deduplikasyon - Manuel ve Email Kayıtları', () => {
+    // Otomatik kayıtları (statement) simüle etmek için yardımcı fonksiyon
+    const createStoreWithItems = (items: any[]) => {
+      return configureStore({
+        reducer: { data: dataReducer },
+        preloadedState: {
+          data: {
+            items,
+            error: null,
+            lastUpdated: Date.now(),
+          },
+        },
+      });
+    };
+
+    const makeSerializedStatement = (overrides: Partial<any> = {}) => ({
+      id: `auto_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      bankName: BANK_NAMES.AKBANK,
+      dueDate: new Date('2026-03-15T09:00:00.000Z').toISOString(),
+      amount: 2500,
+      last4Digits: '1234',
+      source: 'email',
+      isPaid: false,
+      entryType: 'debt',
+      originalMessage: { id: 'msg1', sender: 'test@akbank.com', subject: 'Ekstre', date: new Date().toISOString(), plainBody: null, htmlBody: null },
+      ...overrides,
+    });
+
+    it('should remove manual entry when matching email entry arrives', () => {
+      // Manuel kayıt ile store oluştur (screenshot'tan eklenmiş gibi)
+      const manualEntry = {
+        id: 'manual_akbank_1',
+        description: 'Akbank - ****1234',
+        amount: 2500,
+        dueDate: new Date('2026-03-15T09:00:00.000Z').toISOString(),
+        source: 'manual' as const,
+        isPaid: false,
+        entryType: 'debt' as const,
+      };
+
+      const testStore = createStoreWithItems([manualEntry]);
+
+      // Email'den gelen aynı ekstre
+      const emailStatement = makeSerializedStatement();
+
+      // fetchAndProcessDataThunk.fulfilled action'ını simüle et
+      testStore.dispatch({
+        type: fetchAndProcessDataThunk.fulfilled.type,
+        payload: { items: [emailStatement], totalItems: 1 },
+      });
+
+      const state = testStore.getState().data;
+
+      // Sadece 1 kayıt olmalı (email kaydı)
+      expect(state.items.length).toBe(1);
+      expect(state.items[0].source).toBe('email');
+      expect((state.items[0] as any).bankName).toBe(BANK_NAMES.AKBANK);
+    });
+
+    it('should transfer isPaid from manual to email entry during deduplication', () => {
+      // Ödenmiş olarak işaretlenmiş manuel kayıt
+      const manualEntry = {
+        id: 'manual_akbank_paid',
+        description: 'Akbank - ****5678',
+        amount: 3000,
+        dueDate: new Date('2026-03-20T09:00:00.000Z').toISOString(),
+        source: 'manual' as const,
+        isPaid: true,
+        entryType: 'debt' as const,
+      };
+
+      const testStore = createStoreWithItems([manualEntry]);
+
+      // Email'den gelen aynı ekstre (isPaid: false)
+      const emailStatement = makeSerializedStatement({
+        last4Digits: '5678',
+        dueDate: new Date('2026-03-20T09:00:00.000Z').toISOString(),
+        amount: 3000,
+        isPaid: false,
+      });
+
+      testStore.dispatch({
+        type: fetchAndProcessDataThunk.fulfilled.type,
+        payload: { items: [emailStatement], totalItems: 1 },
+      });
+
+      const state = testStore.getState().data;
+
+      expect(state.items.length).toBe(1);
+      expect(state.items[0].source).toBe('email');
+      // isPaid durumu manuel kayıttan aktarılmış olmalı
+      expect(state.items[0].isPaid).toBe(true);
+    });
+
+    it('should not remove manual entries that do not match email entries', () => {
+      // Farklı banka veya kart numarasına sahip manuel kayıt
+      const manualEntry = {
+        id: 'manual_different',
+        description: 'Akbank - ****9999',
+        amount: 1500,
+        dueDate: new Date('2026-03-25T09:00:00.000Z').toISOString(),
+        source: 'manual' as const,
+        isPaid: false,
+        entryType: 'debt' as const,
+      };
+
+      const testStore = createStoreWithItems([manualEntry]);
+
+      // Farklı kart numarası olan email kaydı
+      const emailStatement = makeSerializedStatement({
+        last4Digits: '1234',
+        dueDate: new Date('2026-03-15T09:00:00.000Z').toISOString(),
+      });
+
+      testStore.dispatch({
+        type: fetchAndProcessDataThunk.fulfilled.type,
+        payload: { items: [emailStatement], totalItems: 1 },
+      });
+
+      const state = testStore.getState().data;
+
+      // 2 kayıt olmalı: 1 manuel + 1 email
+      expect(state.items.length).toBe(2);
+    });
+
+    it('should not remove non-bank manual entries', () => {
+      // Banka adı olmayan manuel kayıt
+      const manualEntry = {
+        id: 'manual_kira',
+        description: 'Kira Ödemesi',
+        amount: 5000,
+        dueDate: new Date('2026-03-15T09:00:00.000Z').toISOString(),
+        source: 'manual' as const,
+        isPaid: false,
+        entryType: 'debt' as const,
+      };
+
+      const testStore = createStoreWithItems([manualEntry]);
+
+      const emailStatement = makeSerializedStatement();
+
+      testStore.dispatch({
+        type: fetchAndProcessDataThunk.fulfilled.type,
+        payload: { items: [emailStatement], totalItems: 1 },
+      });
+
+      const state = testStore.getState().data;
+
+      // 2 kayıt olmalı: "Kira Ödemesi" kaldırılmamalı
+      expect(state.items.length).toBe(2);
+      const manualItems = state.items.filter(i => i.source === 'manual');
+      expect(manualItems.length).toBe(1);
+    });
+
+    it('should handle deduplication with amount differences (OCR vs email)', () => {
+      // Screenshot'tan farklı tutar algılanmış olabilir
+      const manualEntry = {
+        id: 'manual_diff_amount',
+        description: 'Akbank - ****1234',
+        amount: 2499, // OCR hatalı okuma
+        dueDate: new Date('2026-03-15T09:00:00.000Z').toISOString(),
+        source: 'manual' as const,
+        isPaid: false,
+        entryType: 'debt' as const,
+      };
+
+      const testStore = createStoreWithItems([manualEntry]);
+
+      // Email'den gelen doğru tutar
+      const emailStatement = makeSerializedStatement({
+        amount: 2500,
+      });
+
+      testStore.dispatch({
+        type: fetchAndProcessDataThunk.fulfilled.type,
+        payload: { items: [emailStatement], totalItems: 1 },
+      });
+
+      const state = testStore.getState().data;
+
+      // Tutar farklı olsa da banka+kart+tarih eşleştiği için deduplikasyon yapılmalı
+      expect(state.items.length).toBe(1);
+      expect(state.items[0].source).toBe('email');
+      expect((state.items[0] as any).amount).toBe(2500); // Doğru tutar korunmalı
+    });
+
+    it('should not deduplicate when dueDate differs', () => {
+      const manualEntry = {
+        id: 'manual_diff_date',
+        description: 'Akbank - ****1234',
+        amount: 2500,
+        dueDate: new Date('2026-04-15T09:00:00.000Z').toISOString(), // Farklı ay
+        source: 'manual' as const,
+        isPaid: false,
+        entryType: 'debt' as const,
+      };
+
+      const testStore = createStoreWithItems([manualEntry]);
+
+      const emailStatement = makeSerializedStatement({
+        dueDate: new Date('2026-03-15T09:00:00.000Z').toISOString(),
+      });
+
+      testStore.dispatch({
+        type: fetchAndProcessDataThunk.fulfilled.type,
+        payload: { items: [emailStatement], totalItems: 1 },
+      });
+
+      const state = testStore.getState().data;
+
+      // Tarih farklı olduğu için 2 kayıt kalmalı
+      expect(state.items.length).toBe(2);
     });
   });
 

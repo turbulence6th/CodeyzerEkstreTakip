@@ -8,6 +8,7 @@ import type { RootState } from '../index';
 // Type guard importları eklendi
 import { isStatement, isManualEntry as isTypeGuardManualEntry } from '../../utils/typeGuards';
 import { addMonths } from '../../utils/formatting'; // addMonths import edildi
+import { parseBankEntryDescription } from '../../utils/bank-entry-format';
 
 // DisplayItem tipi artık ParsedLoan içermiyor.
 type DisplayItem = ParsedStatement | ManualEntry;
@@ -43,6 +44,20 @@ const createStableKey = (item: ParsedStatement): string => {
     // Ekstreler için: banka-son4hane-tutar-sonodemetarihi
     const dateStr = item.dueDate.toISOString().split('T')[0]; // Sadece YYYY-MM-DD
     return `${item.bankName}:${item.last4Digits || 'none'}:${item.amount}:${dateStr}`.toLowerCase();
+};
+
+// Deduplikasyon için eşleştirme anahtarı (tutar hariç - OCR/email farkı olabilir)
+const createDeduplicationKey = (bankName: string, last4Digits: string | undefined, dueDateISO: string): string => {
+    const dateStr = dueDateISO.split('T')[0];
+    return `${bankName}:${last4Digits || 'none'}:${dateStr}`.toLowerCase();
+};
+
+// Manuel giriş description'ından banka adı ve son 4 hane çıkar
+// Format: "Akbank - ****1234" veya "Akbank"
+const extractManualEntryDeduplicationKey = (entry: SerializableManualEntry): string | null => {
+    const parsed = parseBankEntryDescription(entry.description);
+    if (!parsed) return null;
+    return createDeduplicationKey(parsed.bankName, parsed.last4Digits, entry.dueDate);
 };
 
 
@@ -403,14 +418,51 @@ const dataSlice = createSlice({
                 isPaid: paidStatusMap.has(item.id) ? true : item.isPaid
             }));
 
+        // --- DEDUPLİKASYON: Manuel kayıtlarla email kayıtlarını karşılaştır ---
+        // Yeni gelen otomatik kayıtların eşleştirme anahtarlarını oluştur
+        const autoDeduplicationKeys = new Set<string>();
+        updatedAutomaticEntries.forEach(item => {
+            const key = createDeduplicationKey(item.bankName, item.last4Digits, item.dueDate);
+            autoDeduplicationKeys.add(key);
+        });
+
+        // Eşleşen manuel kayıtları bul, isPaid durumunu email kaydına aktar ve kaldır
+        const manualPaidTransfer = new Map<string, boolean>();
+        const deduplicatedManualEntries = updatedManualEntries.filter(entry => {
+            const matchKey = extractManualEntryDeduplicationKey(entry);
+            if (matchKey && autoDeduplicationKeys.has(matchKey)) {
+                // Manuel kaydın isPaid durumunu aktar
+                if (entry.isPaid) {
+                    manualPaidTransfer.set(matchKey, true);
+                }
+                console.log(`[Dedup] Manuel kayıt email ile eşleşti, kaldırılıyor: "${entry.description}" (key: ${matchKey})`);
+                return false; // Bu manuel kaydı kaldır
+            }
+            return true; // Bu manuel kaydı koru
+        });
+
+        // Eşleşen manuel kayıtların isPaid durumunu email kayıtlarına uygula
+        const finalAutomaticEntries = updatedAutomaticEntries.map(item => {
+            const key = createDeduplicationKey(item.bankName, item.last4Digits, item.dueDate);
+            if (manualPaidTransfer.has(key)) {
+                return { ...item, isPaid: true };
+            }
+            return item;
+        });
+
+        const removedCount = updatedManualEntries.length - deduplicatedManualEntries.length;
+        if (removedCount > 0) {
+            console.log(`[Dedup] ${removedCount} adet çakışan manuel kayıt kaldırıldı.`);
+        }
+        // --- DEDUPLİKASYON SONU ---
 
         // Mevcut manuel kayıtları ve GÜNCELLENMİŞ otomatik kayıtları birleştir
-        state.items = [...updatedManualEntries, ...updatedAutomaticEntries];
+        state.items = [...deduplicatedManualEntries, ...finalAutomaticEntries];
 
         state.error = null;
         state.lastUpdated = Date.now();
         sortItemsByDate(state.items);
-        console.log(`Data slice updated. Total items: ${state.items.length} (Manual: ${updatedManualEntries.length}, Auto: ${updatedAutomaticEntries.length})`);
+        console.log(`Data slice updated. Total items: ${state.items.length} (Manual: ${deduplicatedManualEntries.length}, Auto: ${finalAutomaticEntries.length})`);
         console.log("Paid status map size:", paidStatusMap.size);
       })
       .addCase(fetchAndProcessDataThunk.rejected, (state, action) => {

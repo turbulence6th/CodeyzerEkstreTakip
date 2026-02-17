@@ -1,8 +1,9 @@
 import type { BankEmailParser, EmailDetails, ParsedStatement, DecodedEmailBody } from '../../statement-parsing/types';
 import { parseDMYDate, parseTurkishNumber, parseStandardNumber } from '../../../utils/parsing';
+import { BANK_NAMES } from '../../bank-registry';
 
 export const qnbEmailParser: BankEmailParser = {
-    bankName: 'QNB Finansbank',
+    bankName: BANK_NAMES.QNB,
 
     canParse(sender: string, subject: string, body: DecodedEmailBody): boolean {
         return sender.toLowerCase().includes('eekstre.qnb.com.tr') || 

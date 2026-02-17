@@ -1,8 +1,9 @@
 import type { BankEmailParser, EmailDetails, ParsedStatement, DecodedEmailBody } from '../../statement-parsing/types';
 import { parseDMYDate, parseTurkishNumber } from "../../../utils/parsing";
+import { BANK_NAMES } from '../../bank-registry';
 
 export const ziraatEmailParser: BankEmailParser = {
-    bankName: 'Ziraat Bankası',
+    bankName: BANK_NAMES.ZIRAAT,
 
     canParse(sender: string, subject: string, body: DecodedEmailBody): boolean {
         // Gönderen ve konu kontrolü (daha önce olduğu gibi)

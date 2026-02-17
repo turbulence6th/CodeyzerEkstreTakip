@@ -1,8 +1,9 @@
 import type { BankEmailParser, EmailDetails, ParsedStatement, DecodedEmailBody } from '../../statement-parsing/types'; // DecodedEmailBody import edildi
 import { parseTurkishDate } from "../../../utils/parsing"; // parseTurkishNumber kaldırıldı
+import { BANK_NAMES } from '../../bank-registry';
 
 export const yapikrediEmailParser: BankEmailParser = {
-    bankName: 'Yapı Kredi',
+    bankName: BANK_NAMES.YAPI_KREDI,
 
     // canParse imzası güncellendi, body parametresi yeni tipi kullanıyor
     canParse(sender: string, subject: string, body: DecodedEmailBody): boolean {

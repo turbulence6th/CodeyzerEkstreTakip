@@ -32,6 +32,7 @@ import type { ManualEntry } from '../types/manual-entry.types';
 // OCR servisleri
 import { ocrService } from '../services/ocr.service';
 import { screenshotProcessor } from '../services/screenshot-parsing/screenshot-processor';
+import { formatBankEntryDescription } from '../utils/bank-entry-format';
 
 // Eski SMS ile ilgili importlar ve kodlar kaldırıldı
 
@@ -96,7 +97,7 @@ const ManualEntryTab: React.FC = () => {
             }
 
             // 3. Formu otomatik doldur
-            const bankDesc = `${parsed.bankName}${parsed.last4Digits ? ' - ****' + parsed.last4Digits : ''}`;
+            const bankDesc = formatBankEntryDescription(parsed.bankName, parsed.last4Digits);
             setDescription(bankDesc);
             setAmount(parsed.amount?.toString() || '');
             setDueDate(parsed.dueDate.toISOString());

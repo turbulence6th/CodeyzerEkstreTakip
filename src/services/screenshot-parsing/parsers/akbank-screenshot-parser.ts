@@ -1,5 +1,6 @@
 import type { BankScreenshotParser, ScreenshotDetails, ParsedStatement } from '../../statement-parsing/types';
 import { parseTurkishNumber, parseTurkishDayMonth } from '../../../utils/parsing';
+import { BANK_NAMES } from '../../bank-registry';
 
 /**
  * Akbank mobil ekstre ekran görüntüsünden veri çıkaran parser
@@ -13,7 +14,7 @@ import { parseTurkishNumber, parseTurkishDayMonth } from '../../../utils/parsing
  * - Ekstre Tutarı: 6.028,66 TL (son gün sonrasındaki tutar)
  */
 export const akbankScreenshotParser: BankScreenshotParser = {
-    bankName: 'Akbank',
+    bankName: BANK_NAMES.AKBANK,
 
     canParse(extractedText: string): boolean {
         const lowerText = extractedText.toLowerCase();

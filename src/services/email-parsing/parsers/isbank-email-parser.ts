@@ -2,6 +2,7 @@ import { BankEmailParser, ParsedStatement, EmailDetails, DecodedEmailBody } from
 import { gmailService } from '../../index'; // Gmail servisi
 // import { Plugins } from '@capacitor/core'; // Eski import
 import { parseTurkishNumber } from '../../../utils/parsing'; // Sayı ayrıştırma yardımcısını ekle
+import { BANK_NAMES } from '../../bank-registry';
 
 // Varsayımsal PdfParser plugin tanımını import edelim
 import { ParsePdfResult, PdfParser } from '@plugins/pdf-parser';
@@ -56,7 +57,7 @@ async function parseExtractedPdfText(pdfText: string, emailDetails: EmailDetails
             console.log(`[Isbank PDF Parser - ${emailId}] Successfully parsed from PDF.`);
             // Dönüş objesine last4Digits'i ekle (varsa)
             const parsedData: ParsedStatement = {
-                bankName: 'İş Bankası',
+                bankName: BANK_NAMES.IS_BANKASI,
                 amount: amount,
                 dueDate: dueDate,
                 source: 'email',
@@ -88,7 +89,7 @@ function base64UrlToStandardBase64(base64Url: string): string {
 }
 
 class IsbankEmailParser implements BankEmailParser {
-    bankName = 'İş Bankası';
+    bankName = BANK_NAMES.IS_BANKASI;
 
     // canParse: Sadece gönderici ve konu formatını kontrol et (async olmasına gerek yok)
     // Interface'e uygun olarak 4. parametreyi kaldırdık.

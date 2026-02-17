@@ -28,43 +28,46 @@ import { qnbEmailParser } from '../email-parsing/parsers/qnb-email-parser';
 // SCREENSHOT Parser'ları
 import { akbankScreenshotParser } from '../screenshot-parsing/parsers/akbank-screenshot-parser';
 
+// Merkezi banka sabitleri
+import { BANK_NAMES } from '../bank-registry';
+
 // --- Banka İşlemci Yapılandırması --- //
 // Her banka için E-posta ve Screenshot parser'larını ve Gmail sorgusunu burada tanımlayalım
 // Dışa aktarılıyor:
 export const availableBankProcessors: BankProcessor[] = [
   {
-    bankName: 'Yapı Kredi',
+    bankName: BANK_NAMES.YAPI_KREDI,
     emailParser: yapikrediEmailParser,
     gmailQuery: 'from:(ekstre@ekstre.yapikredi.com.tr) subject:("Hesap Özeti")',
   },
   {
-    bankName: 'Ziraat Bankası',
+    bankName: BANK_NAMES.ZIRAAT,
     emailParser: ziraatEmailParser,
     gmailQuery: 'from:(ziraat@ileti.ziraatbank.com.tr) subject:("e-ekstre")',
   },
   {
-    bankName: 'Garanti BBVA Bonus',
+    bankName: BANK_NAMES.GARANTI,
     emailParser: garantiEmailParser,
     gmailQuery: 'from:(garantibbva@garantibbva.com.tr) subject:("Bonus Ekstresi")',
   },
   {
-    bankName: 'Kuveyt Türk',
+    bankName: BANK_NAMES.KUVEYT_TURK,
     emailParser: kuveytturkEmailParser,
     gmailQuery: 'from:(bilgilendirme@kuveytturk.com.tr) subject:("Kuveyt Türk Kredi Kartı Hesap Ekstreniz")',
   },
   {
-    bankName: 'İş Bankası',
+    bankName: BANK_NAMES.IS_BANKASI,
     emailParser: isbankEmailParser,
     gmailQuery: 'from:(bilgilendirme@ileti.isbank.com.tr) subject:("Maximum Kredi Kartı Hesap Özeti")',
   },
   {
-    bankName: 'Akbank',
+    bankName: BANK_NAMES.AKBANK,
     emailParser: akbankEmailParser,
     screenshotParser: akbankScreenshotParser,
     gmailQuery: 'from:(hizmet@bilgi.akbank.com) subject:("Kredi kartı ekstre bilgileri")',
   },
   {
-    bankName: 'QNB Finansbank',
+    bankName: BANK_NAMES.QNB,
     emailParser: qnbEmailParser,
     gmailQuery: 'from:(eekstre@eekstre.qnb.com.tr)',
   },

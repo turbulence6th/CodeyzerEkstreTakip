@@ -2,6 +2,7 @@ import type { ParsedStatement } from '../services/statement-parsing/types';
 import type { ManualEntry } from '../types/manual-entry.types';
 import { formatTargetDate } from './formatting'; // Tarih formatlama fonksiyonunu import edelim
 import { isStatement, isManualEntry } from './typeGuards';
+import { parseBankEntryDescription } from './bank-entry-format';
 
 type InputItem = ParsedStatement | ManualEntry;
 
@@ -61,8 +62,17 @@ export function generateAppId(item: InputItem, installmentNumber?: number): stri
     let date: Date | null = null;
 
     if (isManualEntry(item)) {
-        type = 'manuel';
-        namePart = sanitizeForAppId(item.description);
+        // Screenshot'tan eklenen banka kayıtlarını tespit et (format: "BankaAdı - ****XXXX")
+        // Bu kayıtlar için email ile aynı AppID üretilir, böylece takvimde duplikat oluşmaz
+        const bankInfo = parseBankEntryDescription(item.description);
+
+        if (bankInfo) {
+            type = 'ekstre';
+            namePart = sanitizeBankName(bankInfo.bankName);
+        } else {
+            type = 'manuel';
+            namePart = sanitizeForAppId(item.description);
+        }
         date = item.dueDate instanceof Date ? item.dueDate : null;
     } else if (isStatement(item)) {
         type = 'ekstre'; // Kredi taksitleri de bu yola girecek

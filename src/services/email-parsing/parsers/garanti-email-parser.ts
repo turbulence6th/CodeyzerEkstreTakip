@@ -1,8 +1,9 @@
 import type { BankEmailParser, EmailDetails, ParsedStatement, DecodedEmailBody } from '../../statement-parsing/types';
 import { parseDottedDate, parseTurkishNumber } from '../../../utils/parsing';
+import { BANK_NAMES } from '../../bank-registry';
 
 export const garantiEmailParser: BankEmailParser = {
-    bankName: 'Garanti BBVA Bonus',
+    bankName: BANK_NAMES.GARANTI,
 
     canParse(sender: string, subject: string, body: DecodedEmailBody): boolean {
         return sender.toLowerCase().includes('garantibbva@garantibbva.com.tr') &&
