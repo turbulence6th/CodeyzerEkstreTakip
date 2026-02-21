@@ -211,11 +211,11 @@ describe('dataSlice - Manuel Kredi Girişi', () => {
   });
 
   describe('selectTotalDebt', () => {
-    it('should calculate total debt including unpaid installments within 1 month', () => {
+    it('should calculate total debt only for installments visible on main screen (within 1 month)', () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Kredi ekle
+      // Kredi ekle (3 taksit: bugün, 1 ay sonra, 2 ay sonra)
       const loanEntry: ManualEntry = {
         id: 'test_loan_debt',
         description: 'Borç Kredisi',
@@ -228,10 +228,10 @@ describe('dataSlice - Manuel Kredi Girişi', () => {
 
       store.dispatch(addManualEntry(loanEntry));
 
-      // Tüm taksitler borç hesaplamasına dahil olmalı (3 * 500 = 1500)
+      // Sadece 1 ay içindeki taksitler borç hesaplamasına dahil olmalı (2 * 500 = 1000)
       const state = store.getState() as any; // Test store'dan RootState'e cast
       const totalDebt = selectTotalDebt(state);
-      expect(totalDebt).toBe(1500);
+      expect(totalDebt).toBe(1000);
     });
 
     it('should not include expenses in total debt', () => {

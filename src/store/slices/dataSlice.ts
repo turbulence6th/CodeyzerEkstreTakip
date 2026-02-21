@@ -520,9 +520,9 @@ export const selectAllDataWithDates = createSelector(
   }
 );
 
-// Toplam borcu hesaplayan yeni memoized selector (sadece ödenmemiş borçları dahil et)
+// Toplam borcu hesaplayan memoized selector (sadece ana ekranda görünen ödenmemiş borçları dahil et)
 export const selectTotalDebt = createSelector(
-  [selectAllData],
+  [selectAllDataWithDates],
   (items): number => {
     return items.reduce((total, item) => {
       // Ödenmişse veya borç değilse hesaba katma
@@ -530,11 +530,10 @@ export const selectTotalDebt = createSelector(
           return total;
       }
 
-      // Tarih kontrolü kaldırıldı. Sadece ödenmemiş borçları topla.
       let currentAmount = 0;
-      if (isSerializableStatement(item)) {
+      if (isStatement(item)) {
         currentAmount = item.userAmount ?? item.amount ?? 0;
-      } else if (isSerializableManualEntry(item)) {
+      } else if (isTypeGuardManualEntry(item)) {
         currentAmount = item.amount;
       }
       return total + currentAmount;
