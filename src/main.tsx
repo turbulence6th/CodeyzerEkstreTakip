@@ -46,7 +46,9 @@ async function waitForSecureStorage(maxRetries = 30, delayMs = 100): Promise<boo
         console.log(`[Key Init] SecureStorage not ready, retry ${i + 1}/${maxRetries}...`);
         await new Promise(resolve => setTimeout(resolve, delayMs));
       } else {
-        // Diğer hatalar için plugin hazır demektir
+        // Plugin hazır ama test çağrısı başka bir nedenle başarısız oldu
+        // Bu durumda plugin'in kullanılabilir olduğunu varsayabiliriz
+        console.warn('[Key Init] SecureStorage test call failed with non-plugin error, assuming ready:', errorMsg);
         return true;
       }
     }
@@ -126,11 +128,13 @@ const container = document.getElementById('root');
 if (!container) throw new Error('Root element #root not found in the DOM.');
 const root = createRoot(container);
 
-const startApp = async (isRetry = false) => {
+const startApp = async (retryCount = 0): Promise<void> => {
+  const MAX_RETRIES = 2;
+
   try {
-    // Retry durumunda önce eski verileri temizle
-    if (isRetry) {
-      console.log('[Main] Retry mode: Clearing all persisted data...');
+    // Son deneme: eski verileri temizleyip sıfırdan başla
+    if (retryCount === MAX_RETRIES) {
+      console.log('[Main] Final retry: Clearing all persisted data...');
       await storage.removeItem('persist:root');
       await Preferences.remove({ key: ENCRYPTED_REDUX_KEY_PREF });
     }
@@ -156,14 +160,14 @@ const startApp = async (isRetry = false) => {
     );
 
   } catch (error) {
-    console.error('[Main] CRITICAL: Failed to initialize app.', error);
+    console.error(`[Main] Initialization attempt ${retryCount + 1} failed.`, error);
 
-    // İlk denemeyse, verileri temizleyip tekrar dene
-    if (!isRetry) {
-      console.log('[Main] First attempt failed. Clearing data and retrying...');
-      await storage.removeItem('persist:root').catch(() => {});
-      await Preferences.remove({ key: ENCRYPTED_REDUX_KEY_PREF }).catch(() => {});
-      return startApp(true);
+    if (retryCount < MAX_RETRIES) {
+      // Önce veri silmeden tekrar dene, son denemede verileri temizle
+      const delayMs = (retryCount + 1) * 500;
+      console.log(`[Main] Retrying in ${delayMs}ms... (attempt ${retryCount + 2}/${MAX_RETRIES + 1})`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      return startApp(retryCount + 1);
     }
 
     const errorMessage = error instanceof Error ? error.message : String(error);

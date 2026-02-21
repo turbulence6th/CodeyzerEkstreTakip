@@ -11,9 +11,7 @@ import type { EmailDetails, ScreenshotDetails } from '../services/statement-pars
 import type { ManualEntry } from '../types/manual-entry.types';
 
 // Servisler
-import { gmailService, calendarService } from '../services';
-import { statementProcessor } from '../services/statement-parsing/statement-processor';
-import { calendarService as oldCalendarService } from '../services/calendar.service';
+import { calendarService } from '../services';
 
 // Redux
 import { useSelector, useDispatch } from 'react-redux';

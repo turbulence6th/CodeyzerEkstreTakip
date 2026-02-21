@@ -18,77 +18,14 @@
 
 import { GoogleAuth } from '@plugins/google-auth';
 import type {
-    GoogleAuthPlugin,
     GmailSearchOptions,
     GmailSearchResponse,
     GmailDetailsOptions,
     GmailMessage,
     GmailAttachmentOptions,
     GmailAttachmentResponse
-} from '../plugins/google-auth/definitions'; // Düzeltilmiş import yolu
-
-// Redux store ve actionları için importlar
-import { getStore } from '../store'; // `store` yerine `getStore` kullanılıyor
-import { setAuthCredentials, clearAuth } from '../store/slices/authSlice'; // `logout` yerine `clearAuth` kullanılıyor
-
-// --- Native API Çağrıları için Hata Yönetimi ve Yeniden Deneme Sarmalayıcısı ---
-interface NativePluginError extends Error {
-  code?: string;
-  message: string;
-}
-
-async function callNativeGoogleApi<T>(
-  nativeApiFunction: () => Promise<T>,
-  isRetry: boolean = false
-): Promise<T> {
-  try {
-    return await nativeApiFunction();
-  } catch (e) {
-    const error = e as NativePluginError;
-    // Native plugin tarafından SIGN_IN_REQUIRED veya INVALID_GRANT kodu ile reject edilen hataları kontrol et
-    if (error && (error.code === "SIGN_IN_REQUIRED" || error.code === "INVALID_GRANT")) {
-      if (isRetry) {
-        console.error(
-          'callNativeGoogleApi: Silent sign-in was already attempted and failed, or the API call failed again after retry. Logging out.'
-        );
-        getStore().dispatch(clearAuth());
-        throw new Error('Authentication failed after retry and silent sign-in attempt.');
-      }
-
-      console.warn(
-        `callNativeGoogleApi: Native API call failed with code: ${error.code}. Attempting silent sign-in.`
-      );
-      try {
-        const silentSignInResult = await GoogleAuth.trySilentSignIn();
-        // silentSignInResult, GoogleUser tipinde olmalı (idToken içerir, accessToken içermez)
-        if (silentSignInResult && silentSignInResult.idToken) {
-          getStore().dispatch(setAuthCredentials(silentSignInResult));
-          console.log(
-            'callNativeGoogleApi: Silent sign-in successful. Retrying original native API call.'
-          );
-          return await callNativeGoogleApi(nativeApiFunction, true);
-        } else {
-          console.error(
-            'callNativeGoogleApi: Silent sign-in did not return the necessary credentials (e.g., idToken). Logging out.'
-          );
-          getStore().dispatch(clearAuth());
-          throw new Error('Silent sign-in failed to provide necessary credentials.');
-        }
-      } catch (silentError) {
-        const sError = silentError as NativePluginError;
-        console.error('callNativeGoogleApi: Silent sign-in attempt also failed:', sError.message);
-        getStore().dispatch(clearAuth());
-        throw new Error(`Silent sign-in attempt failed: ${sError.message || 'Unknown error'}`);
-      }
-    }
-    // Yetkilendirme hatası değilse veya farklı bir hata ise tekrar fırlat
-    console.error(
-      `callNativeGoogleApi: Native API call failed with an unhandled error or a non-auth error: ${error.message}, Code: ${error.code}`
-    );
-    throw error;
-  }
-}
-// --- Sarmalayıcı Sonu ---
+} from '../plugins/google-auth/definitions';
+import { callNativeGoogleApi } from '../utils/googleApiClient';
 
 /**
  * Gmail API ile etkileşim kurmak için servis.

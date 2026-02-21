@@ -1,5 +1,5 @@
 import { BankEmailParser, ParsedStatement, EmailDetails, DecodedEmailBody } from '../../statement-parsing/types'; // Tipleri statement-parsing'den alıyoruz
-import { gmailService } from '../../index'; // Gmail servisi
+import { gmailService } from '../../gmail.service'; // Gmail servisi (döngüsel bağımlılık önlemek için doğrudan import)
 // import { Plugins } from '@capacitor/core'; // Eski import
 import { parseTurkishNumber } from '../../../utils/parsing'; // Sayı ayrıştırma yardımcısını ekle
 import { BANK_NAMES } from '../../bank-registry';

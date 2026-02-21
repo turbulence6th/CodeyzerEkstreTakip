@@ -49,7 +49,7 @@ import { generateAppId } from '../utils/identifiers';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 
-type DisplayItem = ParsedStatement | ManualEntry; // ParsedLoan kaldırıldı
+type DisplayItem = ParsedStatement | ManualEntry;
 
 // --- Yardımcı Fonksiyonlar kaldırıldı ---
 
@@ -92,16 +92,10 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
 
     return (
         <>
-            {items.length > 0 ? (
-                <IonList lines="none">
+            <IonList lines="none">
                     {items.map((item, index) => {
-                        // id'yi almak için type guard kullanalım
-                        let itemId: string | undefined;
-                        if (isManualEntry(item)) {
-                            itemId = item.id;
-                        } else if ((item as any).id) { // Geçici olarak any kullandık
-                            itemId = (item as any).id;
-                        }
+                        // Redux store'dan gelen tüm item'lar id içerir (SerializableStatement'a eklenir)
+                        const itemId: string | undefined = isManualEntry(item) ? item.id : ('id' in item ? (item as any).id : undefined);
 
                         const listKey = `${item.source}-${itemId || index}`;
 
@@ -238,11 +232,6 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                         );
                     })}
                 </IonList>
-            ) : (
-                <IonItem lines="none">
-                    <p className="empty-list-message">Görüntülenecek aktif ekstre bilgisi bulunamadı. Geçmiş kayıtlar otomatik olarak gizlenir. Yeni veri getirmeyi deneyebilirsiniz.</p>
-                </IonItem>
-            )}
             <IonAlert
                 isOpen={editingItemId !== null}
                 header="Tutar Girin"

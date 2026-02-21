@@ -73,10 +73,10 @@ export const formatTargetDate = (date: Date): string => {
  */
 export const addMonths = (date: Date, months: number): Date => {
     const d = new Date(date);
-    // Beklenen ay, taşma durumunu kontrol etmek için. JavaScript'te aylar 0-11 arasıdır.
-    // Örneğin, 11 (Aralık) + 2 ay = 13. 13 % 12 = 1 (Şubat).
-    const expectedMonth = (d.getMonth() + months) % 12;
-    d.setMonth(d.getMonth() + months);
+    const targetMonth = d.getMonth() + months;
+    // Beklenen ay: negatif değerler ve 12+ değerler için doğru çalışan formül
+    const expectedMonth = ((targetMonth % 12) + 12) % 12;
+    d.setMonth(targetMonth);
 
     // Eğer setMonth sonrası ay, beklenen aydan farklıysa, bu, ayın son gününden taşma olduğunu gösterir.
     // Örn: 31 Ocak'a 1 ay eklenince 31 Şubat (yok) yerine 2 Mart'a atlar. Bu durumda ay 2, beklenen 1 olur.

@@ -72,16 +72,16 @@ class GmailServiceMock {
         console.log('--- Using Mock Gmail Service ---');
     }
 
-    async searchEmails(query: string, maxResults: number = 10): Promise<{ id: string; threadId: string }[]> {
+    async searchEmails(query: string, maxResults: number = 10): Promise<{ messages: { id: string; threadId: string }[] }> {
         console.log(`[Mock] GmailService.searchEmails called with query: ${query}`);
         await new Promise(res => setTimeout(res, MOCK_DELAY));
-        
+
         // Sorguyu ayrıştırmak için basit bir yaklaşım
         let fromQuery = '';
         let subjectQuery = '';
         const fromMatch = query.match(/from:\(([^)]+)\)/i);
         const subjectMatch = query.match(/subject:\("?([^)"]+)"?\)/i);
-        
+
         if (fromMatch && fromMatch[1]) {
             fromQuery = fromMatch[1].toLowerCase();
         }
@@ -92,11 +92,11 @@ class GmailServiceMock {
         console.log(`[Mock] Parsed query - From: '${fromQuery}', Subject: '${subjectQuery}'`);
 
         // Filtrelemeyi ayrıştırılmış sorgu parçalarına göre yap
-        const results = mockEmails
-            .filter(email => { 
+        const messages = mockEmails
+            .filter(email => {
                 const fromHeader = email.payload.headers.find(h => h.name === 'From')?.value?.toLowerCase() || '';
                 const subjectHeader = email.payload.headers.find(h => h.name === 'Subject')?.value?.toLowerCase() || '';
-                
+
                 let fromMatchResult = true;
                 let subjectMatchResult = true;
 
@@ -106,14 +106,14 @@ class GmailServiceMock {
                 if (subjectQuery && !subjectHeader.includes(subjectQuery)) {
                     subjectMatchResult = false;
                 }
-                
+
                 return fromMatchResult && subjectMatchResult; // Her iki kriter de (varsa) eşleşmeli
             })
-            .slice(0, maxResults) 
-            .map(email => ({ id: email.id, threadId: email.threadId })); 
-            
-        console.log(`[Mock] GmailService.searchEmails returning ${results.length} results based on parsed query.`);
-        return results;
+            .slice(0, maxResults)
+            .map(email => ({ id: email.id, threadId: email.threadId }));
+
+        console.log(`[Mock] GmailService.searchEmails returning ${messages.length} results based on parsed query.`);
+        return { messages };
     }
 
     // getEmailDetails artık payload içeren yapıyı döndürecek

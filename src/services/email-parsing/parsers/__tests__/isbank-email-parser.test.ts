@@ -5,8 +5,8 @@ import type { ParsePdfResult } from '../../../../plugins/pdf-parser/definitions'
 
 // --- Mocking Dependencies --- //
 
-// Mock gmailService
-vi.mock('../../../index', () => ({
+// Mock gmailService (doğrudan gmail.service'den import ediliyor)
+vi.mock('../../../gmail.service', () => ({
   gmailService: {
     getAttachment: vi.fn(),
   },
@@ -20,7 +20,7 @@ vi.mock('../../../../plugins/pdf-parser', () => ({
 }));
 
 // Import mocks after mocking
-import { gmailService } from '../../../index';
+import { gmailService } from '../../../gmail.service';
 import { PdfParser } from '../../../../plugins/pdf-parser';
 
 

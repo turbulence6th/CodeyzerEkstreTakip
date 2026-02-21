@@ -6,8 +6,12 @@ export const qnbEmailParser: BankEmailParser = {
     bankName: BANK_NAMES.QNB,
 
     canParse(sender: string, subject: string, body: DecodedEmailBody): boolean {
-        return sender.toLowerCase().includes('eekstre.qnb.com.tr') || 
-               sender.toLowerCase().includes('qnb');
+        // Sender'dan domain kısmını çıkar ve qnb kontrolü yap
+        // "Ad <email@domain>" veya "email@domain" formatını destekle
+        const lowerSender = sender.toLowerCase();
+        const emailMatch = lowerSender.match(/@([^\s>]+)/);
+        const domain = emailMatch ? emailMatch[1] : '';
+        return domain.includes('qnb');
     },
 
     parse(email: EmailDetails): ParsedStatement | null {
