@@ -34,6 +34,7 @@ import {
     receiptOutline, // Yeni ikon
     warningOutline, // Haftasonu uyarısı için
     createOutline, // Tutar düzenleme ikonu (swipe)
+    walletOutline, // KMH ikonu
 } from 'ionicons/icons';
 
 // Tipler
@@ -114,6 +115,9 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                             if (item.description.includes('Taksit')) {
                                 itemIcon = cashOutline;
                                 itemColor = "success";
+                            } else if (item.entryType === 'kmh') {
+                                itemIcon = walletOutline;
+                                itemColor = "danger";
                             } else {
                                 itemIcon = item.entryType === 'debt' ? cashOutline : receiptOutline;
                                 itemColor = "tertiary";
@@ -183,8 +187,8 @@ const DisplayItemList: React.FC<DisplayItemListProps> = ({
                                 </IonItem>
 
                                 <IonItemOptions side="end">
-                                    {/* Tutarı null olan statement'lar için tutar girme butonu */}
-                                    {isStatement(item) && item.amount === null && (
+                                    {/* Tutarı null olan statement'lar veya KMH girişleri için tutar düzenleme butonu */}
+                                    {((isStatement(item) && item.amount === null) || (isManualEntry(item) && item.entryType === 'kmh')) && (
                                         <IonItemOption
                                             color="primary"
                                             onClick={() => itemId && setEditingItemId(itemId)}

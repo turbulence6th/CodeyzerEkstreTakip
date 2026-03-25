@@ -118,11 +118,73 @@ class CalendarHandler {
             }
 
             // Description'da appId'yi ara
-            let eventFound = events.items?.contains { event in
-                event.descriptionProperty?.contains(appId) ?? false
-            } ?? false
+            var eventFound = false
+            var foundEventId: String? = nil
+            if let items = events.items {
+                for event in items {
+                    if event.descriptionProperty?.contains(appId) ?? false {
+                        eventFound = true
+                        foundEventId = event.identifier
+                        break
+                    }
+                }
+            }
 
-            completion(.success(["eventFound": eventFound]))
+            var result: [String: Any] = ["eventFound": eventFound]
+            if let eventId = foundEventId {
+                result["eventId"] = eventId
+            }
+            completion(.success(result))
+        }
+    }
+
+    func updateEvent(
+        eventId: String,
+        summary: String?,
+        description: String?,
+        completion: @escaping (Result<[String: Any], Error>) -> Void
+    ) {
+        // Önce mevcut etkinliği getir
+        let getQuery = GTLRCalendarQuery_EventsGet.query(withCalendarId: "primary", eventId: eventId)
+
+        calendarService.executeQuery(getQuery) { [weak self] ticket, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+
+            guard let event = response as? GTLRCalendar_Event else {
+                completion(.failure(NSError(domain: "CalendarHandler", code: -1, userInfo: [NSLocalizedDescriptionKey: "Event not found"])))
+                return
+            }
+
+            // Verilen alanları güncelle
+            if let summary = summary {
+                event.summary = summary
+            }
+            if let description = description {
+                event.descriptionProperty = description
+            }
+
+            let updateQuery = GTLRCalendarQuery_EventsUpdate.query(withObject: event, calendarId: "primary", eventId: eventId)
+
+            self?.calendarService.executeQuery(updateQuery) { ticket, response, error in
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+
+                guard let updatedEvent = response as? GTLRCalendar_Event else {
+                    completion(.failure(NSError(domain: "CalendarHandler", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response type"])))
+                    return
+                }
+
+                completion(.success([
+                    "id": updatedEvent.identifier ?? "",
+                    "summary": updatedEvent.summary ?? "",
+                    "updated": true
+                ]))
+            }
         }
     }
 

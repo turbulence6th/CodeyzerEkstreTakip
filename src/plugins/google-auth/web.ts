@@ -74,6 +74,15 @@ export class GoogleAuthWeb extends WebPlugin implements GoogleAuthPlugin {
     return Promise.resolve({ eventFound: false }); 
   }
 
+  async updateCalendarEvent(options: import("./definitions").CalendarUpdateOptions): Promise<import("./definitions").CalendarUpdateResponse> {
+    console.warn('GoogleAuthWeb.updateCalendarEvent() called on web. Mock response returned.', options);
+    return Promise.resolve({
+      id: options.eventId,
+      summary: options.summary,
+      updated: true
+    });
+  }
+
   // --- Web Platformu için Gmail Metodları (Mock Implementasyon) ---
 
   async searchGmailMessages(options: import("./definitions").GmailSearchOptions): Promise<import("./definitions").GmailSearchResponse> {

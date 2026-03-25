@@ -155,22 +155,73 @@ public class GoogleCalendarHandler {
                         .execute();
 
                 boolean eventFound = false;
+                String foundEventId = null;
                 if (events.getItems() != null) {
                     for (Event event : events.getItems()) {
                         if (event.getDescription() != null && event.getDescription().contains(appId)) {
                             eventFound = true;
+                            foundEventId = event.getId();
                             break;
                         }
                     }
                 }
                 JSObject result = new JSObject();
                 result.put("eventFound", eventFound);
+                if (foundEventId != null) {
+                    result.put("eventId", foundEventId);
+                }
                 call.resolve(result);
 
             } catch (IOException e) {
                 ErrorUtils.handleIOException(call, e, "Error searching calendar events", TAG);
             } catch (Exception e) {
                 ErrorUtils.handleGenericException(call, e, "Unexpected error searching calendar events", TAG);
+            }
+        });
+    }
+
+    public void updateCalendarEvent(PluginCall call, GoogleSignInAccount account) {
+        String eventId = call.getString("eventId");
+        String summary = call.getString("summary");
+        String description = call.getString("description");
+
+        if (account == null) {
+            ErrorUtils.handleGenericException(call, new IllegalArgumentException("GoogleSignInAccount is null."), "Account is null for updateCalendarEvent", TAG);
+            return;
+        }
+
+        if (eventId == null || eventId.isEmpty()) {
+            ErrorUtils.handleGenericException(call, new IllegalArgumentException("eventId is required for updating events."), "eventId missing for updateCalendarEvent", TAG);
+            return;
+        }
+
+        executorService.execute(() -> {
+            try {
+                Calendar service = buildCalendarServiceWithAccount(account);
+
+                // Mevcut etkinliği getir
+                Event event = service.events().get("primary", eventId).execute();
+
+                // Sadece verilen alanları güncelle
+                if (summary != null) {
+                    event.setSummary(summary);
+                }
+                if (description != null) {
+                    event.setDescription(description);
+                }
+
+                Event updatedEvent = service.events().update("primary", eventId, event).execute();
+
+                JSObject result = new JSObject();
+                result.put("id", updatedEvent.getId());
+                result.put("summary", updatedEvent.getSummary());
+                result.put("updated", true);
+                call.resolve(result);
+
+            } catch (IOException e) {
+                ErrorUtils.handleIOException(call, e, "Error updating calendar event", TAG);
+            } catch (Exception e) {
+                ErrorUtils.handleGenericException(call, e, "Unexpected error updating calendar event", TAG);
             }
         });
     }

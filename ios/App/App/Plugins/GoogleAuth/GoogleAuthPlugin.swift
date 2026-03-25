@@ -14,6 +14,7 @@ public class GoogleAuthPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "signOut", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "createCalendarEvent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "searchCalendarEvents", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "updateCalendarEvent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "searchGmailMessages", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getGmailMessageDetails", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getGmailAttachment", returnType: CAPPluginReturnPromise)
@@ -241,6 +242,34 @@ public class GoogleAuthPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(data)
             case .failure(let error):
                 call.reject(error.localizedDescription, "CALENDAR_SEARCH_FAILED")
+            }
+        }
+    }
+
+    @objc func updateCalendarEvent(_ call: CAPPluginCall) {
+        guard let calendarHandler = calendarHandler else {
+            call.reject("Not signed in", "NOT_SIGNED_IN")
+            return
+        }
+
+        guard let eventId = call.getString("eventId") else {
+            call.reject("Missing eventId parameter")
+            return
+        }
+
+        let summary = call.getString("summary")
+        let description = call.getString("description")
+
+        calendarHandler.updateEvent(
+            eventId: eventId,
+            summary: summary,
+            description: description
+        ) { result in
+            switch result {
+            case .success(let data):
+                call.resolve(data)
+            case .failure(let error):
+                call.reject(error.localizedDescription, "CALENDAR_UPDATE_FAILED")
             }
         }
     }
