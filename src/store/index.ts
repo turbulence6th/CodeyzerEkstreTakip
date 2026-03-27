@@ -14,6 +14,7 @@ import authReducer from './slices/authSlice';
 import dataReducer from './slices/dataSlice';
 import loadingReducer from './slices/loadingSlice'; // Yeni loading reducer'ı import et
 import toastReducer from './slices/toastSlice'; // Yeni toast reducer'ı import et
+import settingsReducer from './slices/settingsSlice';
 
 // Doğru export'u bul (CJS/ESM uyumluluğu için)
 // const encryptTransform = (RPTEncrypt as any).default || RPTEncrypt; // Önceki deneme
@@ -59,6 +60,7 @@ export const initializeStore = (encryptionKey: string) => {
     data: dataReducer,
     loading: loadingReducer,
     toast: toastReducer,
+    settings: settingsReducer,
   });
 
   // 2. Transform listesini oluştur
@@ -84,7 +86,7 @@ export const initializeStore = (encryptionKey: string) => {
   const persistConfig = {
     key: 'root',
     storage,
-    whitelist: ['auth', 'data'],
+    whitelist: ['auth', 'data', 'settings'],
     transforms
   };
 
@@ -119,6 +121,7 @@ const rootReducerPlaceholder = combineReducers({
   data: dataReducer,
   loading: loadingReducer,
   toast: toastReducer,
+  settings: settingsReducer,
 });
 export type RootState = ReturnType<typeof rootReducerPlaceholder>;
 // Thunk aksiyonlarını da destekleyen doğru AppDispatch tipi

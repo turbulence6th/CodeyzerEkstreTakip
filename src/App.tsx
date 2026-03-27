@@ -59,7 +59,8 @@ import './theme/variables.css';
 // Redux
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from './store';
-import { selectTotalDebt } from './store/slices/dataSlice';
+import { selectTotalDebt, addManualEntry } from './store/slices/dataSlice';
+import { selectRentSettings, setLastRentEntryMonth } from './store/slices/settingsSlice';
 
 setupIonicReact();
 
@@ -85,12 +86,41 @@ const App: React.FC = () => {
   const isAuthenticated = useSelector((state: RootState) => !!state.auth.idToken);
   const totalDebt = useSelector(selectTotalDebt);
   const totalDebtRef = useRef(totalDebt);
-  
+  const rentSettings = useSelector(selectRentSettings);
+
   useEffect(() => {
     totalDebtRef.current = totalDebt;
   }, [totalDebt]);
 
   const dispatch = useDispatch();
+
+  // Otomatik kira kaydı oluşturma: ayın ilk iş gününde tetiklenir
+  useEffect(() => {
+    const { rentAmount, rentPaymentDay, lastRentEntryMonth } = rentSettings;
+    if (!rentAmount || !rentPaymentDay) return;
+
+    const today = new Date();
+    const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+    if (lastRentEntryMonth === currentMonthKey) return;
+
+    // Ödeme günü geldiyse kayıt oluştur
+    if (today.getDate() < rentPaymentDay) return;
+
+    const dueDate = new Date(today.getFullYear(), today.getMonth(), rentPaymentDay);
+
+    dispatch(addManualEntry({
+      id: `rent_${currentMonthKey}`,
+      description: 'Kira',
+      amount: rentAmount,
+      dueDate,
+      source: 'manual',
+      entryType: 'debt',
+      isPaid: false,
+    }));
+
+    dispatch(setLastRentEntryMonth(currentMonthKey));
+  }, [rentSettings, dispatch]);
 
   useEffect(() => {
     // Sadece kimlik doğrulanmışsa dinleyiciyi kur

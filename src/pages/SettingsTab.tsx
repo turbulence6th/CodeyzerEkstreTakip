@@ -1,5 +1,5 @@
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, useIonAlert, IonTextarea, IonModal, IonButtons, IonIcon } from '@ionic/react';
-import React, { useState, useRef } from 'react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButton, useIonAlert, IonTextarea, IonModal, IonButtons, IonIcon, IonInput, IonItem, IonLabel } from '@ionic/react';
+import React, { useState, useRef, useEffect } from 'react';
 import './SettingsTab.css';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
@@ -13,6 +13,7 @@ import type { RootState, AppDispatch } from '../store';
 import { signOutFromGoogleThunk } from '../store/slices/authSlice';
 import { clearData, importData } from '../store/slices/dataSlice';
 import { addToast } from '../store/slices/toastSlice';
+import { setRentSettings, clearRentSettings, selectRentSettings } from '../store/slices/settingsSlice';
 
 const SettingsTab: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -20,9 +21,21 @@ const SettingsTab: React.FC = () => {
 
   const { user: userInfo } = useSelector((state: RootState) => state.auth);
   const dataItems = useSelector((state: RootState) => state.data.items);
+  const rentSettings = useSelector(selectRentSettings);
 
-  // Import modal state
+  // Kira ayarları local state
+  const [rentAmountInput, setRentAmountInput] = useState<string>('');
+  const [rentPaymentDayInput, setRentPaymentDayInput] = useState<string>('');
+
+  // Redux'tan gelen kira değerlerini input'lara yükle
+  useEffect(() => {
+    setRentAmountInput(rentSettings.rentAmount !== null ? String(rentSettings.rentAmount) : '');
+    setRentPaymentDayInput(rentSettings.rentPaymentDay !== null ? String(rentSettings.rentPaymentDay) : '');
+  }, [rentSettings.rentAmount, rentSettings.rentPaymentDay]);
+
+  // Modal state'leri
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isRentModalOpen, setIsRentModalOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -150,6 +163,44 @@ const SettingsTab: React.FC = () => {
     }
   };
 
+  // Kira ayarlarını kaydet
+  const handleSaveRent = () => {
+    const amount = parseFloat(rentAmountInput.replace(',', '.'));
+    const day = parseInt(rentPaymentDayInput, 10);
+
+    if (isNaN(amount) || amount <= 0) {
+      dispatch(addToast({ message: 'Geçerli bir kira tutarı girin.', duration: 2000, color: 'warning' }));
+      return;
+    }
+    if (isNaN(day) || day < 1 || day > 28) {
+      dispatch(addToast({ message: 'Ödeme günü 1-28 arasında olmalıdır.', duration: 2000, color: 'warning' }));
+      return;
+    }
+
+    dispatch(setRentSettings({ amount, paymentDay: day }));
+    dispatch(addToast({ message: 'Kira ayarları kaydedildi.', duration: 2000, color: 'success' }));
+    setIsRentModalOpen(false);
+  };
+
+  // Kira ayarlarını sil
+  const handleClearRent = () => {
+    presentAlert({
+      header: 'Kira Ayarlarını Sil',
+      message: 'Kira ayarları silinecek. Otomatik kayıt oluşturulmayacak.',
+      buttons: [
+        { text: 'İptal', role: 'cancel' },
+        {
+          text: 'Sil',
+          role: 'destructive',
+          handler: () => {
+            dispatch(clearRentSettings());
+            dispatch(addToast({ message: 'Kira ayarları silindi.', duration: 2000, color: 'success' }));
+          },
+        },
+      ],
+    });
+  };
+
   // Çıkış Yapma Fonksiyonu (AccountTab'den taşındı)
   const handleSignOut = () => {
     dispatch(signOutFromGoogleThunk())
@@ -217,6 +268,72 @@ const SettingsTab: React.FC = () => {
                 </div>
             </div>
         )}
+
+        {/* Kira Ayarları - Özet Satır */}
+        <div style={{ marginBottom: '15px', marginTop: '20px' }}>
+          <p style={{ marginBottom: '10px', fontWeight: 'bold' }}>Kira Ayarları</p>
+          {rentSettings.rentAmount !== null ? (
+            <p style={{ marginBottom: '10px', fontSize: '0.9em', color: 'var(--ion-color-medium)' }}>
+              {rentSettings.rentAmount.toLocaleString('tr-TR')} ₺ — Her ayın {rentSettings.rentPaymentDay}. günü
+              {rentSettings.lastRentEntryMonth && ` (Son kayıt: ${rentSettings.lastRentEntryMonth})`}
+            </p>
+          ) : (
+            <p style={{ marginBottom: '10px', fontSize: '0.9em', color: 'var(--ion-color-medium)' }}>
+              Henüz kira ayarı yapılmadı. Ayarlamak için düzenle butonuna basın.
+            </p>
+          )}
+          <IonButton expand="block" fill="outline" onClick={() => setIsRentModalOpen(true)}>
+            Kira Ayarlarını Düzenle
+          </IonButton>
+        </div>
+
+        {/* Kira Ayarları Modal */}
+        <IonModal isOpen={isRentModalOpen} onDidDismiss={() => setIsRentModalOpen(false)}>
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>Kira Ayarları</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setIsRentModalOpen(false)}>Kapat</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding">
+            <p style={{ marginBottom: '16px', fontSize: '0.9em', color: 'var(--ion-color-medium)' }}>
+              Ayın ilk iş günü otomatik kira kaydı oluşturulur.
+            </p>
+            <IonItem lines="full" style={{ marginBottom: '8px' }}>
+              <IonLabel position="stacked">Aylık Kira Tutarı (₺)</IonLabel>
+              <IonInput
+                type="number"
+                inputmode="decimal"
+                value={rentAmountInput}
+                onIonInput={(e) => setRentAmountInput(e.detail.value || '')}
+                placeholder="Örn: 5000"
+                min={0}
+              />
+            </IonItem>
+            <IonItem lines="full" style={{ marginBottom: '20px' }}>
+              <IonLabel position="stacked">Ödeme Günü (1-28)</IonLabel>
+              <IonInput
+                type="number"
+                inputmode="numeric"
+                value={rentPaymentDayInput}
+                onIonInput={(e) => setRentPaymentDayInput(e.detail.value || '')}
+                placeholder="Örn: 5"
+                min={1}
+                max={28}
+              />
+            </IonItem>
+            <IonButton expand="block" onClick={handleSaveRent} style={{ marginBottom: '10px' }}>
+              Kaydet
+            </IonButton>
+            {rentSettings.rentAmount !== null && (
+              <IonButton expand="block" fill="outline" color="danger" onClick={handleClearRent}>
+                Kira Ayarını Sil
+              </IonButton>
+            )}
+          </IonContent>
+        </IonModal>
 
         {/* Import Modal */}
         <IonModal isOpen={isImportModalOpen} onDidDismiss={() => setIsImportModalOpen(false)}>
