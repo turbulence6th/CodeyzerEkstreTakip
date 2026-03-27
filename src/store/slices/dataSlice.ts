@@ -185,6 +185,9 @@ const dataSlice = createSlice({
   name: 'data',
   initialState,
   reducers: {
+    clearError: (state) => {
+      state.error = null;
+    },
     clearData: (state) => {
       state.items = [];
       state.error = null;
@@ -285,8 +288,7 @@ const dataSlice = createSlice({
                 sortItemsByDate(state.items);
                 console.log(`Manual entry added: ${serializedEntry.id}`);
             } else {
-                console.warn(`Entry with ID ${serializedEntry.id} already exists.`);
-                state.error = `Bu ID (${serializedEntry.id}) ile zaten bir giriş mevcut.`;
+                console.warn(`Entry with ID ${serializedEntry.id} already exists, skipping.`);
             }
         }
     },
@@ -618,5 +620,5 @@ export const selectGroupedLoans = createSelector(
 
 
 // Yeni action'ı export et
-export const { clearData, addManualEntry, deleteManualEntry, togglePaidStatus, deleteLoan, importData, setUserAmount, clearUserAmount, updateItemDueDate, updateManualEntryAmount } = dataSlice.actions;
+export const { clearError, clearData, addManualEntry, deleteManualEntry, togglePaidStatus, deleteLoan, importData, setUserAmount, clearUserAmount, updateItemDueDate, updateManualEntryAmount } = dataSlice.actions;
 export default dataSlice.reducer;
