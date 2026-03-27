@@ -59,7 +59,7 @@ import './theme/variables.css';
 // Redux
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from './store';
-import { selectTotalDebt, addManualEntry } from './store/slices/dataSlice';
+import { selectTotalDebt, addManualEntry, deleteManualEntry, clearError } from './store/slices/dataSlice';
 import { selectRentSettings, setLastRentEntryMonth } from './store/slices/settingsSlice';
 
 setupIonicReact();
@@ -87,6 +87,7 @@ const App: React.FC = () => {
   const totalDebt = useSelector(selectTotalDebt);
   const totalDebtRef = useRef(totalDebt);
   const rentSettings = useSelector(selectRentSettings);
+  const dataItems = useSelector((state: RootState) => state.data.items);
 
   useEffect(() => {
     totalDebtRef.current = totalDebt;
@@ -94,23 +95,44 @@ const App: React.FC = () => {
 
   const dispatch = useDispatch();
 
-  // Otomatik kira kaydı oluşturma: ayın ilk iş gününde tetiklenir
+  // Uygulama açılışında persisted hata durumunu temizle
+  useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
+
+  // Otomatik kira kaydı oluşturma: her zaman bir sonraki ödeme ayını göster
   useEffect(() => {
     const { rentAmount, rentPaymentDay, lastRentEntryMonth } = rentSettings;
     if (!rentAmount || !rentPaymentDay) return;
 
     const today = new Date();
-    const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-    if (lastRentEntryMonth === currentMonthKey) return;
+    // Ödeme günü bu ay geçtiyse hedef ay = sonraki ay, geçmediyse bu ay
+    let targetYear = today.getFullYear();
+    let targetMonth = today.getMonth();
+    if (today.getDate() > rentPaymentDay) {
+      targetMonth += 1;
+      if (targetMonth > 11) {
+        targetMonth = 0;
+        targetYear += 1;
+      }
+    }
 
-    // Ödeme günü geldiyse kayıt oluştur
-    if (today.getDate() < rentPaymentDay) return;
+    const targetMonthKey = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
+    const targetId = `rent_${targetMonthKey}`;
 
-    const dueDate = new Date(today.getFullYear(), today.getMonth(), rentPaymentDay);
+    // Hedef ay dışındaki eski kira kayıtlarını temizle
+    dataItems
+      .filter(item => item.id.startsWith('rent_') && item.id !== targetId)
+      .forEach(item => dispatch(deleteManualEntry(item.id)));
+
+    if (lastRentEntryMonth === targetMonthKey) return;
+    if (dataItems.some(item => item.id === targetId)) return;
+
+    const dueDate = new Date(targetYear, targetMonth, rentPaymentDay);
 
     dispatch(addManualEntry({
-      id: `rent_${currentMonthKey}`,
+      id: targetId,
       description: 'Kira',
       amount: rentAmount,
       dueDate,
@@ -119,8 +141,8 @@ const App: React.FC = () => {
       isPaid: false,
     }));
 
-    dispatch(setLastRentEntryMonth(currentMonthKey));
-  }, [rentSettings, dispatch]);
+    dispatch(setLastRentEntryMonth(targetMonthKey));
+  }, [rentSettings, dataItems, dispatch]);
 
   useEffect(() => {
     // Sadece kimlik doğrulanmışsa dinleyiciyi kur
