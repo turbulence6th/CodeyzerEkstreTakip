@@ -195,6 +195,16 @@ public class GoogleAuthPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void updateCalendarEvent(PluginCall call) {
+        if (this.currentGoogleAccount == null) {
+            call.reject("User not signed in or account not available for updateCalendarEvent.", "SIGN_IN_REQUIRED");
+            return;
+        }
+        // Delegate to GoogleCalendarHandler
+        this.googleCalendarHandler.updateCalendarEvent(call, this.currentGoogleAccount);
+    }
+
+    @PluginMethod
     public void signOut(PluginCall call) {
         firebaseAuth.signOut();
         googleSignInClient.signOut().addOnCompleteListener(task -> {

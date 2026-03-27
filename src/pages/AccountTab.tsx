@@ -25,6 +25,7 @@ import {
   togglePaidStatus,
   setUserAmount,
   updateItemDueDate,
+  updateManualEntryAmount,
 } from '../store/slices/dataSlice';
 import { startGlobalLoading, stopGlobalLoading } from '../store/slices/loadingSlice';
 import { addToast } from '../store/slices/toastSlice';
@@ -314,8 +315,43 @@ Tutar: ${formatCurrency(item.amount)}`;
       dispatch(togglePaidStatus(id));
   };
 
-  const handleSetUserAmount = (id: string, amount: number) => {
-      dispatch(setUserAmount({ id, amount }));
+  const handleSetUserAmount = async (id: string, amount: number) => {
+      // Item'ı bul ve türüne göre doğru action'ı dispatch et
+      const item = displayItems.find(i => ('id' in i ? (i as any).id : undefined) === id);
+      if (!item) return;
+
+      if (isManualEntry(item)) {
+          dispatch(updateManualEntryAmount({ id, amount }));
+      } else {
+          dispatch(setUserAmount({ id, amount }));
+      }
+
+      const appId = generateAppId(item);
+      if (!appId || !calendarEventStatus[appId]) return;
+
+      try {
+          const searchResult = await calendarService.searchEventDetails(appId);
+          if (searchResult.found && searchResult.eventId) {
+              // Güncel description oluştur
+              let description = '';
+              if (isManualEntry(item)) {
+                  description = `Son Ödeme: ${formatDate(item.dueDate)}\nTutar: ${formatCurrency(amount)}`;
+              } else if (isStatement(item)) {
+                  description = `Son Ödeme Tarihi: ${formatDate(item.dueDate)}`;
+                  description += `\nTutar: ${formatCurrency(amount)}`;
+                  if (item.last4Digits) {
+                      description += `\nKart: ...${item.last4Digits}`;
+                  }
+                  description += `\nKaynak: ${item.source.toUpperCase()}`;
+              }
+              description += `\n\n${appId}`;
+
+              await calendarService.updateEvent(searchResult.eventId, undefined, description);
+              dispatch(addToast({ message: 'Takvim etkinliği güncellendi.', duration: 2000, color: 'success' }));
+          }
+      } catch (error: any) {
+          console.error('Error updating calendar event:', error);
+      }
   };
 
   const handleUpdateDueDate = (id: string, dueDate: string) => {

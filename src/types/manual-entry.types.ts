@@ -27,7 +27,7 @@ export interface ManualEntry {
   /**
    * Girdinin türünü belirtir (Borç, Harcama veya Kredi).
    */
-  entryType: 'debt' | 'expense' | 'loan';
+  entryType: 'debt' | 'expense' | 'loan' | 'kmh';
   /**
    * Ödendi durumunu belirtir.
    */

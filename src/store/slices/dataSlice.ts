@@ -16,7 +16,7 @@ type DisplayItem = ParsedStatement | ManualEntry;
 // --- Serialize edilmiş veri tipi (isPaid eklendi) ---
 type SerializableStatement = Omit<ParsedStatement, 'dueDate'> & { id: string; dueDate: string; isPaid?: boolean; userAmount?: number; entryType: 'debt'; };
 // SerializableLoan artık state'te saklanmayacak.
-type SerializableManualEntry = Omit<ManualEntry, 'dueDate'> & { dueDate: string; source: 'manual'; isPaid?: boolean; entryType: 'debt' | 'expense' | 'loan'; installmentCount?: number; };
+type SerializableManualEntry = Omit<ManualEntry, 'dueDate'> & { dueDate: string; source: 'manual'; isPaid?: boolean; entryType: 'debt' | 'expense' | 'loan' | 'kmh'; installmentCount?: number; };
 type SerializableDisplayItem = SerializableStatement | SerializableManualEntry; // SerializableLoan kaldırıldı
 
 // Thunk dönüş tipi: items artık isPaid içerebilir
@@ -336,6 +336,17 @@ const dataSlice = createSlice({
             console.warn(`Item with ID ${id} not found for updating dueDate.`);
         }
     },
+    // Manuel giriş tutarını güncelleme reducer'ı (KMH vb. için)
+    updateManualEntryAmount: (state, action: PayloadAction<{ id: string; amount: number }>) => {
+        const { id, amount } = action.payload;
+        const item = state.items.find(i => i.id === id);
+        if (item && isSerializableManualEntry(item)) {
+            item.amount = amount;
+            console.log(`Manual entry ${id} amount updated to: ${amount}`);
+        } else {
+            console.warn(`Manual entry with ID ${id} not found for updating amount.`);
+        }
+    },
     // Verileri import et (cihazlar arası aktarım için)
     importData: (state, action: PayloadAction<{ items: SerializableDisplayItem[], merge: boolean }>) => {
        const { items: importedItems, merge } = action.payload;
@@ -525,8 +536,8 @@ export const selectTotalDebt = createSelector(
   [selectAllDataWithDates],
   (items): number => {
     return items.reduce((total, item) => {
-      // Ödenmişse veya borç değilse hesaba katma
-      if (item.isPaid || item.entryType !== 'debt') {
+      // Ödenmişse veya borç/KMH değilse hesaba katma
+      if (item.isPaid || (item.entryType !== 'debt' && item.entryType !== 'kmh')) {
           return total;
       }
 
@@ -607,5 +618,5 @@ export const selectGroupedLoans = createSelector(
 
 
 // Yeni action'ı export et
-export const { clearData, addManualEntry, deleteManualEntry, togglePaidStatus, deleteLoan, importData, setUserAmount, clearUserAmount, updateItemDueDate } = dataSlice.actions;
+export const { clearData, addManualEntry, deleteManualEntry, togglePaidStatus, deleteLoan, importData, setUserAmount, clearUserAmount, updateItemDueDate, updateManualEntryAmount } = dataSlice.actions;
 export default dataSlice.reducer;

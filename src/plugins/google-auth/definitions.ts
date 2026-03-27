@@ -50,6 +50,12 @@ export interface GoogleAuthPlugin {
    */
   searchCalendarEvents(options: CalendarSearchOptions): Promise<CalendarSearchResponse>;
 
+  /**
+   * Updates an existing event in the user's primary Google Calendar.
+   * Requires CALENDAR_EVENTS_SCOPE.
+   */
+  updateCalendarEvent(options: CalendarUpdateOptions): Promise<CalendarUpdateResponse>;
+
   // --- GMAIL METODLARI ---
   /**
    * Searches messages matching the query.
@@ -102,7 +108,20 @@ export interface CalendarEventResponse {
 
 export interface CalendarSearchResponse {
   eventFound: boolean;
-  // Native plugin'den dönebilecek diğer alanlar...
+  eventId?: string;
+}
+
+export interface CalendarUpdateOptions {
+  accessToken: string;
+  eventId: string;
+  summary?: string;
+  description?: string;
+}
+
+export interface CalendarUpdateResponse {
+  id: string;
+  summary?: string;
+  updated: boolean;
 }
 
 // --- GMAIL ARAYÜZLERİ ---

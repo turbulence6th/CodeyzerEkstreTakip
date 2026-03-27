@@ -43,7 +43,7 @@ const ManualEntryTab: React.FC = () => {
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState<string>(''); // String olarak alıp sonra sayıya çevireceğiz
     const [dueDate, setDueDate] = useState<string | undefined>(new Date().toISOString()); // ISO 8601 formatında string
-    const [entryType, setEntryType] = useState<'debt' | 'expense' | 'loan'>('debt'); // Kredi eklendi
+    const [entryType, setEntryType] = useState<'debt' | 'expense' | 'loan' | 'kmh'>('debt'); // Kredi ve KMH eklendi
     const [installmentCount, setInstallmentCount] = useState<string>(''); // Kredi için taksit sayısı
     const [formattedDueDate, setFormattedDueDate] = useState<string>(''); // Gösterilecek formatlanmış tarih
 
@@ -173,6 +173,8 @@ const ManualEntryTab: React.FC = () => {
              dispatch(addToast({
                 message: entryType === 'loan'
                     ? `Kredi kaydı başarıyla eklendi. ${parsedInstallmentCount} taksit oluşturulacak.`
+                    : entryType === 'kmh'
+                    ? 'KMH kaydı başarıyla eklendi.'
                     : 'Kayıt başarıyla eklendi.',
                 duration: 2000,
                 color: 'success'
@@ -221,6 +223,7 @@ const ManualEntryTab: React.FC = () => {
                             <IonSelectOption value="debt">Borç</IonSelectOption>
                             <IonSelectOption value="expense">Harcama</IonSelectOption>
                             <IonSelectOption value="loan">Kredi</IonSelectOption>
+                            <IonSelectOption value="kmh">KMH</IonSelectOption>
                         </IonSelect>
                     </IonItem>
 
@@ -236,13 +239,13 @@ const ManualEntryTab: React.FC = () => {
                     </IonItem>
                     <IonItem>
                         <IonInput
-                            label={entryType === 'loan' ? 'Aylık Taksit Tutarı (TL)' : 'Tutar (TL)'}
+                            label={entryType === 'loan' ? 'Aylık Taksit Tutarı (TL)' : entryType === 'kmh' ? 'Kullanılan Tutar (TL)' : 'Tutar (TL)'}
                             labelPlacement="stacked"
                             type="number" // Klavye için
                             inputmode='decimal' // Daha iyi mobil klavye
                             value={amount}
                             onIonInput={(e) => setAmount(e.detail.value!)}
-                            placeholder={entryType === 'loan' ? 'Örn: 500.00' : 'Örn: 1500.50'}
+                            placeholder={entryType === 'loan' ? 'Örn: 500.00' : entryType === 'kmh' ? 'Örn: 10000.00' : 'Örn: 1500.50'}
                             clearInput
                         ></IonInput>
                     </IonItem>
