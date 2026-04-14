@@ -27,6 +27,7 @@ import { qnbEmailParser } from '../email-parsing/parsers/qnb-email-parser';
 
 // SCREENSHOT Parser'ları
 import { akbankScreenshotParser } from '../screenshot-parsing/parsers/akbank-screenshot-parser';
+import { garantiScreenshotParser } from '../screenshot-parsing/parsers/garanti-screenshot-parser';
 
 // Merkezi banka sabitleri
 import { BANK_NAMES } from '../bank-registry';
@@ -48,6 +49,7 @@ export const availableBankProcessors: BankProcessor[] = [
   {
     bankName: BANK_NAMES.GARANTI,
     emailParser: garantiEmailParser,
+    screenshotParser: garantiScreenshotParser,
     gmailQuery: 'from:(garantibbva@garantibbva.com.tr) subject:("Bonus Ekstresi")',
   },
   {
