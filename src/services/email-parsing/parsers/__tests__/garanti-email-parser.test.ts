@@ -117,6 +117,18 @@ describe('Garanti BBVA Email Parser', () => {
             }
         });
 
+        it('should parse fully-masked card number format (5549********3700)', async () => {
+            const html = `<html><body>
+                <span style="color:red;">5549********3700</span>
+                <strong>Toplam Borç Tutarı:</strong><br>+13.775,45 TL
+                <strong>Son Ödeme Tarihi:</strong><br>05.05.2026
+            </body></html>`;
+            const result = await garantiEmailParser.parse(createMockEmail(html));
+            expect(result).not.toBeNull();
+            expect(result!.last4Digits).toBe('3700');
+            expect(result!.amount).toBe(13775.45);
+        });
+
         it('should return null if HTML content is missing', async () => {
             const emailWithoutHtml: EmailDetails = { ...mockEmailDetails, htmlBody: null };
             const result = await garantiEmailParser.parse(emailWithoutHtml);

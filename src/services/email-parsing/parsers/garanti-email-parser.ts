@@ -22,8 +22,9 @@ export const garantiEmailParser: BankEmailParser = {
         let last4Digits: string | undefined = undefined;
 
         // --- Kart Numarası (Son 4 Hane) ---
-        // Örnek: <span style="color:red;">5549 60** **** 3700</span>
-        const cardMatch = content.match(/(\d{4})\s*\d{2}\*\*\s*\*\*\*\*\s*(\d{4})/);
+        // Format A: <span style="color:red;">5549 60** **** 3700</span>
+        // Format B: <span style="color:red;">5549********3700</span>
+        const cardMatch = content.match(/(\d{4})\s*(?:\d{2}\*\*\s*\*\*\*\*|\*{6,12})\s*(\d{4})/);
         if (cardMatch && cardMatch[2]) {
             last4Digits = cardMatch[2];
         } else {
