@@ -1,7 +1,11 @@
 import { readFileSync, writeFileSync } from 'fs';
 
+// CLI: node eml2html.js <input.eml> [output.html]
+const inputPath = process.argv[2] || 'qnb.eml';
+const outputPath = process.argv[3] || inputPath.replace(/\.eml$/i, '') + '.html';
+
 // 1. EML dosyasını oku
-const eml = readFileSync('qnb.eml', 'utf8');
+const eml = readFileSync(inputPath, 'utf8');
 
 // 2. Boundary'yi bul
 const boundaryMatch = eml.match(/boundary="([^"]+)"/);
@@ -80,8 +84,8 @@ for (const part of parts) {
 
 if (html) {
   // 5. HTML dosyasına yaz
-  writeFileSync('garanti-ekstre-sample.html', html, 'utf8');
-  console.log('HTML başarıyla çıkarıldı: garanti-ekstre-sample.html');
+  writeFileSync(outputPath, html, 'utf8');
+  console.log(`HTML başarıyla çıkarıldı: ${outputPath}`);
 } else {
   console.log('HTML content not found.');
 }
