@@ -24,6 +24,7 @@ import { isbankEmailParser } from '../email-parsing/parsers/isbank-email-parser'
 import { kuveytturkEmailParser } from 'services/email-parsing/parsers/kuveytturk-email-parser';
 import { akbankEmailParser } from 'services/email-parsing/parsers/akbank-email-parser';
 import { qnbEmailParser } from '../email-parsing/parsers/qnb-email-parser';
+import { vakifbankEmailParser } from '../email-parsing/parsers/vakifbank-email-parser';
 
 // SCREENSHOT Parser'ları
 import { akbankScreenshotParser } from '../screenshot-parsing/parsers/akbank-screenshot-parser';
@@ -72,6 +73,12 @@ export const availableBankProcessors: BankProcessor[] = [
     bankName: BANK_NAMES.QNB,
     emailParser: qnbEmailParser,
     gmailQuery: 'from:(eekstre@eekstre.qnb.com.tr)',
+  },
+  {
+    bankName: BANK_NAMES.VAKIFBANK,
+    emailParser: vakifbankEmailParser,
+    // Bu adres sadece ekstre gönderimi için kullanılıyor; konu kontrolü canParse içinde yapılıyor
+    gmailQuery: 'from:(kkm.ekstre@vakifbank.com.tr)',
   },
   // ... Diğer bankalar eklenebilir
 ];

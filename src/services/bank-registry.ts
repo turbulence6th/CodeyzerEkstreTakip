@@ -7,6 +7,7 @@ export const BANK_NAMES = {
   KUVEYT_TURK: 'Kuveyt Türk',
   IS_BANKASI: 'İş Bankası',
   QNB: 'QNB Finansbank',
+  VAKIFBANK: 'VakıfBank',
 } as const;
 
 export type BankName = typeof BANK_NAMES[keyof typeof BANK_NAMES];
@@ -20,6 +21,7 @@ const BANK_ALIASES: Record<BankName, string[]> = {
   [BANK_NAMES.KUVEYT_TURK]: ['kuveyt türk', 'kuveytturk'],
   [BANK_NAMES.IS_BANKASI]: ['iş bankası', 'isbank'],
   [BANK_NAMES.QNB]: ['qnb', 'finansbank'],
+  [BANK_NAMES.VAKIFBANK]: ['vakıfbank', 'vakifbank', 'vakıf bank', 'vakif bank'],
 };
 
 // Tüm bilinen banka adlarını ve alias'larını döndürür (lowercase)

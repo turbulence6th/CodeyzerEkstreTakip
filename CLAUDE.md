@@ -3,7 +3,7 @@
 Bu proje, banka ekstre e-postalarını ve ekran görüntülerini okuyarak kredi kartı son ödeme tarihlerini ve kredi ilk ödeme tarihlerini listeleyen, React/Ionic/Capacitor ile oluşturulmuş bir **Android ve iOS** uygulamasıdır. Önemli ödeme tarihlerini takip etmelerine yardımcı olmak amacıyla Google Takvim ile isteğe bağlı entegrasyon sunar ve finansal takibi otomatikleştirmeyi, manuel veri girişini azaltmayı hedefler.
 
 ## Temel Özellikler:
-*   **Otomatik Veri Ayrıştırma:** Belirli bankalardan gelen e-postaları (Gmail) (Yapı Kredi, Ziraat Bankası, İş Bankası, Garanti BBVA Bonus, Kuveyt Türk, Akbank, QNB Finansbank) işler. Son ödeme tarihlerini, kredi ödeme tarihlerini ve diğer ilgili finansal bilgileri çıkarır. E-posta ekleri (örn. PDF) ayrıştırılabilir. **Son 2 ay içindeki e-postaları** otomatik olarak tarar (performans ve veri yönetimi için).
+*   **Otomatik Veri Ayrıştırma:** Belirli bankalardan gelen e-postaları (Gmail) (Yapı Kredi, Ziraat Bankası, İş Bankası, Garanti BBVA Bonus, Kuveyt Türk, Akbank, QNB Finansbank, VakıfBank) işler. Son ödeme tarihlerini, kredi ödeme tarihlerini ve diğer ilgili finansal bilgileri çıkarır. E-posta ekleri (örn. PDF) ayrıştırılabilir. **Son 2 ay içindeki e-postaları** otomatik olarak tarar (performans ve veri yönetimi için).
 *   **OCR ile Ekran Görüntüsü Ayrıştırma:** Banka mobil uygulamalarından alınan ekran görüntülerini okuyarak otomatik ekstre kaydı oluşturur. Android'de Google ML Kit, iOS'te Vision framework kullanılır. Akbank (Akbank, Axess, Wings) kart markaları desteklenir. OCR ile kart numarası, son ödeme tarihi ve ekstre tutarı çıkarılır.
 *   **Manuel Giriş:** Otomatik olarak algılanmayan ödeme kayıtlarını manuel olarak eklemeye olanak tanır. Ekran görüntüsünden otomatik form doldurma desteklenir. Desteklenen kayıt türleri: Borç, Harcama, Kredi ve KMH (Kredili Mevduat Hesabı).
 *   **KMH Takibi:** Kredili Mevduat Hesabı borçları ayrı bir kayıt türü (`kmh`) olarak takip edilir. KMH kayıtları toplam borç hesaplamasına dahildir. Swipe ile tutar güncellenebilir ve takvim etkinliği otomatik güncellenir.
@@ -85,12 +85,13 @@ Bu proje, banka ekstre e-postalarını ve ekran görüntülerini okuyarak kredi 
 │   │   ├── ocr.service.ts        # OCR servis katmanı
 │   │   ├── bank-registry.ts      # Banka adları, alias'lar ve normalizasyon
 │   │   ├── email-parsing/
-│   │   │   └── parsers/          # E-posta ayrıştırıcıları (7 banka)
+│   │   │   └── parsers/          # E-posta ayrıştırıcıları (8 banka)
 │   │   │       ├── akbank-email-parser.ts
 │   │   │       ├── garanti-email-parser.ts
 │   │   │       ├── isbank-email-parser.ts
 │   │   │       ├── kuveytturk-email-parser.ts
 │   │   │       ├── qnb-email-parser.ts
+│   │   │       ├── vakifbank-email-parser.ts
 │   │   │       ├── yapikredi-email-parser.ts
 │   │   │       └── ziraat-email-parser.ts
 │   │   ├── statement-parsing/
